@@ -19,7 +19,7 @@ Detailed documentation (pipeline steps, settings, dashboard features, directory 
 
 3) **Host-aware coverage.** Coverage is counted on **human-derived genomes by default**; switch to animal, unknown or all with one click. Laboratory-host genomes are excluded everywhere.
 
-4) **Resolved by lineage (LI–LVII).** Coverage per lineage (LI–LVII), strand-normalised multiple alignment of the amplicon with F/Probe/R positions, reference coordinates and a nucleotide-diversity (π) track.
+4) **Resolved by lineage (LI–LVII).** Coverage per lineage, strand-normalised multiple alignment of the amplicon with F/Probe/R positions, reference coordinates and a nucleotide-diversity (π) track.
 
 5) **Panels of several sets.** Group sets, see the union coverage, and detect **cross-binding** (set 1’s forward primer with set 2’s reverse primer).
 
@@ -107,17 +107,17 @@ curl -L -o webapp/static/vendor/peartree.bundle.min.js \
   https://github.com/artic-network/peartree/releases/latest/download/peartree.bundle.min.js
 ```
 
-# Running the tool
+## Running the tool
 
 *Required input:* one or more **primer/probe sets** (and, optionally, **standard-material** sequences). The genomes are downloaded for you.
 
-**Start the dashboard**
+**Start the dashboard** — the interface is in Korean by default; the **EN** button at the top switches it to English.
 
 ```bash
 ./start.sh            # http://localhost:8765   (127.0.0.1 only — there is no login)
 ```
 
-**Enter your primer/probe sets** on the dashboard page **📝 Primer input / manage** (“📝 프라이머 입력 / 관리”; Excel download/upload supported), or edit `config/primers.tsv` (tab-separated):
+**Enter your primer/probe sets** on the dashboard page **📝 Primer input / manage** (Excel download/upload supported), or edit `config/primers.tsv` (tab-separated):
 
 | column | meaning |
 |---|---|
@@ -169,7 +169,7 @@ python3 webapp/server.py --host 0.0.0.0 --port 8765
 Primer, probe, standard-material and genome (FASTA) **sequences and analysis results are never committed** — they live in `config/`, `data/` and `output/`, which are git-ignored,
 and `tests/test_no_sequences_in_repo.py` fails if a sequence slips in. Tests generate their nucleotide strings (`tests/seqgen.py`). Vendor names in this public copy are neutral (VendorA …).
 
-# Citation
+## Citation
 
 There is no publication for this tool yet. Please cite the software as below, **and** the tools it builds on.
 

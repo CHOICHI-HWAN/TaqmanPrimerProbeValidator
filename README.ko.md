@@ -20,7 +20,7 @@ LASV 에디션은 두 분절(S, L)을 다루며, 유전체와 메타데이터는
 
 3) **숙주를 구분한 커버리지.** 기본은 **사람 유래 게놈** 기준이고, 클릭 한 번으로 동물·미상·전체로 바꿉니다. 실험 숙주 게놈은 어디에서도 제외합니다.
 
-4) **리니지(LI~LVII)별 결과.** 리니지(LI~LVII)별 커버리지, 방향을 맞춘 amplicon 다중 정렬(F/Probe/R 위치, 참조 좌표, 뉴클레오타이드 다양성 π 막대).
+4) **리니지(LI~LVII)별 결과.** 리니지별 커버리지, 방향을 맞춘 amplicon 다중 정렬(F/Probe/R 위치, 참조 좌표, 뉴클레오타이드 다양성 π 막대).
 
 5) **여러 세트 묶음(패널).** 합집합 커버리지와 **교차 결합**(세트 1의 forward + 세트 2의 reverse)을 확인합니다.
 
@@ -91,7 +91,7 @@ chmod +x /경로/mfeprimer-4.2.4-linux-amd64
 
 - `./setup.sh`가 묻는 경로에 입력, 또는 `./setup.sh --mfeprimer /경로/mfeprimer-4.2.4-linux-amd64 --yes`
 - `config/config.yaml`에 `mfeprimer_bin: "/경로/mfeprimer-4.2.4-linux-amd64"`
-- 대시보드 **"Analysis Parameters"** 페이지에서 입력 (저장할 때 한 번 실행해서 확인)
+- 대시보드 **"분석 파라미터"** 페이지에서 입력 (저장할 때 한 번 실행해서 확인)
 - 환경변수 `MFEPRIMER_BIN=/경로/mfeprimer-4.2.4-linux-amd64`
 - 비워 두면 `../*/mfeprimer/` 또는 `PATH`에서 찾습니다
 
@@ -108,11 +108,11 @@ curl -L -o webapp/static/vendor/peartree.bundle.min.js \
   https://github.com/artic-network/peartree/releases/latest/download/peartree.bundle.min.js
 ```
 
-# 실행하기
+## 실행하기
 
 *필수 입력:* **프라이머/프로브 세트** 하나 이상(그리고 선택적으로 **표준물질** 서열). 유전체는 자동으로 내려받습니다.
 
-**대시보드 시작**
+**대시보드 시작** — 화면은 기본이 한국어이고, 상단의 **EN** 버튼으로 영어로 바꿉니다.
 
 ```bash
 ./start.sh            # http://localhost:8765   (127.0.0.1에서만 열림 — 로그인이 없습니다)
@@ -170,7 +170,7 @@ python3 webapp/server.py --host 0.0.0.0 --port 8765
 프라이머·프로브·표준물질·게놈(FASTA) **서열과 분석 결과는 커밋하지 않습니다.** `config/`, `data/`, `output/`에 두고(git 제외),
 서열이 섞이면 `tests/test_no_sequences_in_repo.py`가 실패합니다. 테스트의 염기서열은 `tests/seqgen.py`가 만들어 씁니다. 공개 저장소의 업체명은 일반 이름(VendorA …)입니다.
 
-# 인용
+## 인용
 
 아직 이 도구의 논문은 없습니다. 아래처럼 이 소프트웨어를 인용하고, **바탕이 된 도구도 함께** 인용해 주세요.
 
