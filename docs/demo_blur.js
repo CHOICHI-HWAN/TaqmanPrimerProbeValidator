@@ -1,24 +1,23 @@
 // Demo mode for recording screenshots / GIFs of the dashboard: blurs everything that must not be shown.
-//   - vendor / supplier names (see VENDOR_RE; edit the list for your own partners)
+//   - the words you list in window.__demoBlurWords BEFORE loading this file: vendor / supplier names, standard-material names, ...
+//     (nothing is built in, so no partner names live in this repository), e.g.  window.__demoBlurWords = ["AcmeOligo", "STD-01"]
 //   - nucleotide strings (primers, probes, standard materials, genome pieces): 10 or more bases in a row
 //   - the primer/probe row, the consensus row and the amplicon alignment of the MSA / binding pop-ups
 //   - sequence input boxes (primer forms, standard-material forms) and standard-material names in pop-ups
 // Paste this file into the browser console (or run it with the browser tool) on the dashboard page; it keeps working while the
 // page re-renders. `window.__demoBlurOff()` removes it.
 (function () {
-  const VENDOR_RE = /(?<![A-Za-z])(VendorA|VendorA|VendorB|VendorC|VendorD)(?![A-Za-z])/gi;
   const SEQ_RE = /(?<![A-Za-z0-9_])[ACGTURYKMSWBDHVNacgturykmswbdhvn]{10,}(?![A-Za-z0-9_])/g;
   const BLUR_SELECTORS = [".msa-arrow-row .msa-seq", ".msa-consensus .msa-seq", ".amp-align", ".standard-material-block .amp-align",
     "textarea", ".seq-box", ".mono.seq", "td.seq", ".primer-seq",
     ".standard-material-id", ".modal-box table td:first-child"].join(",");        // standard-material names (pop-ups)
   const PX = 7;
 
-  // extra words to hide anywhere they appear (e.g. the names of your standard materials): set window.__demoBlurWords = [...] BEFORE
-  // loading this file; the dashboard's standard-material names are added automatically below.
+  // words to hide wherever they appear as a whole word (letters/digits on either side do not count): window.__demoBlurWords
   // pure: [start, end) ranges of the text that must be hidden (exported for the tests)
   function sensitiveRanges(text, words) {
     const out = [];
-    const res = [VENDOR_RE, SEQ_RE];
+    const res = [SEQ_RE];
     if (words && words.length) res.push(new RegExp("(?<![A-Za-z0-9])(" + words.map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|") + ")(?![A-Za-z0-9])", "g"));
     for (const re of res) {
       re.lastIndex = 0;
