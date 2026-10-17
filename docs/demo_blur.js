@@ -4,6 +4,10 @@
 //   - nucleotide strings (primers, probes, standard materials, genome pieces): 10 or more bases in a row
 //   - the primer/probe row, the consensus row and the amplicon alignment of the MSA / binding pop-ups
 //   - sequence input boxes (primer forms, standard-material forms) and standard-material names in pop-ups
+// Collect the names that identify your sets (set names, sources/vendors, standard-material names) from the dashboard, then load this file:
+//   const get = async (u) => (await fetch(u)).json();
+//   const [std, sets] = await Promise.all([get("/api/standards/manifest"), get("/api/sets")]);
+//   window.__demoBlurWords = [...new Set([...std.rows.map((r) => r.name), ...sets.flatMap((s) => [s.display_name, s.source])])].filter(Boolean);
 // Paste this file into the browser console (or run it with the browser tool) on the dashboard page; it keeps working while the
 // page re-renders. `window.__demoBlurOff()` removes it.
 (function () {
