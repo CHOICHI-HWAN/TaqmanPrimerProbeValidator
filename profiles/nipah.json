@@ -1,0 +1,60 @@
+{
+  "profile_version": 1,
+  "id": "nipah",
+  "name": "Nipah henipavirus (Henipavirus nipahense)",
+  "short_name": "NiV",
+
+  "source": {
+    "type": "nextstrain",
+    "base_url": "https://data.nextstrain.org/files/workflows/nipah",
+    "segment_subdirs": false,
+    "sequences_file": "sequences.fasta.zst",
+    "metadata_file": "metadata.tsv.zst"
+  },
+
+  "segments": {
+    "genome": {"label": "Genome", "min_len": 17000, "lineage_col": "clade", "reference_accession": "NC_002728"}
+  },
+
+  "metadata": {
+    "accession": "accession",
+    "lineage_fallback": "clade",
+    "date": "date",
+    "country": "country",
+    "region": "region"
+  },
+
+  "lineage": {
+    "label": "Clade",
+    "mode": "auspice_clades",
+    "auspice": "data/nextstrain/nipah_all.json",
+    "attr": "clade_membership",
+    "missing": "unclassified"
+  },
+
+  "qc": {
+    "max_n_fraction": 0.01,
+    "exclude_list": "data/nextstrain/exclude.txt"
+  },
+
+  "population": {
+    "pooled_label": "ALL_NIV",
+    "chrom_prefix": "NIV"
+  },
+
+  "diversity": {
+    "window_size": 1,
+    "min_coverage": 0.95,
+    "min_identity": 0.65,
+    "min_lineage_n": 10
+  },
+
+  "ui": {
+      "name_ko": "니파 바이러스",
+      "web_url": "https://nextstrain.org/staging/nipah/all",
+      "lineage_ko": "클레이드",
+      "lineage_examples": "I, Ia, Ib, II",
+      "lineage_def": "계통수 상에서 공통 조상을 공유하는 게놈들의 그룹 — 니파 바이러스는 Nextstrain nipah 워크플로가 정의한 I, Ia, Ib, II 클레이드로 분류된다(이 도구에서는 로컬 nextstrain build 결과의 clade_membership를 사용).",
+      "orientation_note": ""
+  }
+}

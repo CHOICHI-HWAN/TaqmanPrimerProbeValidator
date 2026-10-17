@@ -1,0 +1,240 @@
+/* Vaadin "Lumo" look for the dashboard -- an opt-in skin layered on top of style.css.
+ *
+ * Active when <html data-skin="lumo"> (the default; the sidebar footer toggles back to the
+ * classic skin, persisted in localStorage like the light/dark choice). Everything here is
+ * scoped under :root[data-skin="lumo"], so removing this file or the attribute restores the
+ * original look unchanged. Values follow Lumo's own tokens (Vaadin 24): the 214deg blue
+ * primary, blue-tinted translucent "contrast" greys, 4px component corners / 8px surfaces,
+ * 36px controls, 500-weight labels, small tight shadows -- and Lumo's default system font stack,
+ * so nothing needs to be downloaded (works offline). */
+
+/* ---------- tokens ---------- */
+:root[data-skin="lumo"] {
+  --lumo-primary: hsl(214, 100%, 48%);
+  --lumo-primary-text: hsl(214, 100%, 43%);
+  --lumo-primary-10: hsla(214, 100%, 48%, .1);
+  --lumo-c5: hsla(214, 61%, 25%, .05);
+  --lumo-c10: hsla(214, 57%, 24%, .1);
+  --lumo-c20: hsla(214, 53%, 23%, .16);
+
+  --bg: #fff; --fg: hsla(214, 35%, 15%, .94); --muted: hsla(214, 42%, 18%, .72);
+  --border: hsla(214, 53%, 23%, .16);
+  --card: #fff; --sidebar-bg: hsl(214, 50%, 98%);
+  --accent: var(--lumo-primary); --accent2: hsl(36, 100%, 45%);
+  --seg-s: var(--lumo-primary-text); --seg-l: hsl(3, 85%, 48%);
+  --ok: hsl(145, 72%, 31%); --warn: hsl(32, 90%, 38%); --bad: hsl(3, 85%, 48%);
+
+  --font-ui: -apple-system, BlinkMacSystemFont, "Roboto", "Segoe UI", Pretendard, "Noto Sans KR", Helvetica, Arial, sans-serif;
+
+  --fs-2xs: 11px; --fs-xs: 12px; --fs-sm: 13px; --fs-base: 14px; --fs-md: 15px; --fs-lg: 16px;
+  --fs-xl: 20px; --fs-2xl: 24px; --fs-stat: 28px;
+
+  --r-xs: 3px; --r-sm: 4px; --r-md: 4px; --r-lg: 8px; --r-xl: 8px; --r-pill: 999px;
+  --btn-sm-pad: 5px 10px;
+
+  --shadow-sm: 0 1px 4px -1px hsla(214, 45%, 20%, .26);
+  --shadow-md: 0 2px 6px -1px hsla(214, 45%, 20%, .3), 0 8px 24px -4px hsla(214, 45%, 20%, .25);
+  --shadow-lg: 0 3px 18px -2px hsla(214, 45%, 20%, .28), 0 12px 48px -6px hsla(214, 45%, 20%, .4);
+  --ease: cubic-bezier(.4, 0, .2, 1);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-skin="lumo"]:not([data-theme="light"]) {
+    --lumo-primary: hsl(214, 90%, 52%); --lumo-primary-text: hsl(214, 100%, 70%);
+    --lumo-primary-10: hsla(214, 90%, 52%, .18);
+    --lumo-c5: hsla(214, 65%, 85%, .06); --lumo-c10: hsla(214, 60%, 80%, .14); --lumo-c20: hsla(214, 64%, 82%, .31);
+    --bg: hsl(214, 35%, 21%); --fg: hsla(214, 100%, 98%, .9); --muted: hsla(214, 90%, 88%, .69);
+    --border: hsla(214, 64%, 82%, .31); --card: hsl(214, 35%, 21%); --sidebar-bg: hsl(214, 35%, 17%);
+    --ok: hsl(145, 65%, 42%); --warn: hsl(36, 100%, 55%); --bad: hsl(3, 100%, 61%); --seg-l: hsl(3, 100%, 61%);
+  }
+}
+:root[data-skin="lumo"][data-theme="dark"] {
+  --lumo-primary: hsl(214, 90%, 52%); --lumo-primary-text: hsl(214, 100%, 70%);
+  --lumo-primary-10: hsla(214, 90%, 52%, .18);
+  --lumo-c5: hsla(214, 65%, 85%, .06); --lumo-c10: hsla(214, 60%, 80%, .14); --lumo-c20: hsla(214, 64%, 82%, .31);
+  --bg: hsl(214, 35%, 21%); --fg: hsla(214, 100%, 98%, .9); --muted: hsla(214, 90%, 88%, .69);
+  --border: hsla(214, 64%, 82%, .31); --card: hsl(214, 35%, 21%); --sidebar-bg: hsl(214, 35%, 17%);
+  --ok: hsl(145, 65%, 42%); --warn: hsl(36, 100%, 55%); --bad: hsl(3, 100%, 61%); --seg-l: hsl(3, 100%, 61%);
+}
+
+/* ---------- base ---------- */
+:root[data-skin="lumo"] body { font-family: var(--font-ui); }
+:root[data-skin="lumo"] .main { background: var(--bg); }
+:root[data-skin="lumo"] h2, :root[data-skin="lumo"] h3 { font-weight: 600; letter-spacing: -.005em; }
+:root[data-skin="lumo"] .detail-header h2 { font-family: var(--font-ui); }
+:root[data-skin="lumo"] a { color: var(--lumo-primary-text); }
+
+/* ---------- sidebar ---------- */
+:root[data-skin="lumo"] .sidebar {
+  background: var(--sidebar-bg); backdrop-filter: none; -webkit-backdrop-filter: none;
+  border-right: 1px solid var(--lumo-c10);
+}
+:root[data-skin="lumo"] .sidebar-header h1 { font-weight: 600; }
+:root[data-skin="lumo"] .confidential-banner { border-radius: 4px; }
+:root[data-skin="lumo"] .theme-toggle-btn { background: var(--lumo-c5); border-color: transparent; }
+:root[data-skin="lumo"] .theme-toggle-btn:hover { background: var(--lumo-primary-10); color: var(--lumo-primary-text); }
+
+/* ---------- buttons: 36px, 4px corners, tertiary-style by default ---------- */
+:root[data-skin="lumo"] .btn {
+  border-radius: 4px; min-height: 36px; padding: 0 14px; font-weight: 500;
+  transition: background-color .1s, box-shadow .1s, opacity .1s;
+}
+:root[data-skin="lumo"] .btn:active { transform: none; opacity: .8; }
+:root[data-skin="lumo"] .btn-primary { background: var(--lumo-primary); color: #fff; font-weight: 600; box-shadow: none; }
+:root[data-skin="lumo"] .btn-primary:hover { opacity: 1; background: hsl(214, 100%, 44%); box-shadow: none; transform: none; }
+:root[data-skin="lumo"] .btn-secondary { background: var(--lumo-c5); color: var(--lumo-primary-text); border: none; }
+:root[data-skin="lumo"] .btn-secondary:hover { background: var(--lumo-primary-10); color: var(--lumo-primary-text); box-shadow: none; }
+:root[data-skin="lumo"] .btn:disabled { opacity: .5; cursor: not-allowed; }
+:root[data-skin="lumo"] .btn-block { border-radius: 4px; margin-bottom: 6px; text-align: left; }
+:root[data-skin="lumo"] .group-bar-row .btn, :root[data-skin="lumo"] .pipeline-btn-row .btn,
+:root[data-skin="lumo"] .btn-fullscreen { min-height: 28px; padding: 0 10px; }
+:root[data-skin="lumo"] .btn:focus-visible, :root[data-skin="lumo"] .seg-tab:focus-visible {
+  outline: 2px solid var(--lumo-primary); outline-offset: 1px;
+}
+
+/* ---------- fields: filled style, focus ring ---------- */
+:root[data-skin="lumo"] .search-box,
+:root[data-skin="lumo"] .group-bar input[type=text],
+:root[data-skin="lumo"] .form-grid input[type=text], :root[data-skin="lumo"] .form-grid input[type=number],
+:root[data-skin="lumo"] .form-grid select, :root[data-skin="lumo"] .form-grid textarea,
+:root[data-skin="lumo"] .diversity-toolbar input, :root[data-skin="lumo"] .diversity-toolbar select,
+:root[data-skin="lumo"] .diversity-smooth-label select {
+  background: var(--lumo-c10); border: 1px solid transparent; border-radius: 4px; color: var(--fg);
+  min-height: 36px; padding: 0 10px;
+}
+:root[data-skin="lumo"] .form-grid textarea { padding: 8px 10px; }
+:root[data-skin="lumo"] .search-box:focus, :root[data-skin="lumo"] .group-bar input:focus,
+:root[data-skin="lumo"] .form-grid input:focus, :root[data-skin="lumo"] .form-grid select:focus,
+:root[data-skin="lumo"] .form-grid textarea:focus, :root[data-skin="lumo"] .diversity-toolbar input:focus,
+:root[data-skin="lumo"] .diversity-toolbar select:focus {
+  outline: none; border-color: var(--lumo-primary); background: var(--bg);
+  box-shadow: 0 0 0 2px var(--lumo-primary-10), 0 0 0 1px var(--lumo-primary);
+}
+:root[data-skin="lumo"] input[type=checkbox] { accent-color: var(--lumo-primary); }
+:root[data-skin="lumo"] .form-grid label { font-weight: 500; }
+
+/* ---------- list items / group items ---------- */
+:root[data-skin="lumo"] .set-item { border-radius: 4px; background: transparent; border: none; padding: 8px 10px; }
+:root[data-skin="lumo"] .set-item:hover { background: var(--lumo-c5); border: none; transform: none; }
+:root[data-skin="lumo"] .set-item.active { background: var(--lumo-primary-10); box-shadow: inset 3px 0 0 var(--lumo-primary); border: none; }
+:root[data-skin="lumo"] .set-item .name { font-family: var(--font-ui); font-weight: 500; }
+:root[data-skin="lumo"] .set-item .bar { border-radius: 2px; background: var(--lumo-c10); }
+:root[data-skin="lumo"] .group-item { border-radius: 4px; border: 1px dashed var(--lumo-primary); background: var(--lumo-primary-10); }
+:root[data-skin="lumo"] .group-item.active { border-style: solid; }
+:root[data-skin="lumo"] .group-chip, :root[data-skin="lumo"] .group-bar { border-radius: 4px; }
+:root[data-skin="lumo"] .group-bar { background: var(--lumo-c5); border-color: var(--lumo-primary); }
+
+/* ---------- badges ---------- */
+:root[data-skin="lumo"] .pill { border-radius: 4px; padding: 2px 8px; font-weight: 500; }
+:root[data-skin="lumo"] .pill-s, :root[data-skin="lumo"] .pill-S { background: var(--lumo-primary-10); color: var(--lumo-primary-text); }
+:root[data-skin="lumo"] .pill-l, :root[data-skin="lumo"] .pill-L { background: hsla(3, 85%, 48%, .12); color: var(--bad); }
+:root[data-skin="lumo"] .pill-ok, :root[data-skin="lumo"] .pill-user { background: hsla(145, 72%, 31%, .12); color: var(--ok); }
+:root[data-skin="lumo"] .pill-bad { background: hsla(3, 85%, 48%, .12); color: var(--bad); }
+:root[data-skin="lumo"] .pill-warn { background: hsla(36, 100%, 50%, .16); color: var(--warn); }
+:root[data-skin="lumo"] .ox-o { background: hsla(145, 72%, 31%, .14); }
+:root[data-skin="lumo"] .ox-x { background: hsla(3, 85%, 48%, .14); }
+
+/* ---------- surfaces: Lumo "card" = 8px radius, hairline outline, small shadow ---------- */
+:root[data-skin="lumo"] .card, :root[data-skin="lumo"] .stat-tile {
+  background: var(--card); border: 1px solid var(--lumo-c10); border-radius: 8px; box-shadow: none;
+}
+:root[data-skin="lumo"] .card:hover, :root[data-skin="lumo"] .stat-tile:hover { box-shadow: var(--shadow-sm); transform: none; }
+:root[data-skin="lumo"] .diversity-chart-card, :root[data-skin="lumo"] .meta-map-card, :root[data-skin="lumo"] .meta-stat-card,
+:root[data-skin="lumo"] .diversity-qc, :root[data-skin="lumo"] .std-banner, :root[data-skin="lumo"] .pipeline-status {
+  background: var(--card); border-color: var(--lumo-c10); border-radius: 8px;
+}
+:root[data-skin="lumo"] .assessment-card, :root[data-skin="lumo"] .std-banner { border-left-width: 4px; }
+:root[data-skin="lumo"] .card h3, :root[data-skin="lumo"] .stat-tile .label { color: var(--muted); font-weight: 500; text-transform: none; letter-spacing: 0; }
+:root[data-skin="lumo"] .card-ctrl-btn { border-radius: 4px; background: transparent; border-color: transparent; }
+:root[data-skin="lumo"] .card-ctrl-btn:hover { background: var(--lumo-c10); color: var(--lumo-primary-text); }
+:root[data-skin="lumo"] .active-jobs-banner { border-radius: 4px; }
+
+/* ---------- tables = Vaadin Grid ---------- */
+:root[data-skin="lumo"] .genome-table-wrap, :root[data-skin="lumo"] .table-wrap, :root[data-skin="lumo"] .primers-grid-wrap {
+  border: 1px solid var(--lumo-c10); border-radius: 8px; background: var(--bg);
+}
+:root[data-skin="lumo"] table.genome-table th, :root[data-skin="lumo"] table.heatmap th,
+:root[data-skin="lumo"] table.primers-table thead th {
+  background: var(--bg); color: var(--muted); font-weight: 500; font-size: var(--fs-xs);
+  border-bottom: 1px solid var(--lumo-c20);
+}
+:root[data-skin="lumo"] table.genome-table td, :root[data-skin="lumo"] table.heatmap td { border-bottom: 1px solid var(--lumo-c10); }
+:root[data-skin="lumo"] table.genome-table tbody tr:hover td, :root[data-skin="lumo"] table.genome-table tr.genome-row:hover { background: var(--lumo-c5); }
+:root[data-skin="lumo"] table.cov-heatmap tr.cov-heat-row:hover { background: var(--lumo-c5); }
+:root[data-skin="lumo"] table.primers-table th, :root[data-skin="lumo"] table.primers-table td { border-color: var(--lumo-c10); }
+:root[data-skin="lumo"] table.primers-table td:focus-within { outline-color: var(--lumo-primary); background: var(--lumo-primary-10); }
+:root[data-skin="lumo"] table.primers-table td.row-num, :root[data-skin="lumo"] table.primers-table thead th.row-num,
+:root[data-skin="lumo"] table.primers-table td.add-date-cell, :root[data-skin="lumo"] table.primers-table td.primer-id-cell,
+:root[data-skin="lumo"] table.primers-table td.del-cell { background: var(--lumo-c5); }
+:root[data-skin="lumo"] td.mm { border-radius: 3px; }
+
+/* ---------- tabs: Lumo underline tabs ---------- */
+:root[data-skin="lumo"] .seg-tab-row { gap: 0; border-bottom: 1px solid var(--lumo-c10); margin-bottom: 16px; }
+:root[data-skin="lumo"] .seg-tab {
+  background: transparent; border: none; border-radius: 0; padding: 10px 16px; font-size: var(--fs-base);
+  font-weight: 500; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+:root[data-skin="lumo"] .seg-tab:hover { color: var(--fg); background: var(--lumo-c5); }
+:root[data-skin="lumo"] .seg-tab.active { background: transparent; color: var(--lumo-primary-text); border-bottom-color: var(--lumo-primary); font-weight: 600; }
+
+/* ---------- misc ---------- */
+:root[data-skin="lumo"] .meta-year-legend-chip { border-radius: 4px; }
+:root[data-skin="lumo"] .diversity-tip { border-radius: 4px; box-shadow: var(--shadow-md); }
+:root[data-skin="lumo"] .modal-box, :root[data-skin="lumo"] .verify-modal-box { border-radius: 8px; box-shadow: var(--shadow-lg); }
+:root[data-skin="lumo"] details > summary { color: var(--lumo-primary-text); cursor: pointer; }
+:root[data-skin="lumo"] .skin-toggle { color: var(--muted); }
+
+/* skin toggle (shown in both skins) */
+.skin-toggle { background: none; border: none; padding: 0 4px; font: inherit; font-size: inherit; cursor: pointer; text-decoration: underline; color: var(--muted); }
+.skin-toggle:hover { color: var(--accent); }
+
+/* dialogs */
+:root[data-skin="lumo"] .ui-dialog { border-radius: 8px; }
+:root[data-skin="lumo"] .modal-head { border-bottom: none; padding-bottom: 4px; }
+:root[data-skin="lumo"] .ui-dialog-input { background: var(--lumo-c10); border-color: transparent; border-radius: 4px; min-height: 36px; }
+:root[data-skin="lumo"] .ui-dialog-input:focus { border-color: var(--lumo-primary); background: var(--bg); box-shadow: 0 0 0 2px var(--lumo-primary-10); }
+:root[data-skin="lumo"] .btn-danger { background: var(--bad); color: #fff; }
+
+/* metadata spreadsheet */
+:root[data-skin="lumo"] .mt-global { background: var(--lumo-c10); border-color: transparent; border-radius: 4px; min-height: 36px; }
+:root[data-skin="lumo"] .mt-global:focus { background: var(--bg); border-color: var(--lumo-primary); box-shadow: 0 0 0 2px var(--lumo-primary-10); }
+:root[data-skin="lumo"] .mt-seg { border-radius: 4px; border-color: var(--lumo-c20); }
+:root[data-skin="lumo"] .mt-seg button { background: transparent; color: var(--lumo-primary-text); font-weight: 500; }
+:root[data-skin="lumo"] .mt-seg button.active { background: var(--lumo-primary); color: #fff; }
+:root[data-skin="lumo"] .mt-wrap { border-color: var(--lumo-c10); border-radius: 8px; }
+:root[data-skin="lumo"] .mt-table thead th, :root[data-skin="lumo"] .mt-table thead tr.mt-filter-row th { background: var(--bg); color: var(--muted); font-weight: 500; }
+:root[data-skin="lumo"] .mt-table th.sorted { color: var(--lumo-primary-text); }
+:root[data-skin="lumo"] .mt-table th, :root[data-skin="lumo"] .mt-table td { border-color: var(--lumo-c10); }
+:root[data-skin="lumo"] .mt-filter-row input { background: var(--lumo-c10); border-color: transparent; }
+:root[data-skin="lumo"] .mt-filter-row input:focus { background: var(--bg); border-color: var(--lumo-primary); }
+:root[data-skin="lumo"] .mt-funnel.on, :root[data-skin="lumo"] .mt-chip { background: var(--lumo-primary-10); color: var(--lumo-primary-text); }
+:root[data-skin="lumo"] .mt-funnel.on { background: var(--lumo-primary); color: #fff; }
+:root[data-skin="lumo"] .mt-menu { border-radius: 8px; }
+:root[data-skin="lumo"] .mt-menu-search { background: var(--lumo-c10); border-color: transparent; }
+
+/* tour */
+:root[data-skin="lumo"] .tour-card { border-radius: 8px; }
+:root[data-skin="lumo"] .tour-spot { box-shadow: 0 0 0 9999px rgba(15,18,24,.58), 0 0 0 2px var(--lumo-primary); border-radius: 4px; }
+:root[data-skin="lumo"] .std-seq-text { background: var(--lumo-c10); border-color: transparent; border-radius: 4px; }
+:root[data-skin="lumo"] .std-seq-btn:hover { background: var(--lumo-primary-10); }
+
+/* spreadsheet grid */
+:root[data-skin="lumo"] .xl-mode-btn.is-on { background: var(--lumo-primary); color: #fff; }
+:root[data-skin="lumo"] .xl-grid th, :root[data-skin="lumo"] .xl-grid td { border-color: var(--lumo-c10); }
+:root[data-skin="lumo"] .xl-grid th { background: linear-gradient(var(--lumo-c5), var(--lumo-c5)), var(--bg); }
+:root[data-skin="lumo"] .xl-grid td.xl-st { background: var(--bg); }
+:root[data-skin="lumo"] .xl-grid td.ro { background: linear-gradient(var(--lumo-c5), var(--lumo-c5)), var(--bg); }
+:root[data-skin="lumo"] .xl-grid td.sel { background: linear-gradient(var(--lumo-primary-10), var(--lumo-primary-10)), var(--bg); }
+:root[data-skin="lumo"] .xl-grid td.active, :root[data-skin="lumo"] .xl-editor { outline-color: var(--lumo-primary); }
+:root[data-skin="lumo"] .xl-grid th.hl { background: linear-gradient(var(--lumo-primary-10), var(--lumo-primary-10)), var(--bg); color: var(--lumo-primary-text); }
+:root[data-skin="lumo"] .xl-formula, :root[data-skin="lumo"] .xl-addr { background: var(--lumo-c10); border-color: transparent; }
+:root[data-skin="lumo"] .xl-wrap { border-color: var(--lumo-c10); border-radius: 8px; }
+:root[data-skin="lumo"] .xl-wrap:focus-within { border-color: var(--lumo-primary); }
+
+/* requirements log */
+:root[data-skin="lumo"] .rq-wrap { border-color: var(--lumo-c10); border-radius: 8px; }
+:root[data-skin="lumo"] .rq-tools input, :root[data-skin="lumo"] .rq-tools select { background: var(--lumo-c10); border-color: transparent; border-radius: 4px; min-height: 36px; }
+:root[data-skin="lumo"] .rq-chip { border-radius: 4px; border-color: var(--lumo-c20); background: transparent; color: var(--lumo-primary-text); }
+:root[data-skin="lumo"] .rq-chip.on { background: var(--lumo-primary); border-color: var(--lumo-primary); color: #fff; }
+:root[data-skin="lumo"] .rq-tile, :root[data-skin="lumo"] .rq-open li { border-color: var(--lumo-c10); border-radius: 8px; }
+:root[data-skin="lumo"] .rq-table th { background: var(--bg); font-weight: 500; }
+:root[data-skin="lumo"] .rq-table tr.rq-phase td { background: var(--lumo-primary-10); color: var(--lumo-primary-text); }

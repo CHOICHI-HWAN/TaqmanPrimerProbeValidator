@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Primer/Probe Validation</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="lumo.css">
+<script>
+  // Applied synchronously before first paint (not in app.js, which loads after the body)
+  // so a saved dark/light choice never flashes the wrong theme for a frame on reload.
+  try {
+    var t = localStorage.getItem("lasv_theme");
+    if (t === "dark" || t === "light") document.documentElement.dataset.theme = t;
+    // Vaadin-Lumo skin is the default; "classic" restores the original look.
+    document.documentElement.dataset.skin = localStorage.getItem("lasv_skin") === "classic" ? "classic" : "lumo";
+  } catch (e) { /* private mode etc. -- falls back to OS preference */ document.documentElement.dataset.skin = "lumo"; }
+</script>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <button id="themeToggleBtn" class="theme-toggle-btn" title="라이트/다크 모드 전환 (Toggle light/dark mode)">&#9789;</button>
+        <button id="langToggleBtn" class="theme-toggle-btn lang-toggle-btn" title="한국어 / English">EN</button>
+        <a href="http://localhost:8760" target="_blank" rel="noopener" class="back-to-entry">&larr; 전체 파이프라인 목록</a>
+        <h1>Primer/Probe</h1>
+        <div class="subtitle">인터랙티브 검증 대시보드</div>
+      </div>
+      <div class="confidential-banner" title="이 대시보드의 프라이머/프로브 서열 및 분석 결과는 대외비 정보입니다. 외부 공유·배포 금지.">
+        🔒 대외비 (CONFIDENTIAL) — 외부 공유 금지
+      </div>
+      <div id="activeJobsBanner" class="active-jobs-banner" hidden></div>
+      <div id="hostScopeBox" class="host-scope-box" hidden></div>
+      <button id="overviewBtn" class="btn btn-secondary btn-block">전체 대시보드</button>
+      <button id="addSetBtn" class="btn btn-primary btn-block">+ 새 프라이머 세트 분석</button>
+      <button id="primersBtn" class="btn btn-secondary btn-block">📝 프라이머 입력 / 관리</button>
+      <button id="stdMgrBtn" class="btn btn-secondary btn-block">🧫 표준물질 입력 / 관리</button>
+      <button id="guideBtn" class="btn btn-secondary btn-block">📖 파이프라인 개요 / 가이드</button>
+      <button id="tourBtn" class="btn btn-secondary btn-block" title="화면 구성과 주요 기능을 단계별로 안내합니다">🧭 UI 사용 안내 (투어)</button>
+      <button id="standardsBtn" class="btn btn-secondary btn-block">🧪 표준물질 대표성</button>
+      <button id="diversityBtn" class="btn btn-secondary btn-block">🧬 리니지별 유전체 다양성</button>
+      <button id="geneConsBtn" class="btn btn-secondary btn-block">🧬 유전자 보존영역</button>
+      <button id="metaTableBtn" class="btn btn-secondary btn-block">📊 메타데이터 표</button>
+      <button id="metadataBtn" class="btn btn-secondary btn-block">🗺 메타데이터 / 지도</button>
+      <button id="paramsBtn" class="btn btn-secondary btn-block">⚙ 분석 파라미터 설정</button>
+      <button id="changelogBtn" class="btn btn-secondary btn-block">📋 변경 이력 (Changelog)</button>
+      <button id="requirementsBtn" class="btn btn-secondary btn-block">🗂 요구사항 기록</button>
+      <button id="reportBtn" class="btn btn-secondary btn-block" title="모든 세트의 종합 분석 결과를 세트당 1페이지씩 PDF로 정리합니다">📄 종합 리포트 PDF 생성</button>
+      <div class="pipeline-btn-row">
+        <button id="fetchDataBtn" class="btn btn-secondary" title="Nextstrain에서 최신 서열/메타데이터를 새로 받고 mfeprimer 인덱스를 다시 만듭니다">데이터 업데이트</button>
+        <button id="rerunBtn" class="btn btn-secondary" title="현재 데이터로 전체 세트 분석을 처음부터 다시 계산합니다">분석 다시하기</button>
+      </div>
+      <div id="pipelineStatus" class="pipeline-status" hidden></div>
+      <button id="groupModeBtn" class="btn btn-secondary btn-block">+ 그룹 만들기 (여러 세트 묶기)</button>
+      <div id="groupBar" class="group-bar" hidden>
+        <input id="groupLabelInput" type="text" placeholder="그룹 이름 (예: VendorB ALL)">
+        <div class="group-bar-row">
+          <span id="groupSelCount" class="count">0개 선택</span>
+          <button id="groupCreateBtn" class="btn btn-primary" disabled>그룹으로 묶기</button>
+          <button id="groupCancelBtn" class="btn btn-secondary">취소</button>
+        </div>
+      </div>
+      <input id="searchBox" class="search-box" type="text" placeholder="세트 검색 (이름, 벤더)...">
+      <div id="setList" class="set-list"></div>
+      <div class="sidebar-footer">&copy; 2026 Chihwan Choi &middot; MIT License &middot; v0.19.0<br><button id="skinToggleBtn" class="skin-toggle" title="화면 스타일 전환 (Vaadin Lumo / 기본)">스타일: Lumo</button></div>
+    </aside>
+
+    <main class="main">
+      <div id="overview" class="overview"></div>
+
+      <div id="detail" class="detail" hidden></div>
+
+      <div id="changelogView" class="changelog-view" hidden></div>
+
+      <div id="guideView" class="guide-view" hidden></div>
+
+      <div id="diversityView" class="diversity-view" hidden></div>
+      <div id="geneConsView" class="diversity-view" hidden></div>
+
+      <div id="metadataView" class="metadata-view" hidden></div>
+
+      <div id="primersView" class="primers-view" hidden></div>
+
+      <div id="stdMgrView" class="primers-view" hidden></div>
+
+      <div id="requirementsView" class="requirements-view" hidden></div>
+
+      <div id="standardsView" class="standards-view" hidden></div>
+
+      <div id="metaTableView" class="metatable-view" hidden></div>
+
+      <div id="paramsView" class="params-view" hidden>
+        <h2>분석 파라미터 설정</h2>
+        <div class="note" style="margin-bottom:16px;">
+          <code>config/config.yaml</code>에 저장됩니다. mismatch 관련 값은 저장 후 "분석 다시하기"를
+          눌러야 기존 세트 결과에 반영됩니다(mfeprimer 재검색 없이 판정 기준만 다시 계산하므로 빠릅니다).
+        </div>
+        <div class="form-grid">
+          <label>목표 Coverage (%)
+            <input id="pTargetCoverage" type="number" step="0.1" min="0" max="100">
+          </label>
+          <label>Primer mismatch 허용 개수 (기본 1)
+            <input id="pPrimerMismatch" type="number" step="1" min="0" max="2">
+          </label>
+          <label>Probe mismatch 허용 개수 (기본 0)
+            <input id="pProbeMismatch" type="number" step="1" min="0" max="2">
+          </label>
+          <label>3' 말단 연속 매치 요구 염기수 (기본 2)
+            <input id="pThreePrime" type="number" step="1" min="0" max="10">
+          </label>
+          <label>mfeprimer CPU 코어 수
+            <input id="pMfeprimerCpu" type="number" step="1" min="1" max="256">
+          </label>
+        </div>
+        <h3 style="margin:18px 0 6px;">실행 도구</h3>
+        <label>mfeprimer 실행 파일 경로
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input id="pMfeprimerBin" type="text" spellcheck="false" placeholder="/path/to/mfeprimer-4.2.4-linux-amd64 (비워 두면 자동 탐색)" style="flex:1;font-family:var(--font-mono);">
+            <button id="checkMfeprimerBtn" type="button" class="btn btn-secondary">확인</button>
+          </div>
+        </label>
+        <div id="mfeprimerStatus" class="note" style="margin:4px 0 0;"></div>
+        <div class="note" style="margin:6px 0 0;">
+          mfeprimer는 conda로 설치되지 않는 단독 실행 파일이라 직접 받아 경로를 지정해야 합니다
+          (<code>setup.sh</code>가 처음에 이 값을 묻고, 여기서 언제든 바꿀 수 있습니다). 저장하면 실제로 실행해 보고
+          mfeprimer가 맞을 때만 반영하며, 새 경로는 다음 분석부터 바로 쓰입니다.
+        </div>
+        <div id="toolsInfo" class="note" style="margin:8px 0 0;"></div>
+        <div class="note" style="margin:6px 0 0;">
+          mfeprimer의 <code>--virus</code>/degenerate 검색은 기본값이 4코어라서, 이 값을 머신의 실제
+          코어 수에 맞게 올려두면 "새 프라이머 세트 분석"과 파이프라인 재실행이 훨씬 빨라집니다
+          (인덱싱은 16, dimer는 2가 mfeprimer 자체 기본값이며 동일하게 이 값을 적용합니다; hairpin/probe
+          검색은 mfeprimer에 CPU 옵션이 없어 영향받지 않습니다).
+        </div>
+        <div class="note" style="margin:10px 0 16px;color:var(--warn);">
+          ⚠ 3' 말단 연속 매치 조건은 저장 후 "분석 다시하기"를 눌러야 반영됩니다 — probe mismatch/target
+          coverage와 달리 mfeprimer 결과를 다시 계산해야 하는 값이라 reconcile만으로는 부족합니다.
+        </div>
+        <div class="form-actions">
+          <button id="saveParamsBtn" class="btn btn-primary">저장</button>
+          <span id="paramsSaveStatus" class="form-status"></span>
+        </div>
+      </div>
+
+      <div id="addForm" class="add-form" hidden>
+        <h2>새 프라이머 세트 분석</h2>
+        <div class="form-grid">
+          <label>이름
+            <input id="fName" type="text" placeholder="예: MyLab_S_Test1">
+          </label>
+          <label>Segment
+            <select id="fSegment">
+              <option value="s">S segment</option>
+              <option value="l">L segment</option>
+            </select>
+          </label>
+          <label>Forward Primer (5'&rarr;3')
+            <textarea id="fF" rows="2" placeholder="5'→3' 서열 (IUPAC 축퇴염기 가능)"></textarea>
+          </label>
+          <label>Reverse Primer (5'&rarr;3')
+            <textarea id="fR" rows="2" placeholder="5'→3' 서열 (IUPAC 축퇴염기 가능)"></textarea>
+          </label>
+          <label>Probe (5'&rarr;3')
+            <textarea id="fP" rows="2" placeholder="5'→3' 서열 (IUPAC 축퇴염기 가능)"></textarea>
+          </label>
+          <label class="checkbox-row">
+            <input id="fSave" type="checkbox">
+            config/primers.tsv에 영구 저장 (다음 전체 snakemake 실행에도 포함됨)
+          </label>
+        </div>
+        <div class="form-actions">
+          <button id="fSubmit" class="btn btn-primary">분석 실행</button>
+          <span id="fStatus" class="form-status"></span>
+        </div>
+        <div class="note">
+          population DB(S 662개 / L 366개 게놈)에 대해 mismatch 0/1/2 primer 매치, probe 완전일치,
+          표준물질(KDCA) 매치, 참조유전체 결합위치, 게놈별 미스매치 표까지 한번에 계산합니다.
+          degenerate base가 많은 프라이머는 mismatch=2 탐색에 몇 분 걸릴 수 있습니다.
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="pipelineModal" class="modal-overlay" hidden>
+    <div class="modal-box">
+      <div class="modal-head">
+        <div>
+          <div id="pipelineModalTitle" class="modal-title">파이프라인 실행 중</div>
+          <div id="pipelineModalSub" class="modal-sub"></div>
+        </div>
+        <button id="pipelineModalClose" class="btn btn-secondary" title="창을 닫아도 실행은 서버에서 계속됩니다">닫기</button>
+      </div>
+      <pre id="pipelineModalLog" class="modal-log"></pre>
+    </div>
+  </div>
+
+  <div id="verifyModal" class="modal-overlay" hidden>
+    <div class="modal-box verify-modal-box">
+      <div class="modal-head">
+        <div>
+          <div class="modal-title">실험(Wet-lab) 검증 결과 추가</div>
+          <div class="modal-sub">표준물질(양성대조물질)로 실제 프라이머를 테스트한 결과를 인실리코 예측과 비교합니다</div>
+        </div>
+        <button id="verifyModalClose" class="btn btn-secondary">닫기</button>
+      </div>
+      <div class="verify-modal-body">
+        <div class="form-grid">
+          <label>표준물질 선택
+            <select id="vfMaterial"></select>
+          </label>
+          <label>검출 여부 (실험 결과)
+            <select id="vfDetected">
+              <option value="true">검출 (양성)</option>
+              <option value="false">미검출 (음성)</option>
+              <option value="">판정 보류</option>
+            </select>
+          </label>
+          <label>Ct 값 (선택)
+            <input id="vfCt" type="text" placeholder="예: 23.4">
+          </label>
+          <label>형광물질(채널)
+            <input id="vfFluorophore" type="text" placeholder="예: FAM" title="이 세트에 저장된 형광물질 값으로 자동 채워집니다 — PCR 플롯의 어느 채널과 비교했는지 기록">
+          </label>
+        </div>
+        <label style="display:block;margin-top:10px;">메모
+          <textarea id="vfNote" rows="2" placeholder="실험 조건, 특이사항 등 (붙여넣기(Ctrl/Cmd+V)로 이미지 첨부 가능)" style="width:100%;resize:vertical;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--fg);font-size:12.5px;"></textarea>
+        </label>
+        <div id="vfInSilicoPreview" class="verify-insilico-preview"></div>
+        <div class="form-actions" style="margin-top:12px;">
+          <button id="vfSaveBtn" class="btn btn-primary">검증 결과 저장</button>
+          <span id="vfSaveStatus" class="form-status"></span>
+        </div>
+        <hr style="margin:18px 0;border-color:var(--border);">
+        <h3 style="margin:0 0 8px;">이 세트의 검증 기록</h3>
+        <div id="vfHistoryList"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="vendor/d3.min.js"></script>
+  <script src="vendor/topojson-client.min.js"></script>
+  <script src="app.js"></script>
+  <script type="module" src="publish.js"></script>
+</body>
+</html>

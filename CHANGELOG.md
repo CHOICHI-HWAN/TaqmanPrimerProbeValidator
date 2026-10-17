@@ -1,0 +1,828 @@
+# Changelog
+
+All notable changes to this project are documented here. Format follows
+[Keep a Changelog](https://keepachangelog.com/), versioning is `MAJOR.MINOR` starting at 0.1.
+
+## [Unreleased]
+
+### Changed
+- **GitHub에는 코드만**: 저장소에서 모든 염기서열을 없앴습니다. 테스트는 실제 프라이머·실제 mfeprimer 출력 대신 `tests/seqgen.py`가 만든 서열을 쓰고, `PUBLISHED_PRIMERS.md`는 추적에서 뺐습니다(로컬 파일). `.gitignore`가 FASTA/GenBank/엑셀/슬라이드 등을 막고, `tests/test_no_sequences_in_repo.py`가 긴 서열 리터럴, 실제 프라이머·표준물질의 12염기 조각(양 가닥), FASTA 레코드를 잡아냅니다.
+
+### Added
+- **숙주 기준(사람/동물/미상/전체)**: 커버리지의 기본 기준을 **사람 유래 게놈**으로 바꾸고(사람이 없는 바이러스는 전체), 사이드바의 "숙주 기준"에서 사람·동물·미상·전체로 전환합니다(개요, 세트·그룹 상세, MSA, 리니지 분포, 메타데이터 표의 "숙주 분류"). 실험 숙주(`is_lab_host`) 게놈은 어느 범위에도 포함하지 않으며 동물 안의 세부 분류는 하지 않습니다. 숙주 미기재 게놈은 "미상"입니다.
+  - `scripts/host_scope.py`: 분류, 범위, 그리고 게놈 하나의 통과 판정(`reconcile.py`가 옮겨 쓰며 결과는 기존과 동일: 27개 세트의 요약·id 목록 대조 차이 0). `webapp/scope_view.py`: 웹 API가 같은 코드로 범위별 재계산.
+  - `summary.tsv`/`group_summary.tsv`는 기본 범위 기준이며 `host_scope` 열이 붙습니다. 정적 보고서에도 "숙주 기준"을 표시합니다.
+  - Firebase 업로드: 범위에 따라 달라지는 응답(개요·세트·그룹·`host-scope`)은 범위별로 올립니다(공개 사이트에서도 같은 토글).
+  - 테스트: `tests/test_host_scope.py`, `tests/test_host_scope_api.py`, `tests/js/host_scope_ui.test.mjs`.
+
+### Security
+- **대시보드 서버 기본 주소가 `127.0.0.1`(이 컴퓨터만)로 바뀌었습니다.** 이전에는 `0.0.0.0`이라 같은 네트워크의 누구나 대외비 서열을 보고 쓰기 API를 쓸 수 있었습니다(로그인 없음). 다른 PC에서 열어야 하면 `--host 0.0.0.0`을 직접 주세요.
+
+### Fixed
+- **"미결합"이 아닌데 "미결합"으로 표시되던 서열**: 프라이머만 검증 기준(mismatch ≤1)을 넘고 결합은 되어 있는 경우(프로브 완전 일치, F/R 모두 결합, 3′ 끝 정상, 프라이머 mismatch ≤2)는 이제 "⚠️ 주의(허용 초과)"로 분류하고, 상세 창의 검증 배너도 빨강 대신 주황으로 표시합니다. 정렬의 프라이머 mismatch 색도 3′ 끝 밖이면 2개까지 노랑입니다. 프로브 mismatch, 3′ 끝 mismatch, 3개 이상, 결합 없음은 그대로 빨강이고 "검증 통과" 판정과 파이프라인 집계는 바뀌지 않습니다.
+- **MSA 위의 다양성(π) 막대**: F가 참조 유전체의 반대 가닥에 결합하는 세트(LASV 25개 중 17개)는 막대가 좌우 반전되어 있었습니다. F/Probe/R 결합 좌표로 열→참조 위치를 맞췄고, 정렬의 삽입 열은 위치를 밀지 않으며, 막대 폭은 서열 글자의 실제 렌더링 폭을 따릅니다(글꼴에 따라 막대가 짧아지던 문제). "정보 열"/필터를 바꿔도 π 행이 유지됩니다.
+- **MSA 눈금자**: 공백이 접혀서(`nowrap`) `|`가 서열 열과 어긋났습니다. 이제 열마다 한 글자이며 참조 유전체의 좌표를 10 단위로 표시합니다(`ref position`). 컬럼 선택(드래그)의 글자 폭 계산도 같이 고쳤습니다.
+
+### Added
+- **표준물질 "일부 매치"**: 검증 기준은 못 맞췄지만 결합이 확인되는 표준물질(F/R이 amplicon을 이루거나 어느 올리고든 mismatch ≤ 2)도 결합 정렬과 함께 표시하고 요약 표·모달에 △로 집계합니다(통과 판정에는 포함하지 않음).
+- **mismatch 색**: 결합 정렬에서 프로브 mismatch와 프라이머 3′ 끝/허용 초과 mismatch는 빨강, 3′ 끝 밖의 프라이머 mismatch는 노랑.
+- **Firebase 업로드 버튼**(대시보드 오른쪽 위, `config/firebase.json`이 있을 때만): 결과만 읽기 전용·로그인 보호 사이트로 올립니다.
+- `tests/js/msa_column_map.test.mjs`(+ `tests/test_msa_column_map.py`), `tests/test_server_defaults.py`.
+
+## [Nipah fork] - 2026-10-14
+
+LASV 스냅샷(`snapshot-20261014`)에서 갈라진 Nipah 프로젝트. 나중에 LASV 파이프라인과 통합하는 것을 전제로 한 변경.
+
+### Added
+- **엑셀(.xlsx) 다운로드/업로드**: 프라이머 입력 페이지와 표준물질 입력 페이지에 "⬇ 엑셀 다운로드"(현재 목록 + 열 설명 시트)와 "⬆ 엑셀 업로드"를 추가. 업로드는 서버에서 읽어 표에 불러오기만 하고("현재 목록에 추가" 또는 "전체 교체" 선택), 저장은 기존처럼 직접 눌러야 반영됩니다. 열 이름은 한글·영문 별칭을 느슨하게 인식하고, 서열 공백/소문자·분석진행(TRUE/FALSE)을 정리하며 모르는 열·빈 행은 안내와 함께 건너뜁니다. 표준 라이브러리만 쓰는 `scripts/xlsx_lite.py`(외부 패키지 불필요).
+- **그룹별 분석/재분석 버튼**: 그룹 상세의 "▶ 이 그룹 분석"(그룹의 합집합·교차 결합·표준물질/참조유전체 조합표와 그룹 요약만, 최신 단계는 건너뜀)과 "↻ 이 그룹 재분석"(강제, 구성 세트 개별 결과는 그대로) — `POST /api/groups/<ID>/analyze[?force=1]`.
+- **세트별 분석/재분석 버튼**: 세트 상세 위쪽의 "▶ 이 세트 분석"은 그 세트와 거기에 의존하는 요약표만 계산하고(이미 최신인 단계는 건너뜀), "↻ 이 세트 재분석"은 입력이 같아도 그 세트를 처음부터 다시 계산합니다(`POST /api/sets/<ID>/analyze[?force=1]`). 새 프라이머를 올려도 전체를 돌릴 필요가 없습니다.
+- **유전자 보존영역 페이지**: 사이드바 "유전자 보존영역" — 참조유전체의 유전자마다 전체와 리니지/클레이드별 평균 π·보존 비율·변이 없는 자리 비율·최장 보존 구간, 유전체 π 트랙, 유전자 상세 창(위치별 π, 가장 긴 보존 구간).
+- **참조유전체 결합위치 상세 창**: 세트 상세의 "참조유전체 결합위치" 카드를 누르면 F/Probe/R의 서열·위치·가닥·길이·mismatch 표, 결합 위치 트랙(amplicon 포함), 표적 유전자와 참조유전체의 결합 정렬을 모달로 보여줍니다.
+- **표준물질 매치 상세 창**: 개요의 "표준물질 O" 타일을 누르면 세트×표준물질 매트릭스(O/X와 F/P/R mismatch)를, 세트 상세의 "표준물질(KDCA) 매치" 카드를 누르면 그 세트의 표준물질별 판정 표와 결합 정렬을 모달로 보여줍니다.
+- `profiles/nipah.json`: segment 하나("genome"), 길이 하한 17000, 참조 NC_002728, 풀링 집단 `ALL_NIV`, 클레이드는 로컬 Nextstrain 빌드에서.
+- 프로필 확장: `source.segment_subdirs/sequences_file/metadata_file`(flat 데이터 구조), `lineage.mode = auspice_clades`
+  (`lineage.auspice/attr/missing`), `qc.max_n_fraction`, `qc.exclude_list`.
+- `scripts/run_nextstrain_nipah.sh`: 공식 nextstrain/nipah 워크플로를 로컬 Nextstrain CLI로 실행해 Auspice JSON·clades.json을 만듦.
+- `scripts/lineage_from_auspice.py`(규칙 `lineage_table`): Auspice JSON의 tip별 clade_membership → accession 표.
+- `scripts/annotate_metadata.py`(규칙 `annotate_metadata`): 전체 메타데이터 + Clade + `QC PASS/QC FAIL` + 사유 → `data/filtered/<seg>_metadata_annotated.tsv`.
+- 필터: N 허용 비율과 제외 목록(`dropped_excluded`) 지원. `scripts/genes_from_gff.py`: GFF에서 `config/refgenome_genes.tsv` 생성.
+- 웹앱: 메타데이터 표에 `QC PASS/FAIL`·`QC 사유`·Clade 열, segment가 하나인 바이러스 지원(segment 선택·표·지도·대시보드 타일이 프로필을 따름), 트리는 로컬 Auspice JSON 사용.
+- `rule all`이 표준물질/프라이머가 아직 없어도 동작(데이터·다양성 단계만 요청).
+
+### Added
+- `test.sh`: 핵심 기능 점검 스크립트(`--full`이면 실제 결과 감사까지). `tests/test_core_e2e.py`: 정답을 아는 합성 게놈으로 mfeprimer 포함 핵심 분석을 끝까지 검증.
+
+### Changed
+- **전체 게놈 정렬: 열 필터와 기본 표시**: 대륙·나라·클레이드/리니지·결합 여부 열 제목의 ▾로 메타데이터 표처럼 값을 골라 거를 수 있고(값마다 개수, 검색, 모두 선택/해제, 다른 열 필터를 반영한 개수), "열 필터 해제" 버튼이 생깁니다. 정보 열은 이제 기본으로 보입니다.
+- **표준물질 상세는 일치하는 것만 펼쳐서**: "표준물질(KDCA) 상세 결합정보"와 표준물질 모달에서 매치되는 표준물질만 결합 정렬을 보여주고, 나머지는 한 줄(이름·사유)로 줄여 접어 둡니다.
+- **전체 게놈 정렬(MSA)**: 필터에 "결합 판정만(정상+주의) / 정상만 / 주의만 / 미결합만"(개수 표시)을 추가하고, 게놈 이름 칸을 표로 바꿔 Accession · 대륙 · 나라 · 클레이드/리니지 · 결합 여부(정상/주의/미결합) · F/P/R mismatch 열을 함께 보여줍니다.
+- **워크플로 설명 갱신**: 가이드(단계 3~4·5·6·8, 비교표, 흐름도), README(단계 표·mermaid), PDF 리포트의 워크플로 페이지를 현재 파이프라인(방향 통일, 두 엔진 비교, 게놈 염기 기준 mismatch, 3′ 끝·amplicon 안 프로브, 선택적 표준물질, 그룹 교차 결합, 세트/그룹별 분석, 유전자 보존영역, 엑셀 입출력, test.sh)에 맞춤.
+- **웹앱 "새 프라이머 세트 분석"(live analysis)의 프로브 판정을 파이프라인과 동일하게**: 이전에는 mfeprimer의 최선 프로브 히트만 쓰고(증폭 산물 안 여부·게놈 직접 탐색 없음) 파이프라인과 결과가 달라질 수 있었습니다. 이제 amplicon 안에서 두 엔진을 비교합니다. `scripts/audit_live.py`(test.sh --full에 포함)로 같은 세트의 라이브 분석과 파이프라인 결과가 게놈별로 일치함을 확인(Nipah 2개, LASV P001·P007).
+- **그룹 커버리지를 두 값으로 함께 표기**: "합집합(세트별 단독 통과의 합)"과 "교차 결합 포함(세트 간 조합으로 통과하는 게놈까지)"을 사이드바 그룹 항목(두 막대), 개요의 그룹 표(두 열)·히트맵(두 막대, 리니지 칸은 교차 포함 기준), 그룹 상세 카드에 모두 표시합니다. 서버가 `validated_with_cross`/`validated_with_cross_pct`를 함께 내려줍니다.
+- **그룹 상세가 교차 결합 결과를 실제로 반영**: 그룹의 "리니지 분포"와 통과 게놈 수가 세트별 합집합만 보고 있어 교차 결합으로 통과하는 게놈이 0으로 보였습니다. 이제 합집합 ∪ 교차 결합 통과(F/R mismatch≤1·3′ 끝 일치·프로브 완전일치)를 기준으로 하고(`validated_ids_with_cross`, `lineage_counts_with_cross`), 교차 결합 분석의 조합 칩마다 "N개 게놈 결합 · M개 통과"를 표시합니다.
+- **그룹 교차 결합(cross-binding) 분석을 세트 분석과 같은 방식으로 정확하게**: 이전에는 mfeprimer가 보고한 프라이머 서열로 mismatch를 세서 5′ 쪽 불일치를 놓쳤고(LASV VendorA 그룹: 교차 통과 103개로 과대평가), 프로브는 게놈에서 "가장 잘 맞는 한 곳"이 증폭 산물 밖이면 안쪽의 다른 사이트를 무시했습니다. 이제 ① 보고 좌표의 실제 게놈 염기로 mismatch·3′ 끝을 세고, ② mfeprimer와 별개로 게놈 전체에서 모든 올리고 쌍을 직접 탐색(`scan_combos`)해 더 나은 쪽을 쓰고, ③ 프로브도 두 엔진으로 증폭 산물 안에서 찾습니다. 독립 무차별 계산과 일치(VendorA: F/R 쌍 185개, 프로브까지 89개). 표에 `f_3p_ok`/`r_3p_ok`/`source` 열 추가. 그룹 카드에 "교차 결합 포함 통과" 수를 표시.
+- **리니지 분포 막대**: 막대 길이가 옆에 적힌 수치와 맞지 않던 문제 수정. 그룹 카드는 "개수/가장 큰 개수", 세트 카드는 "비율/가장 높은 비율"로 막대를 정규화했는데, 이제 둘 다 그 리니지의 전체 게놈 대비 통과 비율(0~100%) 그대로입니다. 그룹 카드에도 통과 0개인 리니지가 함께 표시됩니다.
+- 전체 게놈 정렬(MSA): 점(.)의 기준이 고정 consensus가 아니라 **프라이머/프로브**(F/Probe/R 구간은 올리고 염기, 그 밖은 consensus)로 바뀌고,
+  선택 상자로 consensus 기준 전환 가능. `msa.json`에 행별 `seq`와 `ref` 추가, FASTA 내보내기는 실제 염기 기록.
+- 프로필 `ui` 블록 추가(`name_ko`, `web_url`, `lineage_ko`, `lineage_examples`, `lineage_def`, `orientation_note`; 모두 선택). 화면 문구·가이드·투어·
+  정적 대시보드·PDF 리포트가 프로필을 따르고, '리니지/Lineage'는 프로필의 표기(Nipah: 클레이드/Clade)로 치환됨.
+
+- 가이드: 흐름도·단계 설명에 Nipah 데이터 단계(로컬 Nextstrain 빌드 → `lineage_table` → `rename_headers`, `filter` → `annotate_metadata`)와 QC FAIL 사유 추가. PDF 리포트·README도 동일하게 갱신.
+- 정렬 화면에서 PRIMER/PROBE 행도 상단에 고정. 전체화면 중 팝업(상세 창·대화상자·이미지 확대)이 보이지 않던 문제 수정(`modalHost()`).
+- 가이드 흐름도 상자의 HTML 엔티티(`&rarr;` 등)가 글자 그대로 보이던 문제 수정(`diagText()`), 클레이드 표기 치환이 식별자(`lineage_table` 등)를 건드리지 않게 수정.
+
+- `setup.sh` + `environment.yml`(이름 `primer_validation`) + `environment_nextstrain.yml`: 환경 생성, mfeprimer 경로 입력/검증, `config.yaml`의 `env_prefix`/`mfeprimer_bin`/`nextstrain_env_prefix` 기록. 'Analysis Parameters' 페이지에 mfeprimer 경로 입력·확인. `start.sh` 기본 포트는 8767.
+- `run_nextstrain_nipah.sh`는 `nextstrain_env_prefix`(또는 `$NEXTSTRAIN_ENV`)의 환경을 사용.
+
+### Changed
+- **표준물질은 선택 사항**: 표준물질이 없는 segment가 있어도 분석이 끝까지 됩니다. 해당 세트의 표준물질 단계는 건너뛰고(`SET_IDS_STD`/`STD_SEGS`), 표준물질 요약표는 헤더만 있는 빈 표로 만들어집니다. 모두 비활성화하면 이전 `kdca_standard_*` 파일과 인덱스를 지웁니다. 입력 페이지의 "최소 1개 필요" 검증을 없앴고, 화면·평가·리포트는 "표준물질 미등록"으로 표시하며 점수에서 제외합니다.
+
+### Fixed (결과가 바뀌는 수정)
+- **게놈 방향 통일**: 필터링 단계에서 모든 게놈을 참조유전체와 같은 방향으로 뒤집어 놓고 분석합니다(`scripts/orientation.py`, 11-mer 공유 수 비교, 판정 불가는 그대로 두고 기록). `data/filtered/<seg>_orientation.tsv` 추가. 판정 결과(validated, primer_matched)는 LASV 25개·Nipah 2개 세트 모두 이전과 동일하고, 프로브 가닥도 일관됨(LASV P001: 정방향/역방향 619/41 → 0/657). LASV S 619/662, L 43/366, Nipah 2/106개가 뒤집혔음.
+- **프로브도 두 엔진으로 비교**: mfeprimer의 최선 프로브 히트와 증폭 산물 안에서의 게놈 직접 탐색(`scan_probe`, 양쪽 가닥)을 비교해 mismatch가 적은 쪽을 씁니다(`probe_source`, `engine_comparison.tsv`의 probe 열, `engine_concordance.tsv`). "완벽 일치" 판정은 두 엔진이 모든 세트에서 일치(한쪽만 완벽인 게놈 0건), validated 변화 없음. `scripts/audit_strands.py`: 저장된 증폭 산물 서열로 F/R/프로브를 양쪽 가닥에 다시 대어 표와 대조(Nipah 204건, LASV 5,798건 모두 일치, 가닥 방향 이상 없음).
+- **F/R 쌍을 두 엔진으로 모두 구하고 비교**: 모든 게놈에 mfeprimer와 게놈 전체 직접 탐색(`scan_fr`: 모든 사이트·양쪽 가닥·마주 보는 쌍)을 적용해 더 나은 쌍을 씁니다(`choose_fr`; 동률이면 Tm/ΔG가 있는 mfeprimer). 게놈별 `fr_source` 열, `engine_comparison.tsv`, `engine_concordance.tsv` 추가. 이전의 "완벽하지 않을 때만 보완"(`better_fr`)을 대체. 결과(validated)는 직전 실행과 같고, mfeprimer 단독으로는 LASV P004 29개·P020 22개·P005 1개 게놈의 통과 쌍을 놓침.
+- **mfeprimer가 놓친 F/R 사이트 보완**: mfeprimer는 3' k-mer 시드로 사이트를 찾아 실제 최선 사이트를 놓칠 수 있고(증폭 산물을 아예 못 찾거나 더 나쁜 쌍만 보고), 기존 직접 탐색 보완은 "증폭 산물이 하나도 없을 때"만 동작했습니다. 이제 mfeprimer의 쌍이 완벽하지 않으면 게놈 전체 직접 탐색(`better_fr`)과 비교해 더 나은 쪽을 씁니다(직접 탐색 증폭 산물 상한도 400→2000 bp로 mfeprimer와 동일). `scripts/audit_pairs.py`로 전 게놈 검증: 모든 세트에서 누락 0건. 영향: LASV P004 validated 472→477, P020 404→410, P024 472→477; Nipah 변화 없음.
+- **F/R 프라이머의 mismatch 개수가 실제보다 적게 나오던 문제.** mfeprimer가 보고하는 서열(`fpSeq`/`rpSeq`)은 프라이머(축퇴 프라이머는 ACGT 변이형)이고,
+  mfeprimer의 `--misMatch`는 3' 끝 k-mer(기본 9염기) 안의 mismatch만 반영합니다. 그 바깥(5' 쪽)의 mismatch는 보고 서열에 없어서, 그 서열로 다시 센
+  개수가 0으로 나왔습니다. 이제 **보고된 좌표의 실제 게놈 염기**와 비교해 센 뒤(`parse_spec_best(..., genome_seqs=)`) 3' 끝 검사도 게놈 기준으로 합니다.
+  독립 재계산(`scripts/audit_recount.py`)과 전 게놈에서 일치함을 확인. Nipah P001: mismatch 0 비율 84.9% → 22.6%, validated 89 → 88; P002: 100 → 99.
+- **프로브가 두 프라이머 사이에 있는지 확인하지 않던 문제**: 증폭 산물 밖에서 결합하는 프로브는 이제 통과로 세지 않음(`probe_inside_amplicon`). Nipah에는 해당 사례 없음.
+- `scripts/audit_recount.py`: 위 표를 무차별 대입으로 다시 세어 비교하는 감사 스크립트(불일치가 있으면 종료 코드 1).
+
+### Merge notes (LASV로 되돌릴 때)
+- **위 mismatch 수정은 LASV 결과도 크게 바꿉니다**(감사 결과: 25개 세트 중 대부분에서 validated가 줄어듦 — 예: P001 603→약 559, P011 96→약 8). 합치기 전에 LASV를 다시 계산하고 결과 변화를 확인하세요.
+- `rules_report.smk`의 `dashboard` params에 `source_url`이 추가되어 정적 대시보드가 재생성 대상. `msa_alignment` 출력(`msa.json`)에 필드가 늘어 재계산 필요.
+- `fetch_raw`(params), `rename_headers`(입력 unpack, `lineage_missing`), `filter`/`filter_status`(`max_n_fraction`, `exclude_list`)의 params가 바뀌어
+  기존 LASV 결과는 재계산 대상으로 보임 → LASV 회귀 비교 후 `snakemake --touch`로 채택.
+- `data_qc` 표기가 "통과/제외"에서 `QC PASS/QC FAIL`(+ `QC 사유` 열)로 바뀜.
+
+## [0.19.0] - 2026-10-02
+
+### Fixed
+- **리니지별 유전체 다양성(pixy π)에서 역방향(reverse) 게놈이 섞여 π가 부풀려지던 문제.** `mafft
+  --adjustdirection --add`는 뒤집힌 서열에 `_R_` 태그를 붙이면서 이미 정렬된 행을 돌려주는데, 기존
+  코드가 한 번 더 reverse-complement 해서 뒤집힌 게놈이 이중으로 뒤집혔음(참조 대비 identity ~26%).
+  이제 태그만 제거하고 뒤집힌 게놈 ID는 `qc.json`의 `reversed_fixed`에 기록. S 전체 π 0.169(수정 후).
+
+### Added
+- **diversity 품질 필터**: 게놈별 참조 대비 coverage ≥ 0.95, identity ≥ 0.65 미만은 제외
+  (`config.yaml`의 `diversity_min_coverage/identity`), 리니지는 n ≥ 10인 경우만 곡선 표시
+  (`diversity_min_lineage_n`), 전체 계통을 합친 ALL_LASV 곡선 추가. 제외 목록은
+  `output/diversity/<seg>/qc.json`.
+- **영구 프라이머/그룹 ID와 `input_primers/` 스냅샷, 프라이머별 `output/` 레이아웃** (README 참조).
+  `config/primers.tsv`에 `primer_id` 컬럼(자동 부여, 재사용 없음), 그룹은 `G001…`과 멤버 프라이머 ID.
+  Snakemake 와일드카드(`set_id`)는 이제 이 ID이고 결과는 `output/primers/<ID>/<단계>/`에 저장되며,
+  웹앱은 항상 이름을 표시. 프라이머 이름 변경은 더 이상 결과/메모/그룹 연결을 끊지 않음(삭제만 경고).
+  결과 루트가 `results/`에서 `output/`으로 변경됨.
+
+- **표준물질(KDCA) 대표성 분석** (새 규칙 `standard_representativeness`, 출력
+  `output/standards/{s,l}/representativeness.json`, 사이드바 "🧪 표준물질 대표성" 페이지, 세트 상세의
+  "표준물질 대표성" 카드). 표준물질을 참조유전체에 정렬해 좌표를 얻은 뒤, 품질 필터를 통과한
+  population 게놈(diversity VCF와 동일 집합)이 표준물질과 일치하는 비율을 계산: (1) 표준물질 구간
+  identity ≥ 90%(구간 80% 이상 커버), (2) 세트별 F/R/Probe 결합 부위 염기 일치(허용 차이 2/2/1),
+  (3) 표준물질 구간·결합 부위의 pixy π 백분위(보존/보통/고변이)와 다수 염기 일치율. 합집합 일치율
+  ≥ 90% 적합, ≥ 50% 재검토 권고, 미만 심각. 기준은 `config.yaml`의 `standard_rep_*`. 일치 기준을
+  바꿨을 때의 결과(민감도), 리니지별 일치, 불일치 게놈 목록(TSV)을 함께 제공. 결합 부위가
+  표준물질 구간 밖인 세트는 "해당 없음". 현재 데이터에서 S는 16.6%, L은 15.9%로 둘 다 "심각"
+  (표준물질이 참조주(리니지 IV) 서열이라 LII/LIII 등을 대표하지 못함).
+- **브라우저 기본 alert/confirm/prompt를 모달 창으로 교체** (`uiAlert/uiConfirm/uiPrompt`; Esc·배경 클릭=취소,
+  Enter=확인, 삭제 확인은 빨간 버튼).
+- **게놈 결합 상세를 모달 창으로**: 세트/그룹의 게놈별 표 행과 MSA의 게놈 행을 클릭하면 표 아래로 펼치는
+  대신 창으로 열림(그룹 표의 라벨도 ID 대신 프라이머 이름).
+- **시작 시 Nextstrain 최신 데이터 확인(lazy)**: 첫 화면을 그린 뒤 `/api/pipeline/freshness`로 확인하고,
+  원본이 바뀌었으면 "업데이트 후 재분석 / 나중에 / 이 버전 건너뛰기"를 물음(업데이트가 끝나면 재분석
+  여부를 다시 확인). 서버는 확인 결과를 5분간 캐시해 여러 명이 열어도 Nextstrain을 반복 호출하지 않음.
+- **계통수 색 불일치 수정**: PearTree가 "status" 항목을 자체 팔레트로 칠해 범례(초록/빨강/회색)와 색이
+  달랐음 → 각 tip/가지에 `user_colour`로 범례와 같은 색을 직접 지정(하위 tip 상태가 섞인 가지는 회색).
+- **메타데이터 표 페이지** (사이드바 "📊 메타데이터 표", `/api/metadata/table`): 분석에 쓰인 S+L 게놈(1,028행)의
+  Nextstrain 메타데이터 + 검증 통과 세트 수/율 + diversity QC를 스프레드시트로. 열 제목 클릭=정렬(오름차순→
+  내림차순→해제), 열마다 Numbers식 퀵 필터(값 체크 목록·건수)와 입력 필터(텍스트 포함/`a|b`/`=정확히`, 숫자
+  `>=100`·`100-200`), 전체 검색, S/L 전환, 현재 보기 CSV 저장.
+- **테스트 확대**: `tests/test_api_smoke.py`(서버를 띄워 모든 API/정적 파일의 응답 형태 검증)와 표준물질
+  대표성·ID/스냅샷 단위 테스트 추가 — 총 60개. 이 과정에서 발견해 고친 버그: (1) 서버 핸들러에서
+  `sys.exit()`(예: mfeprimer 없음)가 연결을 조용히 끊던 문제 → 500 오류 응답으로 반환, (2) 그룹 상세에
+  `member_names`가 없어 칩에 ID가 보이던 문제, (3) 사용자가 추가한 세트(live 분석)의 좌표/Tm이 문자열이라
+  종합 리포트 생성이 `TypeError`로 실패하고 화면 좌표 계산이 문자열 이어붙이기가 되던 문제.
+- **스프레드시트 형식(엑셀 격자) 모드**: 프라이머 입력/관리·표준물질 입력/관리에 "스프레드시트 형식" 버튼 추가. 열 글자(A, B…)·행 번호,
+  셀/범위 선택(클릭·드래그·Shift), 타이핑/F2/더블클릭 편집, Ctrl+C/X/V(TSV, 엑셀·구글시트와 호환, 값 하나를 범위에 채우기),
+  Delete, Ctrl+D, 실행 취소/다시 실행, 수식 입력줄(긴 서열 편집), 행 삽입/삭제, 머리글·이름 열 고정. 같은 행 데이터를 쓰므로 저장·검증은
+  기존과 동일하며 선택은 브라우저에 기억됨.
+- **요구사항 기록 사이드 메뉴** ("🗂 요구사항 기록"): `docs/requirements_log.json`(→ `/api/requirements`)을 검색·구분·상태 필터로 보여줌.
+  Markdown 사본은 `scripts/build_requirements_log.py`로 재생성.
+- **모듈화 리팩터링 (동작 변경 없음, 기존 결과와 비교 검증)**:
+  - 바이러스(종) 정의를 `profiles/lassa.json`으로 분리(`scripts/virus_profile.py`, 설명 `profiles/README.md`). 데이터 출처,
+    segment(길이 하한·리니지 컬럼·참조 accession), 메타데이터 컬럼 매핑, 풀링 집단 이름(ALL_LASV)·VCF contig 접두사,
+    diversity QC 기준·window가 프로필로 이동. `config.yaml`은 `profile:`로 선택하고 실행 설정만 보유.
+  - `Snakefile`을 단계별 규칙 모듈(`rules_data/matching/standards/groups/reference/qc/diversity/report.smk`)로 분리. 모듈을
+    Snakefile과 같은 위치에 둔 이유: 스크립트 경로 문구가 바뀌면 Snakemake가 모든 결과를 "코드 변경"으로 보고 재계산.
+  - 서버·화면·리포트의 종 의존 코드(풀링 키, segment 목록, Nextstrain 주소, 파일명, 제목)를 프로필에서 읽도록 변경, `/api/profile` 추가.
+  - 검증: ① `snakemake -n -F` 작업 그래프 265개(입력·출력·스레드·와일드카드) 변경 전과 동일 ② 변경 후 전체 재계산(150개 작업)
+    결과를 변경 전과 해시 비교 — 분석에 쓰이는 512개 파일(요약·정렬 표·MSA·VCF·pixy·표준물질 대표성·대시보드 포함) 전부 바이트 단위
+    동일, 다른 것은 mfeprimer 원본 리포트·로그뿐(같은 명령을 두 번 돌려도 달라지는 mfeprimer 자체의 비결정성) ③ 웹 API 14종 응답
+    비교. 이 과정에서 `/api/metadata`의 출처 URL이 빠지는 회귀를 찾아 수정. 그룹 lineage 행이 프로세스마다 다른 순서로 나오던
+    것은 정렬해 고정.
+  - 기존 결과를 쓰는 환경에서는 `rename_headers`의 params(컬럼 매핑)가 바뀌어 재계산 대상으로 보이므로, 위 비교로 동일함을 확인한 뒤
+    `snakemake --touch`로 한 번 채택하세요(재계산 없이 메타데이터만 갱신).
+- **표준물질 입력 / 관리 페이지** (사이드바 "🧫 표준물질 입력 / 관리", `config/standards.tsv`, `scripts/standards_common.py`):
+  하드코딩되어 있던 KDCA 표준물질 FASTA를 프라이머처럼 스프레드시트로 등록·수정(이름/segment/서열/출처/비고/
+  분석진행). 저장하면 파이프라인이 읽는 `config/kdca_standard_<seg>.fasta`·`_metadata.tsv`를 자동 생성
+  (내용이 같으면 파일을 건드리지 않아 재계산 없음). 기존 6개는 자동 이전(생성 파일이 기존과 바이트 단위로 동일).
+  긴 서열은 창에서 편집, FASTA 붙여넣기로 여러 개 추가. 이름은 결과·실험 검증 기록의 ID라 이름 변경·삭제 시
+  확인을 받고, 분석 대상 프라이머가 있는 segment에서 표준물질을 모두 끄면 저장을 막음.
+- **Vaadin Lumo 스타일 스킨** (`webapp/static/lumo.css`, 기본 적용). Lumo 토큰(214° 블루 primary, 4px/8px
+  모서리, 36px 컨트롤, 밑줄 탭, Grid 스타일 표, 필드 포커스 링, 라이트/다크)을 `style.css` 변수 위에
+  `html[data-skin="lumo"]` 범위로만 덮어씀 — 사이드바 하단 "스타일" 버튼으로 기본 스킨과 전환(브라우저에
+  저장). 폰트는 Lumo 기본 시스템 폰트 스택이라 별도 다운로드/CDN 없이 오프라인에서도 동작.
+- 프라이머 입력 스프레드시트에 **비고(remark)** 컬럼 추가 (제조사 제품명 등 자유 메모; 분석 입력
+  스냅샷에는 포함되지 않아 수정해도 재계산 없음).
+
+### Changed
+- 버전을 0.19.0으로 올리고 새 작업 폴더(`pipeline_snakemake_v0.19.0`)에서 새로 시작. 이 버전은
+  0.18.0에서 도입한 스프레드시트 포맷 `config/primers.tsv`(primer_name/segment/forward_primer/
+  reverse_primer/probe/fluorophore/source/proceed/add_date)를 기준으로 하며, 0.17.x 이전의
+  9컬럼 포맷(set_id/F_id/F_seq/...)과는 호환되지 않음. 버전 표기는 루트 `VERSION` 파일, 사이드바
+  하단, `webapp/package.json`에 있음.
+
+## [0.18.0] - 2026-10-02
+
+### Added
+- **`config/primers.tsv`를 비전문가도 엑셀처럼 바로 다룰 수 있는 단순한 포맷으로 전면
+  교체하고, 웹앱에 이를 직접 입력/수정하는 새 "프라이머 입력 / 관리" 스프레드시트 페이지를
+  추가.** 기존 포맷(set_id/segment/source/F_id/F_seq/R_id/R_seq/P_id/P_seq, 9컬럼, 별도
+  oligo id 입력 필요)을 `primer_name, segment, forward_primer, reverse_primer, probe,
+  fluorophore, source, proceed, add_date`(9컬럼, oligo id는 이름에서 자동 생성)로 교체 —
+  기존 25개 세트는 새 포맷으로 마이그레이션 완료(형광물질은 기존 `ui_state.json`에
+  저장돼 있던 값을 그대로 가져옴; `add_date`는 원래 추가 시점을 알 수 없어 마이그레이션
+  시점으로 기록).
+  - **`proceed`(분석진행여부) 컬럼**: False인 행은 Snakemake 파이프라인 전체에서 완전히
+    제외됨(`mfe_common.load_primers_manifest()`가 Snakefile의 룰 와일드카드 전체가 쓰는
+    `SET_IDS` 자체를 빌드하는 지점에서 걸러내므로, 결과가 아예 계산되지 않음 — 단순히
+    화면에서 숨기는 게 아님). 아직 준비 안 된 후보 프라이머를 지우지 않고 목록에 남겨두는
+    용도.
+  - **새 웹 페이지**: 사이드바의 "📝 프라이머 입력/관리" — 모든 행(proceed=False 포함)을
+    한 번에 보여주는 가벼운 인라인 편집 그리드(별도 라이브러리 없이 순수 JS). 셀 수정,
+    행 추가(마지막 빈 행에 입력하면 자동으로 다음 빈 행 생성)/삭제, 저장 시 서버에서
+    이름 중복·빈 서열·잘못된 IUPAC 문자·segment 값(S/L 아님)·proceed 값(True/False 아님)을
+    검증해 문제가 있으면 해당 셀만 표시해 저장을 막음. `add_date`는 읽기전용으로, 이름이
+    처음 채워진 저장 시점에 서버가 자동으로 오늘 날짜를 기록.
+  - **기존 형광물질 빠른 수정 기능(세트 상세 페이지)도 같은 파일에 쓰도록 변경** — 예전엔
+    `config/ui_state.json`의 별도 딕셔너리에 저장돼 스프레드시트와 따로 노는 두 번째
+    소스였는데, 이제 둘 다 `config/primers.tsv`의 `fluorophore` 컬럼 하나만 쓰므로 어느
+    쪽에서 고쳐도 항상 일치함.
+  - **스프레드시트 UI**: 전체 격자선·행 번호·고정 헤더, 셀 안을 꽉 채우는 테두리 없는 입력칸과
+    활성 셀 강조, Enter/↑↓로 위아래 이동·←→로 옆 칸 이동, 엑셀/구글시트에서 복사한 여러
+    행·열 영역 붙여넣기(탭 구분) 지원. 행 추가/삭제 시 전체를 다시 그리지 않아 입력 중 포커스가
+    유지됨.
+  - **최종 코드 검토에서 발견·수정한 후속 결함들**: (1) "새 프라이머 세트 분석 → config/primers.tsv에
+    영구 저장"이 옛 9컬럼 순서로 행을 이어 써서 새 포맷 파일을 깨뜨리던 문제 — 새 포맷으로
+    쓰도록 수정(중복 이름은 무시). (2) 그룹의 멤버 세트가 체크 해제/이름 변경/삭제되면 그룹이
+    존재하지 않는 세트의 결과를 요구해 파이프라인이 실패하던 문제 — Snakefile이 그룹 멤버를 현재
+    활성 세트로만 걸러내고, 활성 멤버가 하나도 없는 그룹은 제외. (3) 스프레드시트에서 기존 이름을
+    바꾸거나 행을 지울 때(=세트 ID가 바뀌어 결과·메모·실험 기록·그룹과의 연결이 끊김) 저장 전에
+    확인창으로 경고. (4) 오래전 삭제된 `normalize_orientation`을 가져오던 낡은 테스트가 수집
+    단계에서 실패하던 것을 현재 함수(`resolve_add_flips`) 기준으로 교체하고, 매니페스트 포맷
+    회귀 테스트(`tests/test_primers_manifest.py`) 추가 — 전체 27개 통과. README에 새 매니페스트
+    포맷 문서화.
+  - **검증 완료**: Snakefile dry-run으로 25개 세트 정상 인식 확인, `proceed=False`로
+    바꾼 행이 룰 와일드카드에서 실제로 빠지는 것 확인(25→24), 브라우저에서 직접 행
+    추가·편집·저장·삭제까지 전체 흐름 실행해 파일에 정확히 반영되는 것 확인, 저장 시
+    빈 트레일링 행이 파일에 같이 안 써지도록 처리. 데모 패키지에도 전체 반영.
+
+## [0.17.0] - 2026-10-02
+
+### Fixed
+- **그룹 상세 페이지의 "Binding-site overlay on lineage nucleotide diversity (pixy π)" 차트에
+  F/R 프라이머 위치가 아예 안 보이던 문제 수정 — `LASV-VendorB-S-GPC-ALL` 그룹(VendorB_S_NG_1 +
+  VendorB_S_SL_2)에서 재현.** 원인: `run_refgenome_binding.py`가 단일 참조유전체(AY628203)에
+  대해 `mfeprimer search -m 6`(최대 6 mismatch, 꽤 관대한 허용치)로 F/R/Probe를 각각 독립
+  검색하는데, 이 두 세트의 F/R은 population 정렬 테이블(`results/alignment/.../mismatch_table.tsv`)
+  기준으로는 이 바로 그 AY628203 genome에 0~2 mismatch로 정상 결합하는데도 `search -m 6`가
+  **아예 아무것도 찾지 못함** — 이미 3장/0.15.0에서 확인된 것과 동일한 mfeprimer seed-탐색
+  false-negative 클래스(seed 영역 안에 진짜 mismatch가 있으면 그 허용치 안에 있어도 후보 자체를
+  못 찾음). `found=False`라서 좌표가 없으니 차트가 그릴 게 없었던 것. `run_refgenome_binding.py`에
+  `direct_best_match()` 폴백을 1차로 추가해 found=True까지는 복구했으나, 이 폴백이 보고하는
+  mismatch 수치(예: VendorB_S_NG_1의 F=4, R=6)가 population 정렬 테이블의 공식 수치(F=1, R=1)와
+  다르게 나오는 문제를 바로 뒤이어 발견 — 조사 결과 mfeprimer의 `--virus` 지오메트릭 검색(공식
+  경로)은 이 genome에서 인델 등 정렬 민감도 차이로 단순 고정폭 문자열 비교(검색 실패 시 폴백,
+  그리고 애초의 `search -m 6` 자체)로는 재현되지 않는 방식으로 매치를 찾아내고 있었음.
+  **최종 수정**: 참조유전체는 그 세트의 population 전체 중 그냥 평범한 genome 하나일 뿐이므로,
+  별도로 좁게 다시 검색하는 대신 그 세트 자신의 이미 계산된 population 결과를 재사용하도록
+  구조를 바꿈 — F/R은 `primer_match`의 `--virus` spec.tsv를(`parse_spec_best()`에 개별
+  oligo 좌표(`f_pos`/`r_pos`)와 strand까지 노출하도록 확장), Probe는 `alignment_table`의
+  `mismatch_table.tsv`를(probe strand는 거기 없어서 이미 확정된 위치/mismatch 수치로 역산해
+  재계산) 우선 조회하고, 거기 없을 때만(mismatch_levels 0~2 밖, 즉 매우 낮은 품질의 프라이머인
+  경우) 기존의 독립 검색 → brute-force 폴백 순서로 넘어가도록 Snakefile에 두 입력(`spec`,
+  `alignment`)을 추가. **검증**: 25개 세트 전체 `refgenome_binding` 재계산 후, 참조유전체가
+  population 정렬 테이블에 존재하는 모든 오ligo(F/P/R, 66개 행)에 대해 두 수치를 교차 비교 —
+  **불일치 0건**, 완전히 일치함을 확인. 기존에 정상이던 세트들도 회귀 없음(같은 0 mismatch로
+  유지, 좌표만 기존 mfeprimer `search`의 0-based 관례에서 파이프라인 전반과 일관된 1-based로
+  정정됨).
+- **(중요) mfeprimer를 호출하는 규칙들이 Snakemake에 자신의 실제 CPU 사용량을 전혀 알리지
+  않아, 여러 개가 동시에 실행되면서 서로 CPU를 두고 경쟁(oversubscription)하는 문제 수정.**
+  `config.yaml`의 `mfeprimer_cpu`(기본 64)는 각 mfeprimer 호출이 `--cpu 64`로 실행됨을
+  뜻하는데, `primer_match`/`standard_primer_match`/`mfeprimer_index`/`standards_index`/
+  `refgenome_index`/`dimer_hairpin_check` 규칙 중 어디에도 `threads:` 선언이 없어서
+  Snakemake 스케줄러는 이 작업들을 비용 1짜리로 착각하고 `--cores 16` 안에서 최대 16개까지
+  동시에 실행시켰음 — 실제로는 각각이 64코어를 요구하는 프로세스이니, 몇 개만 겹쳐도(실제
+  관찰: 동시에 3~4개, `--cpu 64`끼리) 64코어 머신에서 수백 개 스레드가 서로 경합하며 극심한
+  스래싱이 발생. "분석 다시하기" 도중 실패/멈춤처럼 보이는 증상의 원인으로 추정됨(재현된 머신의
+  load average가 16코어 작업 기준 59까지 치솟음). `build_diversity_vcf`(mafft 호출)는 이미
+  `threads: 8`로 올바르게 선언돼 있던 것을 참고해, 나머지 6개 규칙에도
+  `threads: config["mfeprimer_cpu"]`를 추가 — 이제 Snakemake가 각 작업의 실제 비용을 알고
+  `--cores` 예산 안에서 올바르게 직렬화/제한함(`--cores 16 < mfeprimer_cpu=64`이므로 "Rules
+  claiming more threads will be scaled down" 경고와 함께 16으로 스케일다운되어, 사실상 한
+  번에 하나씩만 실행됨). dry-run으로 두 `primer_match` 작업이 이제 `threads: 16`으로 올바르게
+  표시되는 것을 확인. `probe_match`/`refgenome_binding`/`group_cross_binding` 등 나머지
+  mfeprimer 호출 규칙들은 `--cpu`를 아예 지정하지 않아(mfeprimer 자체 기본값 4 사용) 이 문제의
+  대상이 아님을 코드로 확인, 범위를 6개 규칙으로 한정함. **이미 실행 중이던 작업에는 적용되지
+  않음 — Snakefile은 각 snakemake 프로세스 시작 시 한 번만 읽히므로, 다음 번 "분석 다시하기"
+  부터 효과가 있음.**
+- **PDF 리포트 생성(`generate_report.py`)이 정확히 `google-chrome`이라는 이름의 바이너리만
+  찾던 것을 고쳐, `chromium`/`chromium-browser` 등 흔히 쓰이는 이름도 자동으로 찾도록 함.**
+  실제 배포 환경(다른 리눅스 컴퓨터에 프로젝트 폴더를 복사해 쓰는 경우)에서 `google-chrome`
+  대신 `chromium`만 깔려 있어 PDF 생성이 실패하는 사례로 발견. 새 `find_chrome()` 함수가
+  `--chrome` 인자 → 흔한 이름 여러 개(`google-chrome-stable`, `chromium`,
+  `chromium-browser`, `/snap/bin/chromium` 등) 순으로 탐색하고, 아무것도 못 찾으면 이전처럼
+  알아보기 힘든 `FileNotFoundError` traceback 대신 "Chrome/Chromium을 찾을 수 없습니다 —
+  설치하거나 --chrome로 경로 지정하세요" 같은 명확한 한국어 메시지를 데이터 수집 전에 즉시
+  띄움(이전엔 25개 세트를 전부 가져온 뒤에야 실패해서 수십 초를 허비했음).
+- **(중요) 웹서버가 요청 처리 중 예외가 나면 클라이언트에 아무 응답도 안 주고 그냥 연결을
+  끊어버리던 문제 수정 — 실제 원인을 전혀 알 수 없게 만드는 버그였음.** `BaseHTTPRequestHandler`는
+  `do_GET`/`do_POST` 안에서 발생한 예외를 기본적으로 잡아주지 않아서, 처리 중 에러가 나면 그
+  요청을 보낸 쪽(예: PDF 리포트 생성 스크립트)은 `http.client.RemoteDisconnected: Remote
+  end closed connection without response`라는, 진짜 원인과 전혀 상관없어 보이는 메시지만
+  받게 되고, 실제 traceback은 서버 터미널에 찍혔다가 사라짐 — 리눅스 노트북에 배포해 PDF
+  리포트를 생성하다가 그룹 상세 조회 중 이 증상으로 재현. `webapp/server.py`의 `do_GET`/
+  `do_POST`를 새 `_guarded()` 래퍼로 감싸서, 예외가 나면 ① 클라이언트에는 실제 HTTP 500 +
+  에러 메시지를 응답하고 ② `logs/webapp_server_errors.log`에 전체 traceback을 남기도록 함
+  (서버가 떠 있는 터미널을 안 보고 있었어도 나중에 원인 추적 가능). 정상 요청(세트/그룹 목록·
+  상세 등)은 이 변경으로 전혀 영향받지 않음을 확인.
+
+## [0.16.0] - 2026-09-29
+
+### Added
+- **"데이터 업데이트" 클릭 시 Nextstrain 원본 데이터가 실제로 바뀌었는지 먼저 가볍게 확인하고,
+  안 바뀌었으면 정말 다시 받을지 한 번 더 물어보도록 변경.** 기존에는 버튼을 누르면 바로
+  전체 재다운로드(수 분 소요, S+L 합쳐 4개 파일 ~1.5MB)와 mfeprimer 재인덱싱이 시작됐는데,
+  Nextstrain 쪽 데이터셋이 지난 업데이트 이후 전혀 안 바뀐 경우에도 매번 이 과정을 반복하는
+  건 불필요함. Nextstrain의 S3 버킷이 각 파일에 대해 내려받지 않고도 확인 가능한 커스텀
+  메타데이터(`x-amz-meta-sha256sum`: 파일 내용의 sha256, S3 ETag로 폴백)를 HEAD 요청만으로
+  제공한다는 점을 이용 — `webapp/server.py`에 새 함수 `probe_nextstrain_files()`(4개 파일에
+  대해 HEAD만 보내 sha256/ETag/레코드 수 확인)와 `config/fetch_state.json`에 마지막으로 실제
+  다운로드했을 때의 값을 저장하는 로직(`save_fetch_baseline_from_remote()`, fetch_raw job이
+  성공적으로 끝난 직후 자동 호출)을 추가하고, 새 GET `/api/pipeline/freshness` 엔드포인트로
+  현재 remote 값과 저장된 baseline을 비교해 파일별로 바뀌었는지 알려줌. 저장된 baseline이
+  아예 없는 경우(최초 실행 등)는 "바뀌었음"으로 간주해 안전하게 fail-open — 확인 불가능한
+  상태에서 업데이트를 막는 일은 없음. `webapp/static/app.js`의 "데이터 업데이트" 버튼
+  클릭 핸들러가 이 엔드포인트를 먼저 조회해, 4개 파일 모두 변경 없음이면 "현재 로컬 데이터가
+  Nextstrain 최신 버전과 동일한 것으로 보입니다 (변경 없음: ...). 그래도 다시
+  다운로드하시겠습니까?" 문구로, 하나라도 바뀌었으면 기존과 동일한 확인 문구로 `confirm()`을
+  띄움 — 어느 쪽이든 사용자가 최종 확인해야 실제 다운로드가 시작되는 건 그대로 유지.
+  freshness 확인 자체가 네트워크 문제 등으로 실패해도 조용히 기존 동작(그냥 확인 후 진행)으로
+  넘어가 업데이트 버튼이 막히지 않게 함. 실제 Nextstrain 엔드포인트로 검증: baseline 없을 때
+  4개 파일 모두 "no_baseline"으로 changed=true, baseline 저장 후 재확인 시 changed=false,
+  저장된 fingerprint를 인위적으로 바꾼 뒤 재확인 시 그 파일만 정확히 "content_changed"로
+  잡히고 나머지 3개는 그대로 unchanged임을 확인. 브라우저에서 실제 버튼 클릭으로 변경-없음
+  문구가 그대로 뜨는 것도 확인.
+
+## [0.15.0] - 2026-09-29
+
+### Fixed
+- **F/R primer pair에도 프로브와 동일한 mfeprimer seed-탐색 실패 fallback을 추가해, 0.11.0에서
+  "필요시 별도로 진행 예정"으로 남겨뒀던 F/R 쪽 문제를 마무리함.** `mfe_common.py`에 새 공용 함수
+  `direct_best_fr_match()`를 추가 — F/R 각각을 게놈 전체에서 양쪽 가닥으로 브루트포스 IUPAC
+  매칭한 뒤, 두 결과가 기하학적으로 유효한 amplicon(서로 반대 가닥, 올바른 순서, 15~400bp
+  범위)을 이루는 경우에만 채택. `scripts/build_alignment_table.py`(population/표준물질 공용)와
+  `scripts/live_analyze.py`(신규 세트 즉석 분석)의 population/표준물질 루프 양쪽에 연결. 알려진
+  실패 사례(`MH215287`, `LASV-VendorD-S-GPC-PREVIOUS1-P2`)로 검증: fallback 적용 전에는
+  `--virus --misMatch 2` 검색이 amplicon을 아예 못 찾았으나(Forward는 실제로 mismatch 0으로
+  완벽 결합), 적용 후 `mismatch_table.tsv`에 정상적으로 나타남을 확인. 전체 25개 세트
+  population + 표준물질 테이블 재계산 완료, 행 수 일관성 확인.
+- **그룹("ALL" 세트 조합)의 종합 평가(통과/보류/실패)가 실제 결합 조합 교차(cross-binding)
+  오염 여부를 전혀 반영하지 않던 문제 수정.** `group_cross_binding.py`가 그룹의 모든 F/R/Probe를
+  하나로 모아 population 전체에서 의도치 않은 세트 간 교차 결합을 이미 정확히 찾아내고 있었지만
+  (`combo_genomes`), 이 결과는 원시 표로만 보여질 뿐 `webapp/server.py`의
+  `build_group_evaluation()`과 그 JS 짝(`app.js`의 `groupAssessmentInput()`)이 계산하는
+  최종 판정(cls: ok/warn/bad)에는 전혀 들어가지 않았음 — 즉 population 대부분에서 세트끼리
+  서로 엉뚱하게 결합하는 그룹도 다른 지표만 좋으면 "✅ 양호"로 표시될 수 있었음. 세 곳 모두
+  공유하는 `generate_report.py`의 `build_assessment()`(및 JS 짝 `narrateSetAssessment()`)에
+  새 선택적 검사 항목 `cross_binding`을 추가 — 개별 세트에는 이 키가 없으므로(비교할 "다른
+  세트"가 없음) 기존 gene/binding 항목과 같은 방식으로 자동 스킵되고, 그룹에만 적용됨(교차
+  결합 게놈 0개면 +1점, 1개 이상이면 -2점 — 표준물질 불일치와 동급의 중대한 결함으로 취급).
+  `webapp/server.py`(`build_group_evaluation`), `webapp/static/app.js`(`narrateSetAssessment`,
+  `groupAssessmentInput`), `scripts/generate_report.py`(`render_group_section` — 기존에는
+  그룹 커버리지 박스가 실제 판정 없이 항상 초록/"ok" 스타일로 하드코딩돼 있던 것도 함께 고침,
+  PDF 리포트도 세트 상세 페이지와 동일한 판정 로직을 쓰도록 변경) 세 곳 모두 반영. 실제 데이터로
+  검증: `VendorA_L_ALL`(population 2,711개 결합 조합 중 1,617개가 세트 간 교차, 359개 서로 다른
+  게놈에 영향) 그룹 상세 페이지의 "종합 평가" 카드에 새 경고 문구가 정상적으로 표시됨을 확인.
+
+## [0.14.0] - 2026-09-18
+
+### Added
+- 영문/한글 UI 전환 추가, 기본값은 영문 — 사이드바 내비게이션, 카드/섹션 제목, 표 헤더,
+  파라미터/폼 페이지, 모달, 툴팁까지 번역(`STRINGS_EN`, `translateNode()`). 수백 곳에 흩어진
+  템플릿 문자열을 전부 추상 키로 리팩토링하는 대신, 렌더링 후 DOM을 훑어서 사전에 있는
+  문자열을 치환하는 방식이라 기존 한글 소스는 그대로 두고 안전하게 적용됨. 자식 요소가 없는
+  "리프" 요소만 치환 대상으로 삼아(중첩 버튼/입력을 깨뜨리지 않도록), h3/label처럼 텍스트와
+  버튼이 섞인 소수 케이스는 첫 텍스트 노드만 따로 치환. **범위: 내비게이션·제목·표 헤더·폼
+  라벨 등 구조적 UI 텍스트만 포함됨 — 가이드 페이지의 긴 설명 문단, 세트별 자동 평가 근거
+  문장처럼 자유서술형 텍스트는 이번 범위에서 제외(별도로 신중하게 번역할 분량).**
+- 자바스크립트 빌드 파이프라인 추가(`webapp/package.json`, esbuild) — `npm run build`로
+  `static/app.js`를 minify해 `static/app.min.js`로 압축(276.9KB &rarr; 231.7KB). 서버는
+  `app.min.js`가 있으면 그걸, 없으면 원본 `app.js`를 그대로 서빙해서(`server.py`의 `/app.js`
+  라우트) Node가 없는 환경에서도 그대로 동작함 — 빌드는 선택 사항이지 필수 의존성이 아님.
+- 라이트/다크 모드 수동 토글 추가(사이드바 우측 상단) — 기존에는 OS의 `prefers-color-scheme`만
+  따라갔는데, 이제 수동으로 고정 가능하고 `localStorage`에 저장돼 새로고침해도 유지됨. 첫
+  페인트 전에 적용하는 인라인 스크립트를 `index.html`에 추가해 테마가 바뀌는 깜빡임 없음.
+- 카드 최소화 상태가 이제 `localStorage`에 저장돼 새로고침해도 유지됨(카드 제목을 키로 삼아
+  전역 선호로 저장 — "이 카드는 항상 접어두고 싶다"는 식). 최소화됐을 때 보이는 높이도
+  고정값 대신 각 카드의 실제 제목 줄 높이를 측정해서 계산.
+
+### Fixed
+- **(중요) 카드 컨트롤/번역 로직을 붙여주는 `MutationObserver`가 자기 자신이 발생시킨 DOM
+  변경(컨트롤 버튼 추가, 텍스트 번역)에 다시 반응해 무한 루프에 빠져 브라우저 탭이 완전히
+  멈추는 버그 수정.** DOM을 변경하기 직전에 `observer.disconnect()`, 변경 직후 다시
+  `observe()`하는 표준 패턴으로 해결. 세션 중 실제로 탭이 멈추는 것으로 발견됨 — 재현 후 원인
+  파악, 수정, 여러 페이지를 오가며 재현되지 않음을 확인.
+
+## [0.13.0] - 2026-09-18
+
+### Added
+- 모든 결과 카드(세트 상세의 각 카드, 전체 게놈 정렬, 계통수, 리니지별 다양성 차트, 메타데이터
+  통계 카드 등)에 최소화/최대화 버튼 추가 — `webapp/static/app.js`의
+  `attachCardControls()`가 `.card`/`.diversity-chart-card`/`.meta-map-card`/`.meta-stat-card`를
+  `MutationObserver`로 감지해 자동으로 버튼을 붙여서, 카드를 만드는 수십 곳의 코드를 개별
+  수정할 필요가 없음. 전체 게놈 정렬/계통수처럼 이미 자체 전체화면 버튼이 있는 카드는 그
+  버튼 옆에 최소화 버튼만 추가.
+- 전문 용어 각주(footnote) 시스템 추가 — "파이프라인 개요/가이드" 페이지에서 IUPAC
+  축퇴염기, amplicon, mismatch, Tm, &Delta;G, nucleotide diversity(&#960;), VCF, lineage
+  용어가 처음 나올 때 위 첨자 각주 번호를 달고, 페이지 하단에 "용어 설명" 목록으로 전부
+  정리(`GUIDE_FOOTNOTES`, `fn()`, `.footnote-ref`/`.footnote-list`).
+
+### Changed
+- 전체적인 룩앤필을 다듬음(애플 스타일 방향): 카드 모서리를 더 둥글게, 하드 보더 대신 은은한
+  elevation 그림자(`--shadow-sm/md/lg`)로 전환, 사이드바에 반투명 blur(frosted glass) 배경,
+  버튼은 pill 모양 + hover 시 살짝 떠오르는 애니메이션, 입력 필드 포커스 시 부드러운 파란
+  글로우, 모달 열림에 페이드+팝인 애니메이션 추가. 값 자체(색상 팔레트, 폰트)는 유지하고
+  모양/그림자/트랜지션만 다듬어 기존 정보 밀도를 해치지 않도록 함.
+- 지난 버전에서 만든 폰트/여백/모서리 반지름 디자인 토큰을 기반으로 진행 — 새 토큰
+  (`--shadow-*`, `--ease`)도 같은 `:root` 스케일에 추가.
+
+### Fixed
+- 가이드 페이지가 여전히 예전(조인트 정렬) 방식으로 pixy VCF를 만든다고 설명하던 부분을
+  오늘 실제로 적용한 `mafft --keeplength --add` 방식 설명으로 갱신.
+
+## [0.12.0] - 2026-09-18
+
+### Added
+- "분석 파라미터 설정" 페이지에 mfeprimer CPU 코어 수 파라미터 추가(`mfeprimer_cpu`, 기본값은 이
+  머신의 논리 코어 수). mfeprimer의 `--virus`/degenerate 검색(파이프라인에서 가장 느린 단계 — 축퇴
+  프라이머 쌍 검색이 코어 수 기본값(4)으로는 수 분~수십 분 걸림)과 `index`(기본 16), `dimer`(기본 2)
+  전부 이 값을 사용하도록 배선(`hairpin`/`search`는 mfeprimer 자체에 CPU 옵션이 없어 영향받지 않음).
+  Snakemake 파이프라인 스크립트(`run_primer.py`, `build_index.py`, `run_dimer_hairpin.py`)와
+  웹앱의 즉석 분석(`live_analyze.py`), 그룹 이차구조 계산 전부 동일한 설정값을 읽음.
+- 그룹(여러 세트 조합) 상세 페이지에도 "리니지별 유전체 다양성(pixy &#960;) 위에 결합 위치
+  오버레이"를 추가 — 개별 세트 페이지의 기능을 그대로 재사용하되, 구성 세트 전체의 F/Probe/R 결합
+  위치를 한 차트에 함께 표시(각 박스에 어느 세트인지 라벨 포함). 미세조정(fine-tuning) 제안도 그룹의
+  결합 위치 전체에 대해 동일하게 계산됨.
+- "파이프라인 개요 / 가이드" 페이지에 "레퍼런스 / 참고문헌" 표 추가 — mfeprimer/mafft/pixy/htslib/
+  Snakemake/d3.js/Python/Nextstrain 각각의 실제 사용 버전과 학술 인용(DOI)을 한 곳에 정리.
+- 같은 가이드 페이지에 "프로세스 호출 다이어그램" 추가 — 텍스트 워크플로우 설명과 별개로, 어느
+  스크립트가 실제로 mfeprimer/mafft/pixy 중 무엇을 호출하는지, "핵심 판정 경로"(reconcile의
+  validated_pct에 직접 영향)와 "부가 분석"(대시보드 표시용, reconcile 판정에는 들어가지 않음)이
+  어떻게 나뉘고 다시 합쳐지는지, 웹앱의 즉석 분석이 Snakemake DAG를 건너뛰고 직접 도구를 호출하는
+  예외 경로까지 인라인 SVG로 시각화(`renderPipelineDiagram()`).
+- "리니지별 유전체 다양성" 페이지 차트에 참조유전체 위치 구간(시작/끝, 리니지 선택)을 직접 지정해
+  그 구간에서 필터링된 각 게놈이 실제로 갖는 서열을 FASTA로 받는 "이 구간 서열 다운로드" 버튼 추가
+  — 차트를 드래그해 확대한 구간이 입력칸에 자동으로 채워짐. 게놈별 실제 서열은 pixy에 쓰인
+  all-sites VCF(`results/diversity/{seg}/allsites.vcf.gz`)에서 위치별 genotype을 직접 복원해
+  얻음(`build_diversity_download_fasta()`) — 결측/gap/모호 염기는 전부 "N"으로 표시.
+- 같은 다운로드 구간 옆에 "이 구간 정렬 보기" 버튼 추가 — 지정한 구간의 실제 게놈 서열을 세트
+  상세 페이지의 MSA 카드와 똑같은 형태(position 눈금자, CONSENSUS 행, 게놈별 dot-diff 행)로 차트
+  아래에 바로 표시(`/api/diversity/region`, `build_region_alignment()`, 프론트엔드는 기존
+  `.msa-outer`/`.msa-row` 스타일 재사용). 렌더링이 무거워지는 것을 막기 위해 한 번에 볼 수 있는
+  구간 폭은 2,000bp로 제한.
+
+### Fixed
+- 결합 위치 오버레이 차트에서 라벨이 전부 같은 줄에 겹쳐 보이던 문제 수정 — 특히 그룹 페이지는
+  여러 세트의 F/Probe/R이 같은 구간에 몰릴 수 있어 심했음. x좌표 기준으로 겹치지 않는 줄에 자동
+  배치하도록 변경(`renderDiversityOverlays()`).
+- **(중요) pixy π 계산에서 multiallelic 사이트(같은 위치에서 ALT 염기가 2종류 이상)가 전부
+  누락되던 문제 수정 — "이 구간 정렬 보기"에서 실제로는 다양한 서열이 보이는데 π 차트는
+  결측(회색/데이터없음)으로 나온다는 제보로 발견.** 원인: pixy는 기본값이 biallelic SNP +
+  불변 사이트만 계산하고 ALT가 2개 이상인 사이트는 조용히 건너뜀(`--include_multiallelic_snps`
+  플래그, 기본 False). LASV처럼 한 사이트에 리니지마다 서로 다른 치환이 있는 경우가 흔한
+  집단에서는 multiallelic 사이트가 예외가 아니라 오히려 다양성이 가장 큰 자리라, 이걸 빼면
+  가장 중요한 신호가 통째로 빠짐. 실측 확인: L segment 한 165bp 구간에서 74%(165개 중 122개)
+  사이트가 ALT 2개 이상이라는 이유만으로 `no_sites=0`(π 없음) 처리되고 있었음. pixy 자체의 π
+  추정식은 multiallelic 사이트에서도 정확하다고 명시돼 있어(그 사이트를 빼는 것과 계산이
+  틀리는 것은 별개 문제), `run_pixy.py`에 `--include_multiallelic_snps`를 추가해 해결 —
+  같은 구간 재확인 결과 0/165로 감소. `results/diversity/{s,l}/pixy_pi.json` 재계산함
+  (population coverage/mismatch 판정 등 pixy를 쓰지 않는 나머지 파이프라인 결과에는 영향 없음).
+- **(중요) 집단 다양성(pixy) VCF의 genotype 결측률이 비정상적으로 높던 문제 수정 — 리니지별 유전체
+  다양성 페이지의 구간 다운로드/정렬 보기에서 "N"이 너무 많다는 제보(#57, #58)로 발견.** 원인:
+  `build_diversity_vcf.py`가 662개(S)/366개(L) population 게놈 전체를 mafft로 한 번에 조인트
+  정렬(joint MSA)한 뒤 그 컬럼을 VCF 사이트로 썼는데, 이 방식은 리니지 간 발산도가 큰 게놈이 섞이면
+  guide tree가 뒤틀려 실제로는 완전히 정상(원본 서열에 N/모호염기 0%)인 게놈도 참조유전체와 정렬이
+  안 된 것처럼 대량으로 gap 처리됨 — 검증 결과 게놈의 절반가량(중앙값 37.4%, 최악 46.9%)이 허위로
+  "결측"(N) 처리되고 있었음. `mafft --keeplength --add`(참조유전체 하나만 고정 프로파일로 두고
+  나머지 게놈을 각각 독립적으로 그 프로파일에 정렬 — 한 게놈의 정렬 품질이 다른 게놈에 영향을 주지
+  않음)로 교체해 같은 게놈들의 결측률을 중앙값 1.4%(S)/1.5%(L), 최악의 경우도 7~12%대로 낮춤.
+  minimap2+bcftools(원래 기각됐던 방식), Nextclade(`--retry-reverse-complement`,
+  `--min-seed-cover`로 완화), Snippy(`--ctgs`, `--mincov 1`) 세 가지 대안도 같은 문제 게놈들로
+  직접 테스트해 비교: Snippy는 bwa+freebayes가 애초에 근연 세균 재시퀀싱을 가정하는 도구라 LASV의
+  리니지 간 발산도(~20&ndash;30%)에서 완전히 실패(정방향/역방향 모두 read 0% 매핑, variant 0개
+  호출); Nextclade는 완화된 임계값으로 대부분은 mafft와 비슷하게 맞췄지만 가장 발산도가 큰 게놈에서는
+  여전히 과도하게 보수적(예: 한 게놈에서 47.3% 결측 — mafft는 같은 구간을 11.6%만 결측 처리했고,
+  그 mafft 복원 서열이 원본 게놈에 실제로 존재하는지 12-mer 단위로 직접 대조해 100% 일치함을 확인,
+  즉 Nextclade 쪽이 과소 호출). 결측률이 여전히 높게 남은 극소수 게놈(예: `OR493501`, 46.9%)은
+  단독 pairwise 정렬로도 동일하게 나와 도구 문제가 아니라 해당 GenBank 제출물 자체의 실제 생물학적
+  발산/조립 특이사항으로 판단, 별도 조치 없이 그대로 둠. `Snakefile`의 `build_diversity_vcf` 규칙에
+  `ref_fasta` 입력을 추가하고 `results/diversity/{s,l}/allsites.vcf.gz`와 `pixy_pi.json`을 재계산함
+  (population 커버리지/mismatch 판정 등 이 VCF를 쓰지 않는 나머지 파이프라인 결과에는 영향 없음).
+  같은 VCF를 읽는 "이 구간 서열 다운로드"/"이 구간 정렬 보기"(아래 Added 참고)도 이 수정으로
+  정확한 게놈별 서열을 보여주게 됨.
+
+## [0.11.0] - 2026-09-18
+
+### Fixed
+- **(중요) 프로브 mismatch가 실제로는 결합하는데도 "결합 실패"(null)로 표시되던 버그 수정 —
+  25개 세트 population 표에서 4,082개, 표준물질 표에서 7개 게놈에 영향.** 발견 경위: "LASV-VendorD-S-
+  GPC-PREVIOUS1-P2"의 `OL774857`이 "전체 게놈 정렬(MSA)"에서는 정상으로 보이는데 "게놈별 F/Probe/R
+  미스매치" 표에서는 프로브가 안 붙는다는 제보(#55)로 조사. 원인: 프로브 mismatch는 mfeprimer의
+  `search -m 8`(최대 8개까지 허용) 결과를 그대로 사용하는데, mfeprimer가 먼저 짧은 seed로 후보를
+  찾은 뒤에야 mismatch 필터를 적용하는 구조라서, 실제 mismatch가 1개뿐이어도 그 mismatch가 seed
+  영역 안에 있으면 seed 탐색 자체가 실패해 아예 "매치 없음"으로 보고되는 경우가 있음 — F/R에서 이미
+  0.9.0에서 발견·수정한 것과 동일한 종류의 버그가 프로브에는 남아있었음(직접 확인: `OL774857`은
+  실제로 mismatch 1개로 정상 결합).
+  수정: `scripts/build_alignment_table.py`(population/표준물질 공용)와 `scripts/live_analyze.py`
+  (신규 세트 즉석 분석)가 mfeprimer의 프로브 검색이 아무 결과도 못 찾았을 때, 이미 추출해둔 amplicon
+  서열 안에서 프로브를 직접 IUPAC 매칭으로 재탐색하는 fallback을 추가(`mfe_common.py`의 새 공용 함수
+  `direct_best_match()`). 25개 세트 전체(population + 표준물질) 재계산 완료 — **다만 기본 설정
+  (probe_mismatch=0, 완전일치 요구)에서는 구제된 4,082개 게놈이 전부 mismatch&ge;1이라 validated_pct/
+  probe_dropout/표준물질 O·X 같은 대시보드 헤드라인 수치는 전혀 바뀌지 않음** (mismatch=0인 자리는
+  seed 탐색이 실패할 이유가 애초에 없어서 이 버그의 영향을 받지 않음). 개별 게놈의 정확한 mismatch
+  값(0 대신 실제 1로 표시 등)과 MSA-표 일관성만 바로잡힘 — probe_mismatch를 0보다 크게 설정해 쓰는
+  경우라면 결과가 달라질 수 있음.
+- F/R 쪽에도 (훨씬 드물게, 이번 조사 중 발견한 1개 세트에서 662개 중 1개) 같은 종류의 mfeprimer
+  seed-탐색 실패가 남아있음을 확인(`MH215287`: 실제로는 Forward mismatch 0으로 완벽 결합하나
+  `--virus --misMatch 2` 검색이 amplicon을 아예 못 찾음) — 이번 라운드에서는 수정하지 않음(F/R은
+  amplicon 전체를 재구성해야 해서 프로브보다 구조가 복잡함). 필요시 별도로 진행 예정.
+
+### Added
+- 세트별 종합 평가에 통과/보류/실패 3단계 평가(evaluation) 필드 추가 — 기존에는 세트 상세
+  페이지에서만 클라이언트 쪽(`narrateSetAssessment()`)으로 계산되던 종합 판정을
+  `scripts/generate_report.py`의 `build_assessment()`을 서버(`webapp/server.py`)에서도 재사용해
+  `/api/sets`, `/api/sets/<id>` 응답에 `evaluation: {cls, label}`(cls는 ok/warn/bad, label은
+  통과/보류/실패)로 포함. "전체 대시보드"의 "세트별 상세 요약" 표에 "평가" 컬럼으로 추가해 25개
+  세트를 한눈에 비교 가능. 목록(`/api/sets`)에서는 참조유전체 결합·이차구조 정보 없이 빠르게
+  계산하고, 세트 상세(`/api/sets/<id>`)를 열면 그 두 항목까지 포함한 전체 기준으로 재계산돼 상세
+  페이지의 판정과 항상 일치.
+- "메타데이터 / 지도" 페이지에 "연도별 보고 유전체 수" 라인그래프 추가 — 전체 합계뿐 아니라
+  리니지별로도 선을 나눠서 표시하고, 범례 칩을 클릭해 각 선을 켜고 끌 수 있음(토글). 10년 단위로
+  배경색을 다르게 깔아 시대 구간을 한눈에 구분. 지도의 전체/S/L 탭과 연동됨. 새 API 필드
+  `/api/metadata`의 `by_year`(연도별 s/l 합계), `by_lineage_year`(리니지 &times; 연도별 s/l
+  합계). 이 페이지의 다른 미니 차트들과 달리 다중 계열 + 토글 범례라 d3(이미 지도에 사용 중)의
+  scale/line generator/data-join을 그대로 활용(`webapp/static/app.js`의 `renderMetaYearChart()`).
+- 그룹(여러 세트 조합) 상세 페이지에 개별 세트 페이지와 동일한 4가지 항목 추가:
+  - **종합 평가**: `build_assessment()`를 그룹의 union 데이터(population 커버리지, 멤버 중 하나라도
+    표준물질 매치, 그룹 전체 이차구조)로 재사용 — probe dropout/단일 amplicon 크기/단일 결합위치처럼
+    union에 의미가 없는 항목은 입력을 비워 자연스럽게 건너뜀.
+  - **이차구조(Self/Cross-dimer &middot; Hairpin, 그룹 전체)**: 구성 세트 전체의 F/Probe/R을 하나로
+    모아 mfeprimer dimer/hairpin 검사 — 한 세트의 올리고가 **다른 세트**의 올리고와 결합하는 경우까지
+    포함(온디맨드 계산, `webapp/server.py`의 `compute_group_dimer_hairpin()`).
+  - **메모/노트(+사진 첨부)**, **실험(Wet-lab) 검증**: 그룹 단위로 기록. `notes`/`note_images`/
+    `verifications`는 세트와 그룹이 같은 ui_state.json 딕셔너리를 공유하도록 일반화해서
+    `/api/sets/<id>/...`뿐 아니라 `/api/groups/<id>/...`로도 동일하게 동작(`_entity_exists()`가
+    두 id 공간을 모두 인정). 그룹의 실험 검증은 세트별 `standard_genomes` 표가 없어 인실리코 자동
+    비교는 제공하지 않고 결과 기록(검출 여부/Ct/형광물질/메모/사진)만 지원.
+- "전체 대시보드"의 "세트별 상세 요약" 표 위에 "평가"(통과/보류/실패) 판정 기준을 그대로 명시 —
+  population 커버리지/probe dropout/표준물질 매치/참조유전체 결합/이차구조 각 항목의 배점과
+  합산 임계값(3점 이상 통과, 0~2점 보류, 0점 미만 실패)을 표로 보기 전에 바로 확인 가능.
+- "리니지별 유전체 다양성(pixy &#960;)" 페이지 차트를 d3 기반으로 재작성해 인터랙티브하게 변경 —
+  드래그로 특정 구간을 선택하면 확대(brush-to-zoom, `d3.brushX`), 더블클릭 또는 "전체 보기" 버튼으로
+  초기화. 범례 칩을 클릭하면 해당 리니지 선을 켜고 끌 수 있음(토글) — 리니지가 많아 겹치는 구간을
+  원하는 것만 남겨 비교 가능. 기존 문자열 SVG 렌더링(`renderDiversityChart()`)은 세트 상세 페이지의
+  결합위치 오버레이(고정된 확대 창, 인터랙션 불필요)에 계속 쓰이도록 그대로 두고,
+  `renderInteractiveDiversityChart()`를 새로 추가.
+- 세트 상세 페이지의 "리니지별 유전체 다양성(pixy &#960;) 위에 결합 위치 오버레이"에 미세조정
+  제안 추가 — pixy &#960;가 염기 단위(window_size=1bp)로 계산되는 점을 활용해, F/Probe/R 각 결합
+  위치를 &plusmn;40bp 범위 안에서 같은 길이로 옮겨봤을 때 population 전체(ALL_LASV) 평균 &#960;가
+  뚜렷이(&le;50%) 낮아지는 위치가 있으면 "OO을 Nbp 상류/하류로 옮기면 &#960;가 X&rarr;Y로 낮아질
+  것으로 추정됩니다"라고 표시하고, 그 새 위치의 실제 후보 서열까지 population 대립형질(3% 이상
+  빈도)을 IUPAC 코드로 반영해 함께 보여줌. 탐색과 서열 재구성 모두 서버(`webapp/server.py`의
+  `compute_shift_suggestions()`)에서 계산 — population VCF를 직접 읽어야 해서 브라우저 쪽에서는
+  할 수 없는 작업. Tm/GC/이차구조/다른 올리고와의 거리/실제 합성 가능성(축퇴 코드가 많으면 여러
+  서열의 혼합물이 되어 특이도가 떨어질 수 있음)은 전혀 반영하지 않는 참고용 힌트이며 자동 적용되지
+  않음을 명시.
+
+### Fixed
+- **(중요) S segment의 pixy &#960; 다양성 데이터가 기준유전체 기준 좌우로 뒤집혀 있던 버그 발견 및
+  수정.** 발견 경위: 위 미세조정 제안 기능을 검증하려고 실제 population 서열을 직접 재구성해보다가,
+  결과가 기존 커스텀 프라이머 서열과 전혀 맞지 않는 것을 발견 — `build_diversity_vcf.py`가 mafft
+  `--adjustdirection`로 전체 population을 정렬할 때 S segment에서는 기준유전체(AY628203) 자체가
+  반대 방향으로 뒤집힌 채 정렬되었고, 이를 막기 위한 `normalize_orientation()`이 실제로는 작동하지
+  않은 것으로 보임(L segment는 정상). 검증: pixy VCF의 REF 컬럼을 이어붙인 서열이
+  `data/refgenome/s_ref.fasta`와 그대로는 26.5%만 일치하지만 역상보로는 100%(3402/3402) 일치.
+  영향: "리니지별 유전체 다양성" 페이지, 세트별 &#960; 오버레이(F/Probe/R 결합위치 박스와 유전자
+  트랙 정렬)까지 S segment 세트 전부가 잘못된 위치의 &#960; 값을 보여주고 있었음.
+  `webapp/server.py`에 `_detect_diversity_orientation_flip()`을 추가해 `/api/diversity` 응답
+  시점에 자동 감지 후 좌표를 재정렬(파이프라인을 다시 돌려 원인이 고쳐지면 자동으로 no-op).
+- 프라이머/프로브 방향 라벨("상류/하류")이 `-` strand 올리고에서 반대로 표시되던 문제 수정(위 버그
+  수정 과정에서 함께 발견) — 기준유전체 좌표가 커지는 방향은 `+`strand에서만 3&prime; 방향이고
+  `-`strand 올리고는 그 반대이므로, strand를 고려해 방향을 계산하도록 변경.
+
+## [0.10.0] - 2026-09-17
+
+### Added
+- 세트 메모/노트에 이미지 첨부 기능 추가 (실제 RT-PCR 결과 사진 등). 텍스트 입력창에 붙여넣기
+  (Ctrl/Cmd+V) 또는 "📷 사진 추가" 버튼으로 업로드, 썸네일 갤러리 + 클릭 시 확대(라이트박스) +
+  삭제 지원. `config/note_images/<set_id>/`에 저장(gitignored, 대외비 유지), 새 API
+  `POST/DELETE /api/sets/<id>/note/images`, `GET /api/sets/<id>/note/images/<image_id>`.
+- "전체 게놈 정렬(MSA)"에 VS Code 스타일 컬럼(세로) 선택 추가 — ⌥/Alt + 드래그로 특정 구간을
+  전체 행에 걸쳐 세로로 선택, 선택 범위 표시 + "선택 영역 복사"(모든 행의 해당 구간을 게놈 라벨과
+  함께 tab-separated로 클립보드 복사, 엑셀 등에 바로 붙여넣기 가능).
+- 세트별 종합 분석 결과를 하나의 PDF로 정리하는 리포트 생성 기능 추가 — 사이드바
+  "📄 종합 리포트 PDF 생성" 버튼 한 번으로 실행(`scripts/generate_report.py`, 새 API
+  `POST /api/report/generate`(기존 데이터 업데이트/분석 다시하기와 같은 백그라운드 job 방식으로
+  진행 상황 표시), `GET /api/report/download`). 표지(전체 통계) + 세트마다 1페이지(종합 평가,
+  서열, population 커버리지, 표준물질 매치, 참조유전체 결합, 리니지 분포, 메모+첨부 이미지 포함).
+  현재 실행 중인 webapp에서 데이터를 그대로 가져와 대시보드와 항상 같은 수치를 보장. headless
+  Chrome의 DevTools Protocol(Page.printToPDF)을 직접 구동해 PDF로 변환(`--print-to-pdf` CLI
+  플래그의 헤더/푸터 억제 옵션이 현재 Chrome 빌드에서 동작하지 않아 우회). 결과물은
+  `results/final/report.pdf`(gitignored, 대외비 유지).
+
+## [0.9.0] - 2026-09-17
+
+### Fixed
+- **(중요) "validated_pct"(최종 통과 비율)를 포함한 모든 "공식" 커버리지 수치가 실제보다 낮게
+  집계되고 있던 버그 수정 — population 전체 헤드라인 숫자가 세트당 최대 수십 개 게놈만큼
+  과소평가되고 있었음.** 발견 경위: 전체 대시보드의 "세트 × 리니지" 히트맵과 세트 상세 페이지가
+  같은 세트에 대해 서로 다른 리니지 분포를 보여준다는 제보(#24.1)를 조사하다가 원인을 찾음.
+
+  원인: "validated"(최종 통과) 여부를 두 군데서 서로 다른 방식으로 계산하고 있었음 —
+  (1) 게놈별 미스매치 표/MSA는 `--misMatch 2`로 넉넉하게 검색한 뒤 실제 매치된 서열을 기준으로
+  정확한 mismatch 개수를 Python에서 직접 재계산(`build_alignment_table.py`), (2) 반면 "공식"
+  validated_pct/summary 수치(`reconcile.py`)는 `--misMatch 1`(기본 허용치)로 mfeprimer를 별도로
+  다시 실행해서 그 결과의 pass/fail만 사용. 그런데 mfeprimer는 먼저 짧은 seed(k-mer)로 결합
+  후보를 찾은 뒤에야 `--misMatch` 필터를 적용하는 구조라서, seed를 낮은 허용치로 찾다가 실패하면
+  실제로는 mismatch가 허용치 이내인 자리도 "아예 못 찾음(결합 실패)"으로 보고하는 경우가 있음 —
+  확인된 실제 사례: `VendorD_GPC_PREVIOUS1_LASV1_P2`의 게놈 `AY628201`은 F/Probe/R 모두 mismatch=0인
+  완벽한 매치인데도 `--misMatch 1` 직접 검색에서는 결합 실패로 보고됨.
+
+  수정: `reconcile.py`(및 `standard_reconcile`)가 별도의 좁은 mfeprimer 검색을 다시 실행하는 대신,
+  게놈별 미스매치 표(`mismatch_table.tsv`)가 이미 정확하게 계산해둔 mismatch 값을 그대로 읽어서
+  판정 기준(mismatch ≤ 허용치)만 적용하도록 변경 — "validated" 계산 로직이 이제 코드베이스 전체에
+  단 하나만 존재. 사용자 신규 세트 분석(`live_analyze.py`)에도 동일한 리팩터링을 적용(부수 효과로
+  mfeprimer 호출 횟수도 줄어 분석 속도도 약간 빨라짐). 영향받은 예시:
+  `VendorD_GPC_PREVIOUS1_LASV1_P2`는 validated 526→607개(79.5%→91.7%)로 재조정됨. 25개 세트, 9개
+  그룹, 표준물질 매치 전체 재계산 완료.
+
+## [0.8.0] - 2026-09-17
+
+### Added
+- "게놈별 F/Probe/R 미스매치" 표(개별 세트)에도 교차 결합 표와 동일한 "상태" 컬럼(✅ 정상/⚠️ 주의/
+  🚫 문제)과 "문제/주의만 보기" 필터 추가 — mismatch 기준뿐 아니라 Tm/ΔG/amplicon 크기까지 종합한
+  한눈에 보기.
+- 그룹(여러 세트 조합) 상세 페이지에 다음 3가지 추가:
+  - **세트별 Population 커버리지** 표 (primer mm0/1/2, probe 완전일치, validated%).
+  - **표준물질(KDCA) 매치 (Cross-binding)**: 개별 세트 상세 페이지의 표준물질 매치처럼, 그룹의 모든
+    F/R/Probe를 하나로 모아 KDCA 표준물질 DB에 대해 교차 결합까지 포함해 검색.
+  - **참조유전체 결합위치 (Cross-binding)**: 같은 방식으로 단일 참조유전체에 대해 교차 결합까지
+    포함해 결합위치 확인.
+  둘 다 population 교차 결합 분석과 동일한 UI(상태 컬럼, 필터, 상세 보기)를 재사용함
+  (`scripts/group_standard_refgenome_binding.py`, 새 Snakemake 규칙 `group_standard_binding`/
+  `group_refgenome_binding`).
+
+### Fixed
+- **"전체 게놈 정렬(MSA)"에서 프라이머/프로브의 IUPAC 축퇴염기 위치마다 실제로는 문제없는 게놈들이
+  전부 "불일치"처럼(점이 아니라 글자로) 표시되던 문제 수정.** 원인: 게놈별 점(dot) 표시가 프라이머가
+  아니라 population 평균 서열(consensus, 항상 단일 염기)과만 비교하고 있어서, 프라이머가 Y(=C 또는
+  T)처럼 두 염기를 모두 허용하는 위치에서는 그중 소수파 염기를 가진 게놈들이 실제로는 프라이머와
+  완벽히 일치함에도 "consensus와 다르다"는 이유만으로 전부 불일치 글자로 표시되고 있었음. 수정:
+  프라이머/프로브가 덮는 구간에서는 프라이머 자신의 (축퇴염기를 포함한) 서열을 기준으로 일치 여부를
+  판정하도록 변경(`scripts/msa_common.py`). 25개 세트 전체 재계산 확인.
+
+## [0.7.0] - 2026-09-17
+
+### Fixed
+- **(중요) "전체 게놈 정렬(MSA)"과 "게놈별 F/Probe/R 미스매치" 표가 서로 다른 게놈 목록을 보여주던
+  버그 수정.** 원인: mfeprimer의 `--fasta`(amplicon 서열) 출력은 기본적으로 `--max-amp-count`
+  (기본값 10000)개까지만 기록하고 그 이후 후보는 조용히 버리는데, spec.tsv(위치/미스매치 표)는 모든
+  후보를 빠짐없이 기록함. 축퇴염기가 많은 프라이머 세트(예: VendorC_L_1)는 후보 조합 수가 이 한도를
+  훨씬 넘어서(최대 약 20만 건) 일부 게놈의 amplicon 서열이 통째로 누락되었음 -- 해당 게놈은 미스매치
+  표에는 정상적으로(심지어 mismatch=0으로) 나타나지만 MSA에서는 아무 표시 없이(제외 목록에도 없이)
+  그냥 사라져 있었음(VendorC_L_1 기준 364개 중 48개, 그룹 교차 결합 분석은 더 심각해서 일부 그룹은
+  amplicon 서열이 전부 비어 있었음). 수정: amplicon 서열을 mfeprimer의 truncate되는 출력 대신,
+  spec.tsv에 항상 온전히 남아있는 좌표를 이용해 population 유전체 원본에서 직접 잘라내는 방식으로
+  변경(`scripts/mfe_common.py`의 새 `read_fasta_seqs()`, `scripts/build_alignment_table.py`,
+  `scripts/group_cross_binding.py`, `scripts/live_analyze.py`). 영향받은 25개 세트 전체와 9개
+  그룹 전체를 재계산함.
+
+## [0.6.0] - 2026-09-17
+
+### Added
+- "게놈별 교차 결합 F/Probe/R 미스매치" 표에 "상태" 컬럼 추가 (✅ 정상 / ⚠️ 주의 / 🚫 문제) --
+  mismatch 기준(verdictFor)과 결합 품질 평가(Tm/ΔG/크기)를 종합한 한눈에 보는 요약, "문제/주의만
+  보기" 필터도 함께 추가.
+
+### Changed
+- 그룹 교차 결합 분석(`scripts/group_cross_binding.py`)에 amplicon 크기 기반 2단계(discover →
+  filter) 필터링 추가. mfeprimer --virus의 기본 최대 amplicon 크기(2000bp)로 인해, 서로 다른
+  유전자를 노리는 두 세트의 primer가 지오메트리상으로는 짝을 이루지만 실제로는 절대 증폭되지 않을
+  1~2kb짜리 조합까지 "교차 결합 발견"으로 잡히던 문제를 해결. 고정된 크기 컷오프를 하드코딩하는 대신,
+  각 세트가 <b>자기 자신과 정상적으로 결합</b>할 때의 실제 amplicon 크기를 먼저 확인하고, 그중 가장
+  큰 값의 2배(최소 300bp)를 넘는 조합은 비현실적이라고 판단해 제외 -- 세트/그룹마다 실제 설계
+  amplicon 크기가 다르므로, 데이터에서 기준을 끌어냄. 크기 기준은 가능하면 참조유전체로 검증된 정확한
+  값(`gene_summary.tsv`)을 우선 쓰고, 그 값이 없는 세트만 population same-set 매치의 중앙값으로
+  대체 -- population 중앙값을 그대로 1순위로 쓰면 축퇴염기 프라이머가 population 내 서로 다른 위치에
+  매치되는 경우가 섞여 기준 자체가 부풀려질 수 있음을 확인함(예: VendorA_L_ALL은 population 중앙값
+  855bp vs 참조유전체 검증값 약 110bp). 적용된 기준값과 세트별 출처는 그룹 상세 페이지의 "교차 결합
+  분석" 카드에 표시됨(`results/final/groups/<id>/size_filter.json`).
+
+## [0.5.0] - 2026-09-17
+
+### Added
+- `LICENSE` (MIT) 추가 및 README/webapp 사이드바에 저작권 표시 — Copyright (c) 2026 Chihwan Choi
+  (c.mario8609@gmail.com), 오픈소스(MIT) 라이센스.
+- Tm/ΔG 값에 마우스오버 시 의미를 설명하는 tooltip 추가, 파이프라인 가이드 페이지에 "ΔG(결합
+  자유에너지)란? 어떻게 해석하나요?" 상세 설명 카드 추가 (더 음수일수록 안정적인 결합, mismatch=0이라도
+  ΔG가 약할 수 있다는 점, Tm과의 관계 등).
+
+### Fixed
+- "게놈별 교차 결합 F/Probe/R 미스매치" 표에서 행을 펼쳤을 때, 표에 표시된 조합 라벨(예: "SET1-R x
+  SET2-R")과 실제로 펼쳐서 보여주는 서열/라벨("SET1 · F", "SET1의 F_seq")이 서로 다르게 나오던
+  데이터 불일치 버그 수정. 원인: 상세 보기가 어느 oligo가 실제로 결합에 쓰였는지(f_oligo_id/r_oligo_id
+  에 이미 기록된 실제 역할)를 무시하고, 항상 "f_set_id의 F, r_set_id의 R"이라고 가정해 서열과 라벨을
+  하드코딩하고 있었음 — 실제로는 어떤 세트의 R이 fp(좌측) 역할을 맡는 경우도 있어(교차 결합의 특성상),
+  이 경우 완전히 다른 서열이 표시되고 있었음. 이제 f_oligo_id/r_oligo_id에 기록된 실제 역할(F 또는 R)을
+  읽어 그에 맞는 서열과 라벨을 사용하도록 수정 — 표 라벨과 상세 보기가 항상 일치함.
+
+## [0.4.0] - 2026-09-17
+
+### Added
+- "게놈별 F/Probe/R 미스매치" 표에 검색어·필터·정렬을 한 번에 초기화하는 "필터 리셋" 버튼 추가.
+- "결합 품질 평가(참고용)" 섹션 추가: amplicon 크기, Tm, ΔG가 일반적인 TaqMan qPCR 설계 권장 범위를
+  벗어나는지 자동으로 평가해 게놈별/표준물질/교차 결합 상세 보기 어디에서나 표시 (mismatch=0으로
+  "완전일치"라도 Tm/ΔG가 약하면 실제로는 잘 동작하지 않을 수 있다는 점을 보완).
+- 세트 상세 페이지 최상단에 "종합 평가(참고용 자동 분석 의견)" 카드 추가: population 커버리지, probe
+  dropout, 표준물질 매치, 참조유전체 결합, amplicon 크기, MSA에서 제외된 게놈 수를 종합해 이 세트의
+  설계가 전반적으로 양호한지, 어떤 문제가 있는지, 무엇을 보완하면 좋을지 자동으로 요약.
+- "📖 파이프라인 개요 / 가이드" 페이지 추가: 전체 워크플로우 다이어그램(7단계), 사용된 프로그램
+  (Snakemake/mfeprimer/mafft/Nextstrain) 설명, 분석 파라미터 설명, 결과 해석 가이드(mismatch 색상,
+  Tm/ΔG, amplicon 크기, 교차 결합 등)를 한 페이지에 정리.
+- "전체 게놈 정렬(MSA)"에서 제외된 게놈을 사유(길이 이상치 / 정렬을 크게 왜곡시킴)와 함께 펼쳐서
+  볼 수 있는 목록 UI 추가.
+
+### Fixed
+- "전체 게놈 정렬(MSA)"이 소수의 문제 있는 서열(다른 게놈과 공유되지 않는 큰 삽입/결손) 때문에 전체
+  정렬이 gap 투성이로 망가지는 문제를 해결 (`scripts/msa_common.py`). mafft 정렬 후 "혼자서만 특정
+  구간을 차지하는" 서열을 반복적으로(최대 4회) 찾아내 제외하고 남은 서열로 다시 정렬하는 방식으로,
+  그런 서열은 분석에서 제외하고 별도 목록으로만 보여줌.
+- 그룹 교차 결합 표(`scripts/group_cross_binding.py`)에서 같은 두 오ligo가 정방향/역방향이 뒤바뀐
+  서로 다른 조합으로 매치되는 경우, 실제로는 어느 쪽이 F 역할이고 어느 쪽이 R 역할인지와 무관하게
+  라벨을 항상 "-F x -R"로 고정 표시해 두 개의 다른 조합이 똑같은 라벨로 보이던 문제를 수정 -- 실제로
+  결합에 사용된 oligo의 역할(F/R)을 그대로 라벨에 반영.
+- 전체 대시보드의 "세트별 커버리지"와 "최종 통과 게놈의 리니지 분포" 두 패널이 서로 다른 세트
+  목록/순서를 사용해(리니지 분포 쪽은 validated 게놈이 있는 세트만 표시) 같은 세트의 행이 두 패널에서
+  다른 위치에 나타나던 문제를 수정 -- 이제 항상 같은 순서로 나란히 정렬됨.
+
+## [0.3.0] - 2026-09-17
+
+### Added
+- 그룹(여러 세트를 묶은 조합) 분석에 **교차 결합(cross-binding) 탐지**를 추가 (`scripts/group_cross_binding.py`,
+  새 Snakemake 규칙 `group_cross_binding`, 새 파일 `results/final/groups/<id>/combo_mismatch_table.tsv`).
+  기존에는 각 세트를 독립적으로 분석한 뒤 validated 게놈만 단순히 합집합으로 묶었는데, 이는
+  "세트1의 F가 세트2의 R과 결합"하거나 "세트2의 Probe가 세트1의 amplicon 안에 위치"하는 것처럼
+  세트 간에 의도치 않게 결합하는 경우를 완전히 놓치는 방식이었음. 이제 그룹의 모든 F/R을 하나로
+  모아 mfeprimer --virus 검색을 한 번에 수행해 모든 세트 조합을 실제로 찾아내고, 각 Probe가 어느
+  amplicon 안에 위치하는지도 함께 확인함. 그룹 상세 페이지에 "교차 결합 분석" 카드(발견된 조합
+  요약, 정상/교차 결합 구분)와 "게놈별 교차 결합 F/Probe/R 미스매치" 표(조합별로 어느 세트의
+  F/R/Probe인지 명시, mismatch/Tm/ΔG, 검색·"교차 결합만 보기" 필터, 행 클릭 시 결합 위치 상세)를
+  추가.
+- 게놈별 F/Probe/R 미스매치 표(및 새 교차 결합 표)에 mfeprimer가 계산하는 Tm(결합 온도)과
+  ΔG(결합 자유에너지, kcal/mol)를 F/Probe/R 각각 표시 -- 단순 mismatch 개수만으로는 알 수 없는
+  결합 강도를 함께 볼 수 있음 (`scripts/build_alignment_table.py`, `scripts/live_analyze.py`).
+- "전체 게놈 정렬(MSA)"과 "게놈별 F/Probe/R 미스매치" 표를 연동: MSA에서 게놈 행을 클릭하면 아래
+  미스매치 표에서 같은 게놈으로 자동 스크롤 + 하이라이트 + 해당 행 펼침.
+- "표준물질(KDCA) 매치"를 "게놈별 F/Probe/R 미스매치"와 동일한 방식으로 상세화 (새 Snakemake 규칙
+  `standard_alignment_table`, 새 파일 `results/standard_alignment/<set_id>/mismatch_table.tsv`,
+  ad-hoc 분석 경로인 `scripts/live_analyze.py`에도 동일하게 적용). 표준물질 db는 2~4개 레코드뿐이라
+  전체 결과를 언제나 다 보여주며(population 표처럼 매치 안 된 항목을 생략하지 않음), 매치가 안 되는
+  표준물질은 F/Probe/R 각각 mismatch 개수(또는 "매치 안됨")를 명시적으로 표시해 무엇이 왜 실패했는지
+  바로 알 수 있게 함. F/R이 아예 짝을 이루지 못해 amplicon이 없는 경우에도 개별 F/Probe/R의
+  mismatch/Tm/ΔG는 표시.
+
+## [0.2.0] - 2026-09-17
+
+### Added
+- "🔒 대외비 (CONFIDENTIAL)" banner shown on every page of the dashboard.
+- Group deletion (`DELETE /api/groups/<id>` + a "그룹 삭제" button on the group detail page).
+- Per-set notes/memo field, saved via `POST /api/sets/<id>/note`.
+- Drag-and-drop reordering for sidebar sets and groups (`config/ui_state.json`,
+  `GET/POST /api/ui-state`), with alphabetical ascending order as the default everywhere
+  (sidebar sets/groups, genome mismatch table).
+- "⚙ 분석 파라미터 설정" settings page (목표 coverage, primer/probe mismatch 허용치, 3' 말단
+  연속 매치 요구치) reading/writing the real `config/config.yaml` values `reconcile.py`
+  already uses, via `GET/POST /api/params` -- changing a value and re-running the pipeline
+  actually changes the validated/pass-fail outcome, not just a display setting.
+- `PUBLISHED_PRIMERS.md` and a new `PUB_OLSCHLAGER_2010` preset (`source=PUBLISHED` in
+  `config/primers.tsv`): a citable, publicly-published LASV L-segment TaqMan assay
+  (Olschläger et al. 2010, J Clin Microbiol, doi:10.1128/JCM.02351-09), with its sequence
+  verified directly against an open-access source rather than from memory. Turns out it's
+  an exact match to our existing `VendorC_L_1`/`INTRON_L_1` vendor sets.
+- Mermaid workflow diagram in the README covering the full Snakemake DAG plus the webapp
+  layer.
+
+### Changed
+- The MSA "combined" reference row now shows the actual F/Probe/R sequence letters
+  (colour-coded, underlined where a base's IUPAC code doesn't cover the population
+  consensus) instead of a `====FORWARD===>` arrow-bar decoration.
+
+## [0.1.0] - 2026-09-16
+
+### Added
+- Snakemake pipeline (6+ stage DAG: fetch → filter → primer_match → probe_match →
+  reconcile/aggregate → dashboard) validating TaqMan primer/probe sets against Nextstrain
+  LASV S/L segment population genomic data.
+- mfeprimer-based primer-pair coverage search (mismatch 0/1/2) and probe perfect-match
+  search, with IUPAC-ambiguity-aware mismatch counting.
+- Standard-material (KDCA) O/X match check, per-set-group ("ALL") union coverage,
+  reference-genome binding-location maps.
+- Interactive local webapp (`webapp/`) with a stdlib-only Python HTTP server:
+  - Overview dashboard (coverage chart, lineage-distribution heatmap, set-combination
+    union coverage).
+  - Per-set/per-group detail pages with population coverage, standard-material match,
+    reference-genome binding, and a per-genome mismatch table.
+  - Full-population multiple-sequence-alignment view (mafft-aligned amplicons across all
+    matched genomes at once), with F/Probe/R shown as a single combined directional
+    annotation row, dot-diff notation, and "문제 있는 것만"/"문제 없는 것만" filters.
+  - 2-depth hierarchical set grouping (e.g. combine two vendor sets into one "ALL" unit)
+    with a UI to create groups and see combined results.
+  - User-submittable live analysis of a new primer/probe set against the same population
+    database, with optional permanent save to `config/primers.tsv`.
+  - "데이터 업데이트" / "분석 다시하기" pipeline-control buttons that stream the live
+    snakemake log in a modal.
+  - Nextstrain phylogenetic tree overlay via [PearTree](https://github.com/artic-network/peartree)
+    (self-hosted, CSS-isolated in a same-origin iframe), tips colored by validation status,
+    with the legend doubling as a click-to-filter control.
+
+### Fixed
+- R-primer/probe strand-aware mismatch computation now matches mfeprimer's actual
+  geometric (not label-based) fp/rp convention.
+- MSA F/R reference-row placement is now deterministic (derived from mfeprimer's own
+  amplicon-extraction convention) instead of relying on mafft `--adjustdirection`, which
+  could misplace short, degenerate ~20nt oligos against a much longer amplicon alignment.
+- PearTree's bundled CSS (~4000 rules) no longer leaks into the main page -- it's loaded
+  only inside an isolated iframe.
+- Pipeline-run jobs (데이터 업데이트/분석 다시하기) now always reach a terminal status, so a
+  failed run can no longer permanently block future runs.
+- Sequence/alignment views use an explicit fixed-pitch font stack instead of the
+  inconsistently-supported `ui-monospace` keyword.
+
+### Security
+- Removed a real primer sequence (`VendorD_S_PREV_1`) that had been used as illustrative
+  placeholder text in the "new primer set" form; replaced with a synthetic IUPAC example.
+- `config/`, `data/`, `results/`, and `logs/` are gitignored -- this repository ships
+  pipeline code only, never our actual primer/probe sequences or analysis results.

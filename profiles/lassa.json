@@ -1,0 +1,45 @@
+{
+  "profile_version": 1,
+  "id": "lassa",
+  "name": "Lassa mammarenavirus",
+  "short_name": "LASV",
+
+  "source": {
+    "type": "nextstrain",
+    "base_url": "https://data.nextstrain.org/files/workflows/lassa"
+  },
+
+  "segments": {
+    "s": {"label": "S", "min_len": 3000, "lineage_col": "s_lineage", "reference_accession": "AY628203"},
+    "l": {"label": "L", "min_len": 6000, "lineage_col": "l_lineage", "reference_accession": "AY628202"}
+  },
+
+  "metadata": {
+    "accession": "accession",
+    "lineage_fallback": "sub_lineage",
+    "date": "date",
+    "country": "country",
+    "region": "region"
+  },
+
+  "population": {
+    "pooled_label": "ALL_LASV",
+    "chrom_prefix": "LASV"
+  },
+
+  "diversity": {
+    "window_size": 1,
+    "min_coverage": 0.95,
+    "min_identity": 0.65,
+    "min_lineage_n": 10
+  },
+
+  "ui": {
+      "name_ko": "라사 바이러스",
+      "web_url": "https://nextstrain.org/lassa",
+      "lineage_ko": "리니지",
+      "lineage_examples": "LII, LIV",
+      "lineage_def": "계통수 상에서 공통 조상을 공유하는 게놈들의 그룹 — LASV는 LI~LVII 등 7개 주요 리니지로 분류된다.",
+      "orientation_note": "LASV S/L 게놈은 GenBank 등록 방향이 서로 달라"
+  }
+}

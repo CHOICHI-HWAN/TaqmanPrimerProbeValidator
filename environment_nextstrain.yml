@@ -1,0 +1,20 @@
+# Environment for scripts/run_nextstrain_nipah.sh: the official nextstrain/nipah workflow run locally
+# (this is only needed to RE-build the clades; the pipeline itself just reads data/nextstrain/).
+#   ./setup.sh --nextstrain      # builds it and records nextstrain_env_prefix in config/config.yaml
+name: primer_validation_nextstrain
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - python=3.13
+  - snakemake=9.27.0
+  - snakemake-storage-plugin-http=0.3.1   # the workflow downloads sequences.fasta.zst / metadata.tsv.zst over http
+  - augur=34.2.1
+  - nextclade=3.25.0
+  - iqtree=3.1.4
+  - mafft=7.526
+  - seqkit=2.14.0
+  - nextstrain-cli=10.5.0
+  - zstd
+  - git

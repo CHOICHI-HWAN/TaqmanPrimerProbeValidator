@@ -1,0 +1,7 @@
+segment	accession	genome_len	gene	start	end	strand
+genome	NC_002728	18246	N	113	1711	+
+genome	NC_002728	18246	P	2406	4535	+
+genome	NC_002728	18246	M	5108	6166	+
+genome	NC_002728	18246	F	6654	8294	+
+genome	NC_002728	18246	G	8943	10751	+
+genome	NC_002728	18246	L	11412	18146	+
