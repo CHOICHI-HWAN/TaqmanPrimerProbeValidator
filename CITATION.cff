@@ -1,0 +1,48 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below, together with the tools it builds on (MFEprimer-3.0 and the others listed in README.md)."
+title: "TaqMan Primer/Probe Validator (Nipah edition)"
+type: software
+abstract: >-
+  Measures how well TaqMan primer/probe sets detect the known genomes of a virus. Mismatches are recounted on the genome bases
+  (mfeprimer plus an independent genome scan); a genome is validated when both primers have at most one mismatch with an intact
+  3' end and the probe matches exactly inside the amplicon. Coverage is reported per lineage/clade and per host scope (human by
+  default), with an interactive dashboard, standard-material checks and panel (cross-binding) analysis.
+  This copy is the Nipah edition (branch `nipah`).
+authors:
+  - family-names: Choi
+    given-names: Chihwan
+version: "0.19.0"
+date-released: "2026-10-17"
+license: MIT
+repository-code: "https://github.com/CHOICHI-HWAN/TaqmanPrimerProbeValidator"
+url: "https://github.com/CHOICHI-HWAN/TaqmanPrimerProbeValidator"
+keywords:
+  - TaqMan
+  - qPCR
+  - primer
+  - probe
+  - assay validation
+  - virus
+  - Snakemake
+  - MFEprimer
+references:
+  - type: article
+    title: "MFEprimer-3.0: quality control for PCR primers"
+    authors:
+      - family-names: Wang
+        given-names: Kun
+      - family-names: Li
+        given-names: Hong
+      - family-names: Xu
+        given-names: Yingying
+      - family-names: Shao
+        given-names: Qiang
+      - family-names: Yi
+        given-names: Jiaxin
+      - family-names: Wang
+        given-names: Ruiqin
+      - family-names: Qu
+        given-names: Wubin
+    journal: "Nucleic Acids Research"
+    year: 2019
+    doi: "10.1093/nar/gkz351"

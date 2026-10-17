@@ -6,12 +6,14 @@ All notable changes to this project are documented here. Format follows
 ## [Unreleased]
 
 ### Changed
+- **화면 자료를 에디션에 맞게**: README의 스크린샷과 GIF를 Nipah 화면으로 다시 촬영했습니다(업체명·서열·표준물질 이름은 블러). 인용(Nipah 에디션): `CITATION.cff`, README의 BibTeX.
 - **README를 EsViritu 형식으로**: 영어 `README.md`(특징, 개략도, 대시보드 스크린샷, 번호 단계 설치, 사례별 실행, 결과 파일, 인용)와 한국어 `README.ko.md`. 파이프라인 개략도 `docs/schematic/pipeline_schematic.svg`와 정지 스크린샷 3장을 추가했습니다.
 - **README를 짧게**: 도구 설명, 필요한 것, 빠른 시작, **mfeprimer 설정**(받는 곳·실행 권한·경로 지정 4가지·확인), 입력 형식만 남기고 긴 설명은 `docs/PIPELINE.md`로 옮겼습니다.
 - **README 정리 + 화면 미리보기 GIF 3개**(`docs/media/`). 촬영용 도구 `docs/demo_blur.js`(업체명, 10염기 이상 서열, 프라이머/프로브/정렬 행, 서열 입력창, 표준물질 이름을 블러)와 `docs/make_gif.py`.
 - **GitHub에는 코드만**: 저장소에서 모든 염기서열을 없앴습니다. 테스트는 실제 프라이머·실제 mfeprimer 출력 대신 `tests/seqgen.py`가 만든 서열을 쓰고, `PUBLISHED_PRIMERS.md`는 추적에서 뺐습니다(로컬 파일). `.gitignore`가 FASTA/GenBank/엑셀/슬라이드 등을 막고, `tests/test_no_sequences_in_repo.py`가 긴 서열 리터럴, 실제 프라이머·표준물질의 12염기 조각(양 가닥), FASTA 레코드를 잡아냅니다.
 
 ### Added
+- **인용 방법**: `CITATION.cff`(GitHub의 "Cite this repository" 버튼)와 README의 BibTeX. 의존 도구 MFEprimer-3.0 논문도 `references`에 넣었습니다. `tests/test_citation_file.py`가 형식과 버전 일치를 확인합니다.
 - **숙주 기준(사람/동물/미상/전체)**: 커버리지의 기본 기준을 **사람 유래 게놈**으로 바꾸고(사람이 없는 바이러스는 전체), 사이드바의 "숙주 기준"에서 사람·동물·미상·전체로 전환합니다(개요, 세트·그룹 상세, MSA, 리니지 분포, 메타데이터 표의 "숙주 분류"). 실험 숙주(`is_lab_host`) 게놈은 어느 범위에도 포함하지 않으며 동물 안의 세부 분류는 하지 않습니다. 숙주 미기재 게놈은 "미상"입니다.
   - `scripts/host_scope.py`: 분류, 범위, 그리고 게놈 하나의 통과 판정(`reconcile.py`가 옮겨 쓰며 결과는 기존과 동일: 27개 세트의 요약·id 목록 대조 차이 0). `webapp/scope_view.py`: 웹 API가 같은 코드로 범위별 재계산.
   - `summary.tsv`/`group_summary.tsv`는 기본 범위 기준이며 `host_scope` 열이 붙습니다. 정적 보고서에도 "숙주 기준"을 표시합니다.

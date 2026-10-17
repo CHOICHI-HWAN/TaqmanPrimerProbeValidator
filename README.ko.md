@@ -174,6 +174,20 @@ python3 webapp/server.py --host 0.0.0.0 --port 8767
 
 # 인용
 
-아직 이 도구의 논문은 없습니다. 이 저장소와 함께 바탕이 된 도구를 인용해 주세요:
-**MFEprimer-3.0** (Wang K, et al. *Nucleic Acids Res.* 2019, doi:10.1093/nar/gkz351), MAFFT (Katoh & Standley 2013), pixy (Korunes & Samuk 2021), Snakemake (Mölder et al. 2021), Nextstrain (Hadfield et al. 2018).
+아직 이 도구의 논문은 없습니다. 아래처럼 이 소프트웨어를 인용하고, **바탕이 된 도구도 함께** 인용해 주세요.
+
+**이 소프트웨어** — GitHub 저장소 오른쪽의 **“Cite this repository”**([CITATION.cff](CITATION.cff) 기반)에서 APA와 BibTeX를 바로 복사할 수 있습니다. 직접 쓰려면:
+
+```bibtex
+@software{choi_taqman_primer_probe_validator_nipah_2026,
+  author  = {Choi, Chihwan},
+  title   = {TaqMan Primer/Probe Validator (Nipah edition)},
+  year    = {2026},
+  version = {0.19.0},
+  url     = {https://github.com/CHOICHI-HWAN/TaqmanPrimerProbeValidator/tree/nipah}
+}
+```
+
+**바탕이 된 도구:** **MFEprimer-3.0** (Wang K, et al. *Nucleic Acids Res.* 2019, doi:10.1093/nar/gkz351), MAFFT (Katoh & Standley 2013), pixy (Korunes & Samuk 2021), Snakemake (Mölder et al. 2021), Nextstrain (Hadfield et al. 2018).
+
 서드파티 라이선스: [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) · [CHANGELOG.md](CHANGELOG.md) · MIT 라이선스, © 2026 Chihwan Choi.

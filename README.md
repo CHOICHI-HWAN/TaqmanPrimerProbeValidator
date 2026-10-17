@@ -173,6 +173,20 @@ and `tests/test_no_sequences_in_repo.py` fails if a sequence slips in. Tests gen
 
 # Citation
 
-There is no publication for this tool yet. Please cite the repository together with the tools it builds on:
-**MFEprimer-3.0** (Wang K, et al. *Nucleic Acids Res.* 2019, doi:10.1093/nar/gkz351), MAFFT (Katoh & Standley 2013), pixy (Korunes & Samuk 2021), Snakemake (Mölder et al. 2021), Nextstrain (Hadfield et al. 2018).
+There is no publication for this tool yet. Please cite the software as below, **and** the tools it builds on.
+
+**This software** — on GitHub, **“Cite this repository”** (right sidebar, built from [CITATION.cff](CITATION.cff)) gives APA and BibTeX; or use:
+
+```bibtex
+@software{choi_taqman_primer_probe_validator_nipah_2026,
+  author  = {Choi, Chihwan},
+  title   = {TaqMan Primer/Probe Validator (Nipah edition)},
+  year    = {2026},
+  version = {0.19.0},
+  url     = {https://github.com/CHOICHI-HWAN/TaqmanPrimerProbeValidator/tree/nipah}
+}
+```
+
+**Tools it builds on:** **MFEprimer-3.0** (Wang K, et al. *Nucleic Acids Res.* 2019, doi:10.1093/nar/gkz351), MAFFT (Katoh & Standley 2013), pixy (Korunes & Samuk 2021), Snakemake (Mölder et al. 2021), Nextstrain (Hadfield et al. 2018).
+
 Third-party licences: [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) · [CHANGELOG.md](CHANGELOG.md) · MIT licence, © 2026 Chihwan Choi.
