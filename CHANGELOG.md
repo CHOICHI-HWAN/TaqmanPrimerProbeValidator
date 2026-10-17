@@ -6,6 +6,7 @@ All notable changes to this project are documented here. Format follows
 ## [Unreleased]
 
 ### Changed
+- **README 정리 + 화면 미리보기 GIF 3개**(`docs/media/`). 촬영용 도구 `docs/demo_blur.js`(업체명, 10염기 이상 서열, 프라이머/프로브/정렬 행, 서열 입력창, 표준물질 이름을 블러)와 `docs/make_gif.py`.
 - **GitHub에는 코드만**: 저장소에서 모든 염기서열을 없앴습니다. 테스트는 실제 프라이머·실제 mfeprimer 출력 대신 `tests/seqgen.py`가 만든 서열을 쓰고, `PUBLISHED_PRIMERS.md`는 추적에서 뺐습니다(로컬 파일). `.gitignore`가 FASTA/GenBank/엑셀/슬라이드 등을 막고, `tests/test_no_sequences_in_repo.py`가 긴 서열 리터럴, 실제 프라이머·표준물질의 12염기 조각(양 가닥), FASTA 레코드를 잡아냅니다.
 
 ### Added
