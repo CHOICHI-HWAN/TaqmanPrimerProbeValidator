@@ -42,6 +42,9 @@ def is_alphabet_or_pattern(run):
     s = run.upper()
     if len(set(s)) == len(s) or len(set(s)) == 1:               # an alphabet, or AAAA... / NNNN...
         return True
+    h = len(run) // 2                                           # an alphabet written in both cases ("ACGT...acgt...")
+    if len(run) % 2 == 0 and run[:h].upper() == run[h:].upper() and len(set(run[:h].upper())) == h:
+        return True
     return any(s == (s[:p] * (len(s) // p + 1))[:len(s)] for p in range(1, 5))     # ACGTACGT..., ATATAT...
 
 
