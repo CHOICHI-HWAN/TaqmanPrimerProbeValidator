@@ -43,7 +43,8 @@ export async function collect(project, get, progress = () => {}) {
     out.push({ key: `${project}/${key}`, gz: true, ctype, bytes: await gzip(enc.encode(typeof obj === "string" ? obj : JSON.stringify(scrub(obj)))) });
   };
   const json = async (path, scope) => {
-    const r = await get("/api/" + path + (scope ? (path.includes("?") ? "&" : "?") + "host=" + scope : ""));
+    // "host=primary" = the server's default scope: stated explicitly so a scope picked on the page's own toggle cannot leak into it
+    const r = await get("/api/" + path + (SCOPED_RE.test(path) ? (path.includes("?") ? "&" : "?") + "host=" + (scope || "primary") : ""));
     return r.ok ? r.json() : null;
   };
   const data = {};

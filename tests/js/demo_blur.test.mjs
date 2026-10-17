@@ -8,12 +8,14 @@ import { synth } from "./seqjs.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const { sensitiveRanges } = createRequire(import.meta.url)(path.join(here, "../../docs/demo_blur.js"));
-const cut = (t) => sensitiveRanges(t).map(([a, b]) => t.slice(a, b));
+const cut = (t, words) => sensitiveRanges(t, words).map(([a, b]) => t.slice(a, b));
 
-test("vendor names are hidden wherever they sit in a name", () => {
-  assert.deepEqual(cut("LASV-VendorD-S-GPC-PREV1-1B"), ["VendorD"]);
-  assert.deepEqual(cut("VendorA_L_1 and VendorC_L_1 / VendorB"), ["VendorA", "VendorC", "VendorB"]);
-  assert.deepEqual(cut("identity, microbe, idiot"), []);                 // not inside longer words
+test("listed words (vendor names) are hidden wherever they sit in a name, never inside longer words", () => {
+  const w = ["VendorA", "VendorB"];
+  assert.deepEqual(cut("LASV-VendorA-S-GPC-PREV1-1B", w), ["VendorA"]);
+  assert.deepEqual(cut("VendorA_L_1 and VendorB_L_1 / VendorB", w), ["VendorA", "VendorB", "VendorB"]);
+  assert.deepEqual(cut("VendorAB, xVendorA, VendorAx", w), []);
+  assert.deepEqual(cut("LASV-VendorA-S", []), []);                       // nothing is built in
 });
 
 test("nucleotide strings of 10+ bases are hidden, short ones and alphabets are not", () => {
@@ -26,8 +28,8 @@ test("nucleotide strings of 10+ bases are hidden, short ones and alphabets are n
 
 test("a name next to a sequence gives two separate ranges, in order", () => {
   const s = synth(12, 5);
-  const text = `VendorD-${s}`;
-  assert.deepEqual(sensitiveRanges(text), [[0, 3], [4, 16]]);
+  const text = `VendorA-${s}`;
+  assert.deepEqual(sensitiveRanges(text, ["VendorA"]), [[0, 7], [8, 20]]);
 });
 
 test("extra words (standard-material names) are hidden as whole words only", () => {

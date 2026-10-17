@@ -27,7 +27,7 @@ Snakemake 파이프라인입니다. 비분절 유전체와 클레이드(I / Ia /
 
 ![표준물질 매치](docs/media/standard-match.gif)
 
-> 직접 녹화할 때는 대시보드 페이지에서 `docs/demo_blur.js`를 실행한 뒤 화면을 캡처하고, `python3 docs/make_gif.py out.gif 프레임들…`로 GIF를 만드세요.
+> 직접 녹화할 때는 대시보드 페이지에서 `window.__demoBlurWords = ["업체명", "표준물질 이름"]`을 지정한 뒤 `docs/demo_blur.js`를 실행하고(10염기 이상 서열, 프라이머/프로브/정렬 행, 서열 입력창은 자동으로 흐려집니다) 화면을 캡처한 다음, `python3 docs/make_gif.py out.gif 프레임들…`로 GIF를 만드세요.
 
 ## 빠른 시작
 
