@@ -1,0 +1,44 @@
+# Confidential: our real primer/probe sequences and everything derived from them.
+# Never commit these -- see README.md "대외비" note. Anyone cloning this repo gets the
+# pipeline code only; they supply their own config/primers.tsv to run it.
+# config/ holds the real primer manifest + id registry (confidential); only the settings file, which
+# contains no sequences, is tracked.
+config/*
+!config/config.yaml
+data/
+input_primers/
+output/
+logs/
+.snakemake/
+
+# third-party vendor bundle -- fetched by the user (see README), not redistributed here
+webapp/static/vendor/peartree.bundle.min.js
+
+__pycache__/
+*.pyc
+.DS_Store
+
+# frontend build tooling (webapp/package.json) -- app.min.js is a generated artifact of
+# `npm run build`; server.py falls back to the raw static/app.js when it's absent, so it's
+# never required to run the app, only to serve it minified.
+webapp/node_modules/
+webapp/static/app.min.js
+
+# npm leftovers
+node_modules/
+
+# NO sequences on GitHub: primer / probe / standard / genome sequences are confidential -- code only.
+# (tests/test_no_sequences_in_repo.py fails if a tracked or about-to-be-added file contains one)
+PUBLISHED_PRIMERS.md
+*.fa
+*.fasta
+*.fna
+*.fastq
+*.fastq.gz
+*.fq
+*.fai
+*.gb
+*.gbk
+*.numbers
+*.pptx
+*.xlsx

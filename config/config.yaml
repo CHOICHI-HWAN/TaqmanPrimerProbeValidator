@@ -1,0 +1,54 @@
+# LASV primer/probe validation pipeline configuration
+
+# Which virus this run analyses. Everything species-specific (data source, segments, length floors,
+# lineage columns, reference accessions, metadata column mapping, diversity QC thresholds and the
+# pi window) lives in the profile -- see profiles/README.md. This file holds only run settings.
+profile: "profiles/lassa.json"
+
+# mismatch levels of the F/R primer-pair search. mfeprimer runs ONCE at the highest level; the 0/1/2 coverage numbers are
+# computed from the per-genome mismatch table (genome-based counts), so the list only has to contain the level used below.
+primer_mismatch_levels: [0, 1, 2]
+
+# mismatch level that defines a probe "pass" (perfect match only, per assay design intent)
+probe_mismatch: 0
+
+# mismatch level (from primer_mismatch_levels) used to define the primer side of the
+# final reconciliation: validated = (primer matched at this mismatch) AND (probe matched at probe_mismatch)
+primer_mismatch_pass: 1
+
+primers_manifest: "config/primers.tsv"
+groups_manifest: "config/set_groups.tsv"
+standards_manifest: "config/standards.tsv"
+
+# conda env that holds snakemake / mafft / pixy / htslib (written by setup.sh). Empty = use whatever is on PATH.
+env_prefix: ""
+
+# path to the mfeprimer static binary (setup.sh asks for it; also editable on the web app's parameter page).
+# Leave empty to auto-discover under ../*/mfeprimer/ or via $MFEPRIMER_BIN / PATH.
+mfeprimer_bin: ""
+target_coverage_pct: 95.0
+three_prime_consecutive_match: 2
+
+# CPU cores to hand mfeprimer via its own --cpu flag. mfeprimer's --virus/spec search (the
+# single most expensive step in this pipeline -- a degenerate F/R primer-pair search can
+# take many minutes) defaults to only 4 regardless of what the machine actually has;
+# `index` defaults to 16; `dimer` defaults to 2 (`hairpin`/`search` don't take --cpu at all).
+# Set to this machine's actual core count (or a bit under it, to leave headroom for other
+# work) rather than trusting mfeprimer's own conservative defaults.
+mfeprimer_cpu: 4
+
+# (pi window size and the genome-diversity quality filters are species-specific: see the profile's
+#  "diversity" block. Every excluded genome is listed in output/diversity/<seg>/qc.json.)
+
+# Standard-material (KDCA 표준물질) representativeness -- see scripts/standard_representativeness.py.
+# A population genome "matches" a standard when, over the standard's reference span, it covers at
+# least min_coverage of it and is >= identity identical. Primer-site matching tolerates a few
+# differences (degenerate primers never match a single sequence exactly). The union over the
+# standards that cover the region is graded: >= good % -> 적합, >= critical % -> 재검토 권고,
+# below -> 심각(재선정 필요).
+standard_rep_identity: 0.90
+standard_rep_min_coverage: 0.80
+standard_rep_site_tol_primer: 2
+standard_rep_site_tol_probe: 1
+standard_rep_good: 90
+standard_rep_critical: 50

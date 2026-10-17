@@ -1,0 +1,38 @@
+# Conda/mamba environment for the TaqMan primer/probe validation pipelines (LASV, Nipah, ...).
+#
+# Build on a fresh machine with:
+#   ./setup.sh                                # recommended: also asks for the mfeprimer path
+#   mamba env create -f environment.yml      # or by hand: conda env create -f environment.yml
+#   conda activate primer_validation
+#
+# Exact versions this pipeline was built and tested against (Ubuntu 24.04.4 LTS, x86_64,
+# 2026-09-18). Re-export the environment this file was generated from with:
+#   conda env export -n primer_validation --no-builds
+#
+# NOT covered by this file:
+#   - mfeprimer v4.2.4 -- a standalone static binary (not distributed via conda/pip); setup.sh asks for its path
+#   - google-chrome    -- only needed for the optional PDF report export
+#   - bgzip / tabix    -- ARE covered here (via the htslib package)
+name: primer_validation
+channels:
+  - bioconda
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.12.14
+  - snakemake=9.27.0
+  - mafft=7.526
+  - htslib=1.23.1         # provides bgzip, tabix (used by scripts/build_diversity_vcf.py)
+  - zstd=1.5.7             # decompresses Nextstrain's .fasta.zst/.tsv.zst downloads
+  - pyyaml=6.0.3
+  - pip=26.2.1
+  - pip:
+      # pixy note: PyPI's own "pixy" package name is squatted by an unrelated terminal
+      # color/styling library -- `pip install pixy` alone installs the WRONG package. Must
+      # install from the real project's git repo, pinned to the exact release commit (not
+      # just the "2.2.3" tag, which -- unlike a commit hash -- could in principle be moved).
+      - scikit-allel==1.3.13
+      - numcodecs==0.16.5
+      - dask==2026.8.0
+      - pixy @ git+https://github.com/ksamuk/pixy.git@21c7c33dea315a035d6aff86caba018ab668864a
+      - pytest==9.1.1

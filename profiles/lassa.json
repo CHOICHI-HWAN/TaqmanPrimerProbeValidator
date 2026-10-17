@@ -1,0 +1,36 @@
+{
+  "profile_version": 1,
+  "id": "lassa",
+  "name": "Lassa mammarenavirus",
+  "short_name": "LASV",
+
+  "source": {
+    "type": "nextstrain",
+    "base_url": "https://data.nextstrain.org/files/workflows/lassa"
+  },
+
+  "segments": {
+    "s": {"label": "S", "min_len": 3000, "lineage_col": "s_lineage", "reference_accession": "AY628203"},
+    "l": {"label": "L", "min_len": 6000, "lineage_col": "l_lineage", "reference_accession": "AY628202"}
+  },
+
+  "metadata": {
+    "accession": "accession",
+    "lineage_fallback": "sub_lineage",
+    "date": "date",
+    "country": "country",
+    "region": "region"
+  },
+
+  "population": {
+    "pooled_label": "ALL_LASV",
+    "chrom_prefix": "LASV"
+  },
+
+  "diversity": {
+    "window_size": 1,
+    "min_coverage": 0.95,
+    "min_identity": 0.65,
+    "min_lineage_n": 10
+  }
+}
