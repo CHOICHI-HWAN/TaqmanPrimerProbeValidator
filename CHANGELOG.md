@@ -5,7 +5,13 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+- **Windows / macOS**: `Dockerfile` + `docker-compose.yml` (환경만 이미지에 넣고 프로젝트 폴더를 마운트; mfeprimer는 `MFEPRIMER_BIN`으로 지정). Linux에서 빌드·`./test.sh` 12/12·대시보드 응답까지 확인했고, 실제 Windows·macOS에서는 아직 실행해 보지 못했습니다. README에 "Windows와 macOS" 절.
+
 ### Changed
+- 셸 스크립트의 `readlink -f` 제거(옛 macOS 호환), mfeprimer 자동 탐색에 `darwin` 빌드 포함, PDF용 Chrome 경로에 macOS·Windows 추가, 임시 폴더를 `tempfile` 로, `start.sh`에 `HOST` 환경변수, `.gitattributes`로 셸 스크립트 줄바꿈을 LF로 고정.
+
+### Changed (earlier)
 - **화면 자료를 에디션에 맞게**: README의 스크린샷과 GIF를 LASV 화면으로 다시 촬영했습니다(업체명·서열·표준물질 이름은 블러). 인용(LASV): `CITATION.cff`, README의 BibTeX.
 - **README를 EsViritu 형식으로**: 영어 `README.md`(특징, 개략도, 대시보드 스크린샷, 번호 단계 설치, 사례별 실행, 결과 파일, 인용)와 한국어 `README.ko.md`. 파이프라인 개략도 `docs/schematic/pipeline_schematic.svg`와 정지 스크린샷 3장을 추가했습니다.
 - **README를 짧게**: 도구 설명, 필요한 것, 빠른 시작, **mfeprimer 설정**(받는 곳·실행 권한·경로 지정 4가지·확인), 입력 형식만 남기고 긴 설명은 `docs/PIPELINE.md`로 옮겼습니다.

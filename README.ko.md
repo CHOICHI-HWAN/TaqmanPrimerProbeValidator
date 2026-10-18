@@ -108,6 +108,27 @@ curl -L -o webapp/static/vendor/peartree.bundle.min.js \
   https://github.com/artic-network/peartree/releases/latest/download/peartree.bundle.min.js
 ```
 
+## Windows와 macOS
+
+이 도구는 **Linux(Ubuntu 24.04)** 에서 만들고 테스트했습니다. 아래 Docker 방식도 Linux에서만 확인했고, 실제 Windows·macOS 컴퓨터에서는 **아직 실행해 보지 못했습니다.** 문제가 있으면 알려 주세요.
+
+| 시스템 | 방법 |
+|---|---|
+| **Windows** (10/11) | **Docker Desktop**(권장, 아래) 또는 **WSL2**(Ubuntu 안에서 위의 Linux 설치 단계를 그대로). 순수 Windows는 지원하지 않습니다: mafft, htslib, pixy의 Windows 빌드가 없습니다. |
+| **macOS** (Intel / Apple silicon) | **Docker Desktop**(아래), 또는 Miniforge로 직접 설치: `./setup.sh` + <https://www.mfeprimer.com/> 의 macOS용 mfeprimer (테스트 못 함, 환경 단계가 실패하면 Docker 사용). |
+| **Linux** | 위의 설치 단계 또는 Docker. |
+
+**Docker로 실행**(컨테이너가 Linux이므로 Windows·macOS에서도 mfeprimer는 위 3단계의 **linux-amd64** 파일을 받으세요. Apple silicon Mac은 에뮬레이션으로 돌아가 더 느립니다):
+
+```bash
+git clone https://github.com/CHOICHI-HWAN/TaqmanPrimerProbeValidator.git && cd TaqmanPrimerProbeValidator
+export MFEPRIMER_BIN=/전체/경로/mfeprimer-4.2.4-linux-amd64        # PowerShell: $env:MFEPRIMER_BIN="C:\tools\mfeprimer-4.2.4-linux-amd64"
+docker compose run --rm app ./test.sh                              # 설치 점검
+docker compose up --build                                          # 대시보드: http://localhost:8765
+```
+
+`config/`, `data/`, `output/`은 프로젝트 폴더에 그대로 남고(컨테이너에 마운트), 포트는 이 컴퓨터에서만 열립니다. 사용자 id가 1000이 아닌 Linux에서는 먼저 `export UID GID=$(id -g)`를 실행하세요. 컨테이너에서 파이프라인은 `docker compose run --rm app snakemake --cores 4`로 돌립니다.
+
 ## 실행하기
 
 *필수 입력:* **프라이머/프로브 세트** 하나 이상(그리고 선택적으로 **표준물질** 서열). 유전체는 자동으로 내려받습니다.

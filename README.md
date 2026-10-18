@@ -107,6 +107,27 @@ curl -L -o webapp/static/vendor/peartree.bundle.min.js \
   https://github.com/artic-network/peartree/releases/latest/download/peartree.bundle.min.js
 ```
 
+## Windows and macOS
+
+The tool was developed and tested on **Linux (Ubuntu 24.04)**. The Docker setup below was tested on Linux only; it has **not** been run on real Windows or macOS machines yet — please report problems.
+
+| system | how |
+|---|---|
+| **Windows** (10/11) | **Docker Desktop** (recommended, below) or **WSL2** (then follow the Linux steps inside Ubuntu). Native Windows is not supported: mafft, htslib and pixy have no Windows builds. |
+| **macOS** (Intel / Apple silicon) | **Docker Desktop** (below), or natively with Miniforge: `./setup.sh` and mfeprimer’s macOS binary from <https://www.mfeprimer.com/> (untested; if the environment step fails, use Docker). |
+| **Linux** | the Installation steps above, or Docker. |
+
+**With Docker** (the container is Linux, so download the **linux-amd64** mfeprimer — step 3 above — even on Windows/macOS; Apple-silicon Macs run it through emulation, which is slower):
+
+```bash
+git clone https://github.com/CHOICHI-HWAN/TaqmanPrimerProbeValidator.git && cd TaqmanPrimerProbeValidator
+export MFEPRIMER_BIN=/full/path/to/mfeprimer-4.2.4-linux-amd64        # PowerShell: $env:MFEPRIMER_BIN="C:\tools\mfeprimer-4.2.4-linux-amd64"
+docker compose run --rm app ./test.sh                                 # check the installation
+docker compose up --build                                             # dashboard at http://localhost:8765
+```
+
+Your `config/`, `data/` and `output/` stay in the project folder (it is mounted into the container); the port is published on this computer only. On Linux with a user id other than 1000 run `export UID GID=$(id -g)` first. Run the pipeline in the container with `docker compose run --rm app snakemake --cores 4`.
+
 ## Running the tool
 
 *Required input:* one or more **primer/probe sets** (and, optionally, **standard-material** sequences). The genomes are downloaded for you.

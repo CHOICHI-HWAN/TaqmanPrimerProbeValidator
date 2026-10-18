@@ -1,0 +1,16 @@
+# Usage (Windows / macOS / Linux with Docker Desktop or Docker Engine):
+#   MFEPRIMER_BIN=/full/path/to/mfeprimer-4.2.4-linux-amd64  docker compose up --build        # then open http://localhost:8765
+#   MFEPRIMER_BIN=...  docker compose run --rm app bash -c "snakemake --cores 4"                 # run the pipeline from a shell
+# PowerShell:  $env:MFEPRIMER_BIN="C:\tools\mfeprimer-4.2.4-linux-amd64"; docker compose up --build
+services:
+  app:
+    build: .
+    platform: linux/amd64
+    ports:
+      - "127.0.0.1:8765:8765"        # reachable from this computer only; there is no login
+    volumes:
+      - .:/app                          # code + your config/, data/, output/
+      - ${MFEPRIMER_BIN:?set MFEPRIMER_BIN to the mfeprimer linux-amd64 file}:/usr/local/bin/mfeprimer:ro
+    user: "${UID:-1000}:${GID:-1000}"   # Linux: files you create stay yours; ignored on Windows/macOS
+    environment:
+      - MFEPRIMER_BIN=/usr/local/bin/mfeprimer
