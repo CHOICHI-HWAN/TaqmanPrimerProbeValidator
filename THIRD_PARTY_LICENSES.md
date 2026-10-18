@@ -86,7 +86,7 @@ seqkit MIT, git GPL-2.0-or-later. 이 도구들은 Nextstrain 워크플로가 �
 ## 5. 공개 전 체크리스트
 
 1. `git log --all -p | grep -E "^\+.*[ACGTRYSWKMBDHVN]{22,}"`로 이력에 비공개 서열이 없는지 다시 확인 (2026-10-14 확인 결과: 이력의 긴 서열은 모두 논문에 공개된 프라이머와 그 출처 인용뿐).
-2. 화면 상단의 "🔒 대외비 (CONFIDENTIAL) — 외부 공유 금지" 배너는 내부용 문구입니다. 공개용 스크린샷·배포본에서는 제거하세요 (`webapp/static/index.html`).
+2. (처리됨) 예전의 "대외비 — 외부 공유 금지" 배너는 제거했고, 화면 상단과 PDF 표지에는 "in silico 예측 — 실험으로 확인 필요" 안내가 표시됩니다.
 3. 논문 Methods/Acknowledgements에 §2–§4의 인용을 넣으세요: MFEprimer, MAFFT(Katoh & Standley 2013), pixy(Korunes & Samuk 2021), Snakemake(Mölder 2021), Nextstrain(Hadfield 2018), Nextclade/Augur(Nipah 클레이드), IQ-TREE(Nipah 클레이드), 사용한 데이터의 GenBank 원 저자.
 4. MFEprimer 재배포 여부는 저자 확인 전까지 "사용자가 직접 설치"로 유지.
 5. 이 파일의 버전·라이선스 칸은 환경을 갱신할 때마다 다시 확인.

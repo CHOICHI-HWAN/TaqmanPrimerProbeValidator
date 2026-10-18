@@ -92,7 +92,7 @@ const STRINGS_EN = {
   // sidebar navigation
   "전체 파이프라인 목록": "All Pipelines",
   "인터랙티브 검증 대시보드": "Interactive Validation Dashboard",
-  "대외비 (CONFIDENTIAL) — 외부 공유 금지": "CONFIDENTIAL — Do Not Distribute",
+  "ⓘ in silico 예측 — 실험으로 확인 필요": "ⓘ In silico prediction — confirm experimentally",
   "전체 대시보드": "Overview",
   "+ 새 프라이머 세트 분석": "+ New Primer Set Analysis",
   "📖 파이프라인 개요 / 가이드": "📖 Pipeline Overview / Guide",
@@ -184,8 +184,8 @@ const STRINGS_EN = {
 
   // common tooltips
   "라이트/다크 모드 전환 (Toggle light/dark mode)": "Toggle light/dark mode",
-  "이 대시보드의 프라이머/프로브 서열 및 분석 결과는 대외비 정보입니다. 외부 공유·배포 금지.":
-    "The primer/probe sequences and analysis results in this dashboard are confidential. Do not share or distribute externally.",
+  "이 결과는 서열 기반 컴퓨터 예측입니다. 실제 결합·증폭·진단 성능을 확정하지 않으므로 실험적 검증이 필요합니다.":
+    "These results are computational predictions from sequences. They do not establish real binding, amplification or diagnostic performance and must be confirmed experimentally.",
   "Nextstrain에서 최신 서열/메타데이터를 새로 받고 mfeprimer 인덱스를 다시 만듭니다":
     "Fetches the latest sequences/metadata from Nextstrain and rebuilds the mfeprimer index",
   "현재 데이터로 전체 세트 분석을 처음부터 다시 계산합니다": "Recomputes every set from scratch using the current data",

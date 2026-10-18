@@ -69,7 +69,7 @@
   border-right: 1px solid var(--lumo-c10);
 }
 :root[data-skin="lumo"] .sidebar-header h1 { font-weight: 600; }
-:root[data-skin="lumo"] .confidential-banner { border-radius: 4px; }
+:root[data-skin="lumo"] .insilico-note { border-radius: 4px; }
 :root[data-skin="lumo"] .theme-toggle-btn { background: var(--lumo-c5); border-color: transparent; }
 :root[data-skin="lumo"] .theme-toggle-btn:hover { background: var(--lumo-primary-10); color: var(--lumo-primary-text); }
 
