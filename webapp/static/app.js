@@ -104,6 +104,7 @@ const STRINGS_EN = {
   "📄 종합 리포트 PDF 생성": "📄 Generate Summary Report (PDF)",
   "데이터 업데이트": "Update Data",
   "분석 다시하기": "Re-run Analysis",
+  "📚 문헌 프라이머": "📚 Literature primers",
   "+ 그룹 만들기 (여러 세트 묶기)": "+ Create Group (combine sets)",
   "그룹 이름 (예: VendorB ALL)": "Group name (e.g. VendorB ALL)",
   "그룹으로 묶기": "Create Group",
@@ -1603,7 +1604,7 @@ function renderLineageBreakdownCompact(setData) {
   }).join("");
 }
 
-const MAIN_VIEW_IDS = ["overview", "detail", "addForm", "paramsView", "changelogView", "guideView", "diversityView", "geneConsView", "metadataView", "primersView", "standardsView", "metaTableView", "stdMgrView", "requirementsView"];
+const MAIN_VIEW_IDS = ["overview", "detail", "addForm", "paramsView", "changelogView", "guideView", "diversityView", "geneConsView", "metadataView", "primersView", "litView", "standardsView", "metaTableView", "stdMgrView", "requirementsView"];
 function showMainView(id) {
   for (const v of MAIN_VIEW_IDS) $(`#${v}`).hidden = (v !== id);
 }
@@ -7730,3 +7731,140 @@ setLang(currentLang());
   // first visit: offer the UI tour; the data-freshness question waits until that is answered
   setTimeout(async () => { await offerTourOnFirstVisit(); checkFreshnessOnStartup(); }, 1500);   // lazy: after the first paint, never blocks it
 })();
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// 📚 문헌 프라이머 (sub-menus LASV / Nipah): primer/probe sets collected from papers. The data is config/literature/<virus>.tsv on THIS
+// computer only (git-ignored); an entry counts as "원문 대조 완료" only when someone wrote down where it was checked (webapp/literature.py).
+const LIT_FIELDS = [
+  ["name", "이름"], ["segment", "분절"], ["forward_primer", "Forward (5'→3')"], ["reverse_primer", "Reverse (5'→3')"], ["probe", "Probe (5'→3')"],
+  ["probe_dyes", "형광/소광체"], ["target", "표적 유전자·영역"], ["citation", "출처 (저자, 저널, 연도)"], ["doi", "DOI"], ["pmid", "PMID"],
+  ["verified_note", "원문 확인 위치 (예: Table 2)"], ["remark", "메모"],
+];
+let litState = { payload: null, virus: "lasv", editing: null, errors: [] };
+
+async function showLiteraturePage() {
+  litState.editing = null; litState.errors = [];
+  state.activeId = null; state.activeType = null;
+  renderSidebar();
+  showMainView("litView");
+  const view = $("#litView");
+  view.innerHTML = "<p class='note'>불러오는 중...</p>";
+  try {
+    litState.payload = await fetchJSON("/api/literature");
+    litState.virus = litState.payload.edition;
+    renderLiteraturePage();
+  } catch (e) {
+    view.innerHTML = `<p class="note">불러오기 실패: ${escHtml(e.message)}</p>`;
+  }
+}
+
+function litLinks(r) {
+  const out = [];
+  if (r.doi) out.push(`<a href="https://doi.org/${escHtml(r.doi)}" target="_blank" rel="noopener noreferrer">DOI</a>`);
+  if (r.pmid) out.push(`<a href="https://pubmed.ncbi.nlm.nih.gov/${escHtml(r.pmid)}/" target="_blank" rel="noopener noreferrer">PubMed</a>`);
+  return out.join(" · ");
+}
+
+function renderLiteraturePage() {
+  const view = $("#litView"), p = litState.payload, v = p.viruses[litState.virus];
+  const rows = v.rows, mine = true;
+  const badge = (r) => r.verified === "yes"
+    ? `<span class="lit-badge lit-ok" title="${escHtml(r.verified_note)}">원문 대조 완료</span>`
+    : `<span class="lit-badge lit-no">미검증</span>`;
+  const seq = (s) => (s ? `<span class="mono lit-seq">${escHtml(s)}</span>` : `<span class="muted">없음</span>`);
+  const body = rows.map((r, i) => `<tr>
+      <td>${badge(r)}</td>
+      <td><b>${escHtml(r.name)}</b><div class="note">${escHtml(r.lit_id)}</div></td>
+      <td>${escHtml(r.segment)}</td>
+      <td>${seq(r.forward_primer)}</td><td>${seq(r.reverse_primer)}</td><td>${seq(r.probe)}</td>
+      <td>${escHtml(r.probe_dyes)}</td><td>${escHtml(r.target)}</td>
+      <td>${escHtml(r.citation)}<div class="note">${litLinks(r)}</div>${r.verified_note ? `<div class="note">확인: ${escHtml(r.verified_note)}</div>` : ""}</td>
+      <td class="lit-actions">
+        ${r.in_analysis ? `<span class="note">분석 목록에 있음</span>`
+          : r.can_add ? `<button class="btn btn-primary" data-lit-add="${i}">분석에 추가</button>`
+          : `<span class="note" title="${mine ? "Forward/Reverse/Probe 서열이 모두 있어야 합니다" : "다른 바이러스의 세트입니다"}">${mine ? "서열 불완전" : "이 에디션에서 분석 불가"}</span>`}
+        <button class="btn btn-secondary" data-lit-edit="${i}">수정</button>
+        <button class="btn btn-secondary" data-lit-del="${i}">삭제</button>
+      </td></tr>`).join("");
+  view.innerHTML = `
+    <h2>📚 문헌 프라이머</h2>
+    <p class="note">논문에서 찾은 TaqMan 프라이머·프로브 목록입니다. 서열은 <code>${escHtml(v.file)}</code>(이 컴퓨터, git 제외)에만 저장되며 GitHub에 올라가지 않습니다.
+    <b>‘원문 대조 완료’는 논문 원문과 서열을 직접 비교하고 확인한 위치를 적은 항목에만 붙습니다.</b> 그 외 서열은 틀렸을 수 있으니 분석에 쓰기 전에 원문을 확인하세요.</p>
+    <p><button class="btn btn-primary" id="litNewBtn">+ 항목 추가</button>
+    <span class="note" id="litStatus"></span></p>
+    <div id="litForm"></div>
+    ${rows.length ? `<div class="table-wrap"><table class="primers-table lit-table"><thead><tr>
+      <th>상태</th><th>이름</th><th>분절</th><th>Forward</th><th>Reverse</th><th>Probe</th><th>염료</th><th>표적</th><th>출처</th><th></th></tr></thead><tbody>${body}</tbody></table></div>`
+      : `<p class="note">아직 항목이 없습니다. 논문에서 확인한 세트를 ‘+ 항목 추가’로 입력하세요.</p>`}`;
+  $("#litNewBtn").onclick = () => litEdit(null);
+  view.querySelectorAll("[data-lit-edit]").forEach((b) => (b.onclick = () => litEdit(Number(b.dataset.litEdit))));
+  view.querySelectorAll("[data-lit-del]").forEach((b) => (b.onclick = () => litDelete(Number(b.dataset.litDel))));
+  view.querySelectorAll("[data-lit-add]").forEach((b) => (b.onclick = () => litAddToAnalysis(Number(b.dataset.litAdd))));
+  if (litState.editing !== undefined && litState.editing !== false) litRenderForm();
+}
+
+function litEdit(i) { litState.editing = i === null ? { index: null, row: {} } : { index: i, row: { ...litState.payload.viruses[litState.virus].rows[i] } }; litState.errors = []; litRenderForm(); }
+
+function litRenderForm() {
+  const box = $("#litForm"), e = litState.editing;
+  if (!e) { box.innerHTML = ""; return; }
+  const err = (f) => litState.errors.filter((x) => x.field === f).map((x) => `<div class="cell-error-text">${escHtml(x.message)}</div>`).join("");
+  const field = ([f, label]) => {
+    const seqCls = ["forward_primer", "reverse_primer", "probe"].includes(f) ? " mono" : "";
+    const val = escHtml(e.row[f] || "");
+    const input = f === "segment"
+      ? `<select data-lit="segment">${litState.payload.viruses[litState.virus].segments.map((s) => `<option ${e.row.segment === s ? "selected" : ""}>${s}</option>`).join("")}</select>`
+      : `<input type="text" class="cell-input${seqCls}" data-lit="${f}" value="${val}" spellcheck="false" autocomplete="off">`;
+    return `<label class="lit-field"><span>${label}</span>${input}${err(f)}</label>`;
+  };
+  box.innerHTML = `<div class="lit-form">
+    <h3>${e.index === null ? "새 항목" : "항목 수정"}</h3>
+    <div class="lit-grid">${LIT_FIELDS.map(field).join("")}</div>
+    <label class="lit-check"><input type="checkbox" data-lit="verified" ${e.row.verified === "yes" ? "checked" : ""}>
+      원문과 서열을 직접 비교했습니다 (체크하면 ‘원문 확인 위치’가 필요합니다)</label>
+    ${err("verified_note")}
+    <p><button class="btn btn-primary" id="litSaveBtn">저장</button> <button class="btn btn-secondary" id="litCancelBtn">취소</button></p></div>`;
+  $("#litCancelBtn").onclick = () => { litState.editing = null; litState.errors = []; litRenderForm(); };
+  $("#litSaveBtn").onclick = litSaveForm;
+  box.scrollIntoView({ block: "nearest" });
+}
+
+async function litPostRows(rows) {
+  const res = await fetch("/api/literature/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ virus: litState.virus, rows }) });
+  const data = await res.json();
+  if (!res.ok) { litState.errors = data.errors || [{ field: "name", message: data.error || "저장 실패" }]; return false; }
+  litState.payload = data.payload; return true;
+}
+
+async function litSaveForm() {
+  const e = litState.editing, row = { ...e.row };
+  $("#litForm").querySelectorAll("[data-lit]").forEach((el) => { row[el.dataset.lit] = el.type === "checkbox" ? (el.checked ? "yes" : "no") : el.value; });
+  if (!["name", "forward_primer", "reverse_primer", "probe", "citation"].some((f) => String(row[f] || "").trim())) {
+    litState.errors = [{ field: "name", message: "입력된 내용이 없습니다 — 이름, 서열, 출처를 입력하세요" }]; e.row = row; litRenderForm(); return;
+  }
+  const rows = litState.payload.viruses[litState.virus].rows.map((r) => ({ ...r }));
+  if (e.index === null) rows.push(row); else rows[e.index] = row;
+  if (await litPostRows(rows)) { litState.editing = null; litState.errors = []; renderLiteraturePage(); $("#litStatus").textContent = "저장했습니다"; }
+  else { e.row = row; litRenderForm(); }
+}
+
+async function litDelete(i) {
+  const rows = litState.payload.viruses[litState.virus].rows;
+  if (!await uiConfirm(`'${rows[i].name}' 항목을 목록에서 삭제할까요? (분석 목록에 이미 추가한 세트는 그대로 남습니다)`)) return;
+  if (await litPostRows(rows.filter((_, k) => k !== i))) renderLiteraturePage();
+}
+
+async function litAddToAnalysis(i) {
+  const r = litState.payload.viruses[litState.virus].rows[i];
+  const warn = r.verified === "yes" ? "" : "\n\n⚠ 이 서열은 아직 원문과 대조하지 않았습니다. 결과는 서열이 맞다는 전제에서만 의미가 있습니다.";
+  if (!await uiConfirm(`'${r.name}'을(를) 분석 목록(프라이머 입력 / 관리)에 추가할까요?${warn}`)) return;
+  const res = await fetch("/api/literature/add", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ virus: litState.virus, lit_id: r.lit_id }) });
+  const data = await res.json();
+  if (!res.ok) { $("#litStatus").textContent = `추가 실패: ${data.error || (data.errors || []).map((x) => x.message).join(" / ")}`; return; }
+  litState.payload = await fetchJSON("/api/literature");
+  litState.virus = litState.payload.edition;
+  renderLiteraturePage();
+  $("#litStatus").textContent = `${data.name}: ${data.note}`;
+}
+
+$("#litBtn").addEventListener("click", () => showLiteraturePage());

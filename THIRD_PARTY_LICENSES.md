@@ -80,7 +80,7 @@ seqkit MIT, git GPL-2.0-or-later. 이 도구들은 Nextstrain 워크플로가 �
 | Nextstrain 데이터 (`data.nextstrain.org`: sequences/metadata, GenBank 유래) | 저장소에 포함하지 않음(`data/`는 gitignore). 실행 때 내려받음. Nextstrain 문서는 다운로드물에 별도 라이선스를 명시하지 않으며, **미발표 데이터는 제공자 허락하에 포함**되어 있어 추가 연구 전 저자(메타데이터의 authors 열)에게 연락하라고 안내합니다. 논문에는 사용한 accession 목록을 보충자료로 싣고 GenBank·원 저자·Nextstrain(Hadfield et al. 2018, *Bioinformatics* 34:4121)을 인용하세요. |
 | NCBI GenBank / RefSeq (NC_002728 등) | INSDC 공개 데이터. NCBI는 이용 제한을 두지 않지만 제출자가 권리를 주장할 수 있다는 점을 고지함 → 서열 자체를 재배포하지 말고 accession으로 참조 |
 | **nextstrain/nipah 저장소** (`clades.tsv`, `exclude.txt`, `genemap.gff`, 빌드 결과 `nipah_all.json`) | **LICENSE 파일이 없음**(GitHub 라이선스 조회 404, README에도 없음) → 기본 저작권이 유지되는 것으로 보고 `data/nextstrain/`(gitignore)에만 두며 **저장소에 올리지 않음**. 스크립트(`run_nextstrain_nipah.sh`)가 실행 때 GitHub에서 클론함. 인용하고 싶다면 저장소 URL·커밋(`PROVENANCE.txt`)을 적고, 재배포가 필요하면 upstream에 라이선스를 문의하세요. |
-| 공개 문헌 프라이머 (로컬 파일 `PUBLISHED_PRIMERS.md`, 저장소에는 없음) | 논문에서 가져온 짧은 서열과 출처 인용. 인용을 유지하세요. |
+| 문헌 프라이머 (대시보드 "📚 문헌 프라이머", 로컬 `config/literature/*.tsv`, 저장소에는 없음) | 논문에서 가져온 짧은 서열과 출처. 항목마다 출처가 필수이며 '원문 대조 완료'로 표시된 것만 검증된 서열입니다. 공개 여부는 별도로 확인하기 전까지 저장소에 올리지 않습니다. |
 | **우리 프라이머/프로브, KDCA 표준물질, 벤더(VendorD·VendorA 등) 세트** | **비공개**. `config/*`, `data/`, `output/`, `input_primers/`가 gitignore이며 git 이력에도 없음을 확인함. 논문 그림·스크린샷·`output/`·PDF 리포트에 서열이 보이지 않는지 공개 전에 점검하세요. |
 
 ## 5. 공개 전 체크리스트

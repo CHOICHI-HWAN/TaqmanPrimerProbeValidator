@@ -189,6 +189,7 @@ def save_fetch_baseline_from_remote():
 STATIC_DIR = Path(__file__).resolve().parent / "static"  # this package's own bundled assets
 sys.path.insert(0, str(ROOT / "scripts"))
 import scope_view  # noqa: E402 -- host-scope view of the results (webapp/scope_view.py)
+import literature  # noqa: E402 -- literature primer lists (webapp/literature.py)
 
 from live_analyze import analyze_set  # noqa: E402
 
@@ -698,6 +699,34 @@ def load_groups_config():
         members = [m for m in (r.get("member_ids") or "").split(";") if m in active]
         if members:
             out.append(dict(r, member_ids=";".join(members)))
+    return out
+
+
+def literature_edition():
+    """'lasv' / 'nipah' = the virus this web app analyses (decided by its segments), or None."""
+    segs = {k.upper() for k in seg_keys()}
+    for key, info in literature.VIRUSES.items():
+        if segs == set(info["segments"]):
+            return key
+    return None
+
+
+def literature_payload():
+    """Both viruses' literature lists (read-only data for the menu) plus what can be added to THIS edition's analysis."""
+    from mfe_common import load_primers_manifest_raw  # noqa: PLC0415
+    manifest = load_primers_manifest_raw(ROOT / "config" / "primers.tsv")
+    edition = literature_edition()
+    out = {"edition": edition, "columns": literature.COLUMNS, "viruses": {}}
+    for key, info in literature.VIRUSES.items():
+        if key != edition:                      # each dashboard lists the literature of its own virus only
+            continue
+        rows = literature.load(ROOT, key)
+        for r in rows:
+            r["complete"] = literature.complete(r)
+            r["in_analysis"] = bool(literature.complete(r) and literature.same_sequences(manifest, r))
+            r["can_add"] = bool(key == edition and r["complete"] and not r["in_analysis"])
+        out["viruses"][key] = {"label": info["label"], "segments": list(info["segments"]), "rows": rows,
+                               "file": str(literature.file_path(ROOT, key).relative_to(ROOT))}
     return out
 
 
@@ -2214,6 +2243,8 @@ class Handler(BaseHTTPRequestHandler):
             text = path_obj.read_text(encoding="utf-8") if path_obj.exists() else "# Changelog\n\n(아직 없음)"
             return self._send_json({"markdown": text})
 
+        if path == "/api/literature":
+            return self._send_json(literature_payload())
         if path == "/api/primers/manifest":
             from mfe_common import load_primers_manifest_raw, PRIMER_MANIFEST_COLUMNS  # noqa: PLC0415
             rows = load_primers_manifest_raw(ROOT / "config" / "primers.tsv")
@@ -2341,6 +2372,50 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_json(load_params())
         if self.path == "/api/standards/manifest":
             return self._handle_save_standards()
+        if self.path in ("/api/literature/save", "/api/literature/add"):
+            try:
+                payload = self._read_json_body()
+            except json.JSONDecodeError:
+                return self._send_json({"error": "invalid JSON"}, 400)
+            virus = literature_edition()
+            if virus is None or payload.get("virus", virus) != virus:
+                return self._send_json({"error": "이 대시보드의 바이러스 문헌만 다룰 수 있습니다"}, 400)
+            if self.path.endswith("/save"):
+                rows = payload.get("rows")
+                if not isinstance(rows, list):
+                    return self._send_json({"error": "rows는 배열이어야 합니다"}, 400)
+                rows = literature.normalise(rows, virus)
+                errors = literature.validate(rows, virus)
+                if errors:
+                    return self._send_json({"errors": errors}, 400)
+                literature.save(ROOT, virus, rows)
+                return self._send_json({"ok": True, "payload": literature_payload()})
+            # add one entry to this edition's analysis list (config/primers.tsv)
+            from mfe_common import (  # noqa: PLC0415
+                PRIMER_MANIFEST_COLUMNS, load_primers_manifest_raw, validate_primer_manifest_rows, write_primers_manifest,
+            )
+            row = next((r for r in literature.load(ROOT, virus) if r["lit_id"] == payload.get("lit_id")), None)
+            if row is None:
+                return self._send_json({"error": "해당 항목을 찾을 수 없습니다"}, 404)
+            if not literature.complete(row):
+                return self._send_json({"error": "Forward/Reverse/Probe 서열이 모두 있어야 분석에 추가할 수 있습니다"}, 400)
+            manifest = load_primers_manifest_raw(ROOT / "config" / "primers.tsv")
+            if literature.same_sequences(manifest, row):
+                return self._send_json({"error": "같은 서열의 세트가 이미 분석 목록에 있습니다"}, 400)
+            new = literature.manifest_row(row)
+            names = {m.get("primer_name") for m in manifest}
+            base, n = new["primer_name"], 2
+            while new["primer_name"] in names:
+                new["primer_name"], n = f"{base} ({n})", n + 1
+            rows = [{c: str(m.get(c, "")) for c in PRIMER_MANIFEST_COLUMNS} for m in manifest]
+            rows.append({c: str(new.get(c, "")) for c in PRIMER_MANIFEST_COLUMNS})
+            errors = validate_primer_manifest_rows(rows, segments=tuple(k.upper() for k in seg_keys()))
+            if errors:
+                return self._send_json({"errors": errors}, 400)
+            saved = write_primers_manifest(ROOT / "config" / "primers.tsv", rows)
+            sync_pipeline_inputs()
+            return self._send_json({"ok": True, "name": new["primer_name"], "rows": len(saved),
+                                    "note": "분석 목록에 추가했습니다. 사이드바의 '분석 다시하기'를 눌러야 결과가 계산됩니다."})
         if self.path == "/api/primers/manifest":
             from mfe_common import (  # noqa: PLC0415 -- see load_builtin_sets for why
                 PRIMER_MANIFEST_COLUMNS, validate_primer_manifest_rows, write_primers_manifest,

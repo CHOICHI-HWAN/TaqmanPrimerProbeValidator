@@ -182,6 +182,8 @@ snakemake --cores 4 output/primers/P001/final/validated_ids.txt
 curl 'http://localhost:8765/api/sets?host=animal'
 ```
 
+**Literature primers** — sidebar **📚 Literature primers**: a list of this virus's TaqMan primer/probe sets collected from papers, with the source of each. The list starts empty and is stored only on your computer (`config/literature/<virus>.tsv`, git-ignored). Every entry needs a source; “verified against the paper” can only be ticked together with the place where you checked it (e.g. a table), and everything else is shown as *unverified*. One click adds an entry to the analysis list.
+
 **Open the dashboard from another computer on a trusted network**
 
 ```bash
