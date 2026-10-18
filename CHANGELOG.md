@@ -5,6 +5,9 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Changed (licence / limits)
+- "대외비 — 외부 공유 금지" 배너를 제거하고(대시보드·PDF 표지) "in silico 예측 — 실험으로 확인 필요" 안내로 바꿨습니다. README에 "서드파티 소프트웨어·데이터와 한계" 절(MFEprimer 별도 설치, 데이터 출처·재사용 주의, in silico 한계·연구용)을 추가하고, MFEprimer·"커밋하지 않습니다" 문구를 사실대로 고쳤습니다.
+
 ### Added
 - **Windows / macOS**: `Dockerfile` + `docker-compose.yml` (환경만 이미지에 넣고 프로젝트 폴더를 마운트; mfeprimer는 `MFEPRIMER_BIN`으로 지정). Linux에서 빌드·`./test.sh` 12/12·대시보드 응답까지 확인했고, 실제 Windows·macOS에서는 아직 실행해 보지 못했습니다. README에 "Windows와 macOS" 절.
 

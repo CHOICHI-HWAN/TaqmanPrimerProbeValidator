@@ -93,7 +93,7 @@ conda activate primer_validation # only needed to run snakemake yourself; ./star
 ```
 
 **3)  Download mfeprimer** — a single static binary (MFEprimer v4.2.4, linux-amd64) from the official site <https://www.mfeprimer.com/>.
-It is not redistributed here because its licence does not say that redistribution is allowed.
+It is not redistributed here: the official site gives no redistribution terms, so each user downloads it separately.
 
 ```bash
 chmod +x /path/to/mfeprimer-4.2.4-linux-amd64
@@ -201,8 +201,17 @@ python3 webapp/server.py --host 0.0.0.0 --port 8765
 
 ## What is not in this repository
 
-Primer, probe, standard-material and genome (FASTA) **sequences and analysis results are never committed** — they live in `config/`, `data/` and `output/`, which are git-ignored,
-and `tests/test_no_sequences_in_repo.py` fails if a sequence slips in. Tests generate their nucleotide strings (`tests/seqgen.py`). Vendor names in this public copy are neutral (VendorA …).
+Primer, probe, standard-material and genome (FASTA) **sequences and analysis results are kept out of version control** — they live in `config/`, `data/` and `output/`, which are git-ignored,
+and `tests/test_no_sequences_in_repo.py` checks automatically and fails if a sequence slips in. Tests generate their nucleotide strings (`tests/seqgen.py`). Vendor names in this public copy are neutral (VendorA …).
+
+## Third-party software, data and limitations
+
+**Licence.** This project's MIT licence covers the code written for it. It does not apply to the software and data below. Details: [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
+
+- **MFEprimer** is independent third-party software and is not included. Its official site gives no redistribution terms, so each user downloads it from <https://www.mfeprimer.com/> and uses it under the developers' terms.
+- **Genome data** are downloaded at run time and are not stored in this repository. LASV genomes and metadata come from Nextstrain (data.nextstrain.org, GenBank-derived). Nextstrain notes that some records are included with the data providers' permission before publication, so being public does not mean unrestricted reuse or redistribution: acknowledge the original sequence submitters (the `authors` column) and cite Nextstrain when you publish results, and check the terms before redistributing the downloaded sequences or metadata.
+
+**Limitations — in silico only.** The results are computational predictions from known genome sequences and the stated rules (each primer ≤ 1 mismatch with an intact 3′ end, probe an exact match inside the amplicon). They **cannot show whether a set really binds, amplifies or detects in a reaction**: that also depends on reaction conditions, polymerase and chemistry, secondary structure, template quality and amount, and on genomes that are missing from the database or contain sequencing errors. Coverage is relative to the genomes that happen to be available (biased towards what has been sequenced, and where), and is not an estimate of clinical sensitivity or specificity. Confirm every set experimentally before any diagnostic use. For research use only.
 
 ## Citation
 

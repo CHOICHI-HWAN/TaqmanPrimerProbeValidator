@@ -11,7 +11,7 @@ then drives headless Chrome's DevTools Protocol directly (Page.printToPDF) to tu
 into an actual PDF -- not the `--print-to-pdf` CLI flag, whose header/footer-suppression
 flag (--print-to-pdf-no-header) turned out not to work on this Chrome build; the CDP
 `displayHeaderFooter` param does.
-Confidential: written under output/ (gitignored), never committed.
+Written under output/ (gitignored), not committed.
 
 Usage:
     python3 scripts/generate_report.py [--base-url http://localhost:8765] [--out output/report/report.pdf]
@@ -763,7 +763,7 @@ def render_set_section(base_url, set_data, index, total, diversity_data=None):
           <div class="seq-row"><span class="tag">Forward</span><span class="mono seq-redacted">{mask_seq(set_data.get('F_seq'))} <span class="muted">({len(set_data.get('F_seq') or '')}nt)</span></span></div>
           <div class="seq-row"><span class="tag">Probe</span><span class="mono seq-redacted">{mask_seq(set_data.get('P_seq'))} <span class="muted">({len(set_data.get('P_seq') or '')}nt)</span></span></div>
           <div class="seq-row"><span class="tag">Reverse</span><span class="mono seq-redacted">{mask_seq(set_data.get('R_seq'))} <span class="muted">({len(set_data.get('R_seq') or '')}nt)</span></span></div>
-          <div class="note" style="margin-top:4px;font-size:9.5px;color:#889;">서열은 대외비 처리를 위해 리포트에서 가렸습니다 — 대시보드에서 확인하세요.</div>
+          <div class="note" style="margin-top:4px;font-size:9.5px;color:#889;">서열은 리포트에서 가렸습니다 — 대시보드에서 확인하세요.</div>
           {render_citation(set_data.get('citation'))}
         </div>
         <div class="box">
@@ -1044,7 +1044,7 @@ def render_cover(overview_data, sets_count, generated_at, groups_count=0):
     ds = overview_data.get("dataset_sizes", {})
     return f"""
     <section class="report-page cover-page">
-      <div class="confidential-banner">🔒 대외비 (CONFIDENTIAL) — 외부 공유 금지</div>
+      <div class="insilico-note">ⓘ in silico 예측 — 실험으로 확인 필요 (결과는 서열 기반 컴퓨터 예측이며 실제 결합·진단 성능을 확정하지 않습니다)</div>
       <h1 class="cover-title">{VIRUS_SHORT} Primer/Probe Validation<br>종합 분석 리포트</h1>
       <div class="cover-meta">생성 일시: {esc(generated_at)}</div>
       <div class="cover-stats">
@@ -1053,7 +1053,7 @@ def render_cover(overview_data, sets_count, generated_at, groups_count=0):
         <div class="stat"><div class="v">{sets_count}</div><div class="l">등록된 세트</div></div>
         <div class="stat"><div class="v">{groups_count}</div><div class="l">등록된 그룹</div></div>
       </div>
-      <p class="cover-note">이 리포트의 프라이머/프로브 서열 및 분석 결과는 대외비 정보입니다.
+      <p class="cover-note">이 리포트는 서열 기반 in silico 예측이며 실제 결합·진단 성능을 확정하지 않습니다. 외부에 공유하기 전에 서열과 결과의 공개 가능 여부를 확인하세요.
       각 세트별 상세 결과는 다음 페이지부터 이어지며, 마지막에 그룹(여러 세트 조합) 결과가
       이어집니다.</p>
     </section>
@@ -1134,7 +1134,7 @@ body { font-family: -apple-system, "Noto Sans KR", "Malgun Gothic", sans-serif; 
 .note-images figure { margin: 0; width: 140px; }
 .note-images img { width: 100%; border-radius: 6px; border: 1px solid #dde3ea; }
 .note-images figcaption { font-size: 9px; color: #889; margin-top: 2px; }
-.confidential-banner { display: inline-block; background: #fbe8e7; color: #b23f3e; font-weight: 700; padding: 6px 14px; border-radius: 8px; margin-bottom: 40px; }
+.insilico-note { display: inline-block; background: #fbe8e7; color: #b23f3e; font-weight: 700; padding: 6px 14px; border-radius: 8px; margin-bottom: 40px; }
 .cover-page { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; height: 240mm; }
 .cover-title { font-size: 26px; line-height: 1.4; }
 .cover-meta { color: #778; margin: 10px 0 30px; }
