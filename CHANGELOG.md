@@ -5,6 +5,9 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+- **📚 문헌 프라이머 메뉴**: 이 대시보드 바이러스(LASV 에디션은 LASV, Nipah 에디션은 Nipah)의 논문 프라이머·프로브 목록(출처 필수, 서열은 `config/literature/*.tsv`에만 저장·git 제외). '원문 대조 완료'는 확인 위치를 적어야만 표시되고 나머지는 '미검증'. 버튼으로 분석 목록에 추가(다른 바이러스 항목은 불가). `webapp/literature.py`, `tests/test_literature.py`. 목록은 빈 상태로 시작합니다(예전 `PUBLISHED_PRIMERS.md`는 검증되지 않아 사용하지 않습니다).
+
 ## [0.20.0] - 2026-10-18
 
 ### Changed (licence / limits)

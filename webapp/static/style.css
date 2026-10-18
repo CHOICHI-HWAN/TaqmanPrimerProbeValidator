@@ -989,3 +989,19 @@ table.rq-table { border-collapse: collapse; width: 100%; min-width: 880px; font-
 
 .host-scope-badge { margin-right: 190px; }
 @media (max-width: 900px) { .host-scope-badge { margin-right: 0; } }
+
+/* 📚 문헌 프라이머 */
+.sub-menu { margin: -4px 0 10px 14px; }
+.sub-menu .btn { width: 100%; margin-bottom: 6px; text-align: left; }
+.lit-table td { vertical-align: top; }
+.lit-seq { word-break: break-all; font-size: var(--fs-xs); }
+.lit-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: var(--fs-xs); font-weight: 700; white-space: nowrap; }
+.lit-ok { background: rgba(47,158,68,.16); color: #2f9e44; }
+.lit-no { background: rgba(242,166,90,.2); color: var(--accent2); }
+.lit-actions .btn { margin: 0 4px 4px 0; padding: 4px 10px; }
+.lit-form { border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px 14px; margin: 10px 0 16px; background: var(--card); }
+.lit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px 14px; }
+.lit-field span { display: block; font-size: var(--fs-xs); color: var(--muted); margin-bottom: 2px; }
+.lit-field input, .lit-field select { width: 100%; box-sizing: border-box; }
+.lit-check { display: block; margin: 10px 0 4px; font-size: var(--fs-sm); }
+.cell-error-text { color: #c92a2a; font-size: var(--fs-xs); margin-top: 2px; }

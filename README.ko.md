@@ -185,6 +185,8 @@ snakemake --cores 4 output/primers/P001/final/validated_ids.txt
 curl 'http://localhost:8767/api/sets?host=animal'
 ```
 
+**문헌 프라이머** — 사이드바 **📚 문헌 프라이머**: 이 바이러스의 논문 속 TaqMan 프라이머·프로브 세트와 출처를 정리하는 목록입니다. 처음에는 비어 있고 이 컴퓨터에만 저장됩니다(`config/literature/<virus>.tsv`, git 제외). 모든 항목에 출처가 필요하고, ‘원문 대조 완료’는 확인한 위치(예: 표 번호)를 적어야만 표시할 수 있으며 나머지는 *미검증*으로 보입니다. 버튼 한 번으로 분석 목록에 추가합니다.
+
 **신뢰하는 네트워크의 다른 컴퓨터에서 대시보드 열기**
 
 ```bash
