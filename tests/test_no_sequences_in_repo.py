@@ -4,6 +4,8 @@ repository goes to GitHub as CODE ONLY. Checks every tracked file and every file
  1. no sequence / data file types (FASTA, GenBank, spreadsheets, archives, slides);
  2. no long nucleotide literal in a text file (>= 16 plain bases, >= 18 with IUPAC codes). Tests generate what they need (tests/seqgen.py);
     short toy strings, IUPAC *alphabets* (every letter different) and trivially periodic strings ("ACGTACGT...") are fine;
+ 2b. the ONE exception is examples/literature/: published, openly licensed literature sets (see its SOURCES.md and test_literature.py);
+    they are exempt from rule 2 only -- rule 3 still applies to them, so an example that overlaps a private set fails.
  3. if the real configuration is present locally (config/primers.tsv, config/standards.tsv), no 12-base piece of any of its sequences
     (either strand) may appear in a tracked text file, and no FASTA record at all.
 """
@@ -48,9 +50,9 @@ def is_alphabet_or_pattern(run):
     return any(s == (s[:p] * (len(s) // p + 1))[:len(s)] for p in range(1, 5))     # ACGTACGT..., ATATAT...
 
 
-def confidential_kmers():
+def confidential_kmers(names=("primers.tsv", "standards.tsv")):
     seqs = []
-    for name in ("primers.tsv", "standards.tsv"):
+    for name in names:
         p = ROOT / "config" / name
         if p.exists():
             with open(p, newline="", encoding="utf-8") as fh:
@@ -68,9 +70,14 @@ def test_no_sequence_files_are_tracked():
     assert not bad, f"sequence/data files must not be in git: {bad}"
 
 
+LITERATURE_EXAMPLES = "examples/literature/"      # openly licensed, attributed (SOURCES.md); exempt from rule 2 only
+
+
 def test_no_long_nucleotide_literals_in_tracked_text():
     found = []
     for f in candidate_files():
+        if f.startswith(LITERATURE_EXAMPLES):
+            continue
         text = read_text(f)
         if text is None:
             continue
@@ -85,14 +92,17 @@ def test_no_long_nucleotide_literals_in_tracked_text():
 
 
 def test_no_piece_of_the_real_primers_or_standards_in_tracked_text():
-    kmers = confidential_kmers()
-    if not kmers:
+    all_kmers, primer_kmers = confidential_kmers(), confidential_kmers(("primers.tsv",))
+    if not all_kmers:
         pytest.skip("no local config/primers.tsv or standards.tsv to compare with")
     found = []
     for f in candidate_files():
         text = read_text(f)
         if text is None:
             continue
+        # The shipped literature examples are compared with the private PRIMER sets only: a standard material is virus sequence, which
+        # any published primer matches by design.
+        kmers = primer_kmers if f.startswith(LITERATURE_EXAMPLES) else all_kmers
         for n, line in enumerate(text.split("\n"), 1):
             for m in RUN.finditer(line):
                 s = m.group(0).upper()

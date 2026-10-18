@@ -73,3 +73,39 @@ def test_same_sequences_ignores_name_and_case():
 
 def test_incomplete_rows_cannot_be_analysed():
     assert not L.complete(L.normalise([row(probe="")], "lasv")[0])
+
+
+# ---- shipped examples (examples/literature/): only openly licensed sets, each credited -------------------------------------------------
+EXAMPLES = Path(__file__).resolve().parent.parent / "examples" / "literature"
+OPEN_LICENCES = ("CC0", "CC BY", "Public domain")
+
+
+def test_shipped_examples_are_openly_licensed_and_credited():
+    import pytest
+    if not (EXAMPLES / "nipah.tsv").exists():
+        pytest.skip("this edition ships no literature examples")
+    rows = L.load(EXAMPLES.parent.parent, "nipah") if False else None
+    import csv
+    with open(EXAMPLES / "nipah.tsv", newline="", encoding="utf-8") as fh:
+        rows = list(csv.DictReader(fh, delimiter="\t"))
+    sources = (EXAMPLES / "SOURCES.md").read_text(encoding="utf-8")
+    assert rows
+    for r in rows:
+        assert r["license"].startswith(OPEN_LICENCES), f"{r['lit_id']}: licence {r['license']!r} does not allow redistribution"
+        assert r["citation"] and r["doi"], f"{r['lit_id']}: source (citation + DOI) missing"
+        assert r["doi"] in sources, f"{r['lit_id']}: DOI is not credited in examples/literature/SOURCES.md"
+        assert r["verified"] == "yes" and r["verified_note"], f"{r['lit_id']}: examples must be checked against the paper"
+        assert not L.validate(L.normalise([r], "nipah"), "nipah")
+
+
+def test_examples_are_used_until_the_user_has_a_list(tmp_path):
+    import shutil
+    import pytest
+    if not (EXAMPLES / "nipah.tsv").exists():
+        pytest.skip("this edition ships no literature examples")
+    (tmp_path / "examples" / "literature").mkdir(parents=True)
+    shutil.copy(EXAMPLES / "nipah.tsv", tmp_path / "examples" / "literature" / "nipah.tsv")
+    shipped = L.load(tmp_path, "nipah")
+    assert shipped and L.load(tmp_path, "lasv") == []
+    L.save(tmp_path, "nipah", shipped[:1])                    # once the user saves, their own file wins
+    assert len(L.load(tmp_path, "nipah")) == 1

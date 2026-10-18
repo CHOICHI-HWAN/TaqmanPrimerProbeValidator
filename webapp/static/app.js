@@ -7737,7 +7737,7 @@ setLang(currentLang());
 // computer only (git-ignored); an entry counts as "원문 대조 완료" only when someone wrote down where it was checked (webapp/literature.py).
 const LIT_FIELDS = [
   ["name", "이름"], ["segment", "분절"], ["forward_primer", "Forward (5'→3')"], ["reverse_primer", "Reverse (5'→3')"], ["probe", "Probe (5'→3')"],
-  ["probe_dyes", "형광/소광체"], ["target", "표적 유전자·영역"], ["citation", "출처 (저자, 저널, 연도)"], ["doi", "DOI"], ["pmid", "PMID"],
+  ["probe_dyes", "형광/소광체"], ["target", "표적 유전자·영역"], ["citation", "출처 (저자, 저널, 연도)"], ["doi", "DOI"], ["pmid", "PMID"], ["license", "이용 조건 (예: CC BY 4.0)"],
   ["verified_note", "원문 확인 위치 (예: Table 2)"], ["remark", "메모"],
 ];
 let litState = { payload: null, virus: "lasv", editing: null, errors: [] };
@@ -7778,7 +7778,7 @@ function renderLiteraturePage() {
       <td>${escHtml(r.segment)}</td>
       <td>${seq(r.forward_primer)}</td><td>${seq(r.reverse_primer)}</td><td>${seq(r.probe)}</td>
       <td>${escHtml(r.probe_dyes)}</td><td>${escHtml(r.target)}</td>
-      <td>${escHtml(r.citation)}<div class="note">${litLinks(r)}</div>${r.verified_note ? `<div class="note">확인: ${escHtml(r.verified_note)}</div>` : ""}</td>
+      <td>${escHtml(r.citation)}<div class="note">${litLinks(r)}${r.license ? ` · 이용 조건: ${escHtml(r.license)}` : ""}</div>${r.verified_note ? `<div class="note">확인: ${escHtml(r.verified_note)}</div>` : ""}</td>
       <td class="lit-actions">
         ${r.in_analysis ? `<span class="note">분석 목록에 있음</span>`
           : r.can_add ? `<button class="btn btn-primary" data-lit-add="${i}">분석에 추가</button>`

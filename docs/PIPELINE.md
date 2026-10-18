@@ -87,11 +87,11 @@ flowchart TD
 
 `config/config.yaml`의 `primer_mismatch_pass`(기본 1)/`probe_mismatch`(기본 0)가 5번 판정 기준을 결정하고, 대시보드의 "⚙ 분석 파라미터 설정" 페이지에서 값을 바꾼 뒤 "분석 다시하기"를 누르면 mfeprimer 재검색 없이 `reconcile`부터만 다시 돌아 결과에 반영됩니다.
 
-## 공개 문헌 기반 preset
+## 문헌 프라이머
 
-`config/primers.tsv`의 `source` 컬럼이 `PUBLISHED`인 세트는 논문에 공개된(재배포 제약 없는) 서열입니다.
-현재 `PUB_OLSCHLAGER_2010` 1개가 있으며, 정확한 출처와 인용 정보는 로컬 파일 `PUBLISHED_PRIMERS.md`에 있습니다(GitHub에는 서열을 올리지 않으므로 저장소에는 없습니다)
-참고하세요.(서열을 짐작해서 옮기지 않기 위해, 원문을 직접 대조할 수 있는 경우에만 추가했습니다).
+논문에 공개된 프라이머·프로브는 대시보드의 **📚 문헌 프라이머** 메뉴에서 관리합니다(`config/literature/<virus>.tsv`, git 제외). 모든 항목에 출처가
+필요하고, '원문 대조 완료'는 논문과 직접 비교해 확인한 위치를 적은 항목에만 붙습니다. 예전의 `source=PUBLISHED` preset은 출처를 확인하지 못해
+'알 수 없음'으로 바꾸었습니다.
 
 ## 설치 (처음 한 번)
 
