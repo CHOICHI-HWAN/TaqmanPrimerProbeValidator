@@ -5,6 +5,12 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Changed (provenance)
+- 출처를 확인하지 못한 세트(예전 `PUB_...` preset)와 그 인용 메모를 '알 수 없음'으로 정정했습니다. 문헌 목록은 항목마다 출처가 있고 원문 대조 여부를 구분합니다.
+
+### Added
+- **Nipah 문헌 예시** `examples/literature/nipah.tsv`(+ `SOURCES.md`): 재배포가 허용된 논문(CC0 / CC BY)의 세트만 출처와 이용 조건을 달아 함께 제공합니다. 별도 목록이 없을 때 "📚 문헌 프라이머" 메뉴가 이 예시를 읽기 전용으로 보여 주어 메뉴와 '분석에 추가'를 바로 시험할 수 있습니다. 목록에 `license` 칸 추가. 서열 유출 검사는 예시 폴더에서 '긴 서열' 규칙만 제외하고, 비공개 프라이머 세트와의 겹침은 계속 검사합니다.
+
 ### Added
 - **📚 문헌 프라이머 메뉴**: 이 대시보드 바이러스(LASV 에디션은 LASV, Nipah 에디션은 Nipah)의 논문 프라이머·프로브 목록(출처 필수, 서열은 `config/literature/*.tsv`에만 저장·git 제외). '원문 대조 완료'는 확인 위치를 적어야만 표시되고 나머지는 '미검증'. 버튼으로 분석 목록에 추가(다른 바이러스 항목은 불가). `webapp/literature.py`, `tests/test_literature.py`. 목록은 빈 상태로 시작합니다(예전 `PUBLISHED_PRIMERS.md`는 검증되지 않아 사용하지 않습니다).
 
@@ -786,11 +792,7 @@ LASV 스냅샷(`snapshot-20261014`)에서 갈라진 Nipah 프로젝트. 나중�
   연속 매치 요구치) reading/writing the real `config/config.yaml` values `reconcile.py`
   already uses, via `GET/POST /api/params` -- changing a value and re-running the pipeline
   actually changes the validated/pass-fail outcome, not just a display setting.
-- `PUBLISHED_PRIMERS.md` and a new `PUB_OLSCHLAGER_2010` preset (`source=PUBLISHED` in
-  `config/primers.tsv`): a citable, publicly-published LASV L-segment TaqMan assay
-  (Olschläger et al. 2010, J Clin Microbiol, doi:10.1128/JCM.02351-09), with its sequence
-  verified directly against an open-access source rather than from memory. Turns out it's
-  an exact match to our existing `VendorC_L_1`/`INTRON_L_1` vendor sets.
+- (정정) 예전에는 여기에 문헌에서 온 것으로 표시한 preset 세트를 기록했으나, 그 출처는 확인되지 않아 '알 수 없음'으로 바꾸었습니다.
 - Mermaid workflow diagram in the README covering the full Snakemake DAG plus the webapp
   layer.
 

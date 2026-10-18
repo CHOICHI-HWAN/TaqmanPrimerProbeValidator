@@ -1,7 +1,8 @@
 """Primer/probe sets collected from the literature (the dashboard menu "문헌 프라이머" > LASV / Nipah).
 
-The sequences live ONLY in config/literature/<virus>.tsv of the user's own computer (config/* is git-ignored); this module and the
-menu ship with no data. Every entry must name its source (citation / DOI / PMID), and "verified" means: the sequences were compared
+The sequences live in config/literature/<virus>.tsv of the user's own computer (config/* is git-ignored). A list may ship as an
+EXAMPLE in examples/literature/<virus>.tsv -- only sets whose paper allows redistribution (CC0 / CC BY / public domain), each with its
+`license` and an attribution in examples/literature/SOURCES.md; it is used (read-only) until the user has a list of their own. Every entry must name its source (citation / DOI / PMID), and "verified" means: the sequences were compared
 with the primary source, and `verified_note` says where. A new entry is "no" until someone has done that -- nothing here is
 trusted just because it is in the list.
 
@@ -13,7 +14,7 @@ import re
 from pathlib import Path
 
 COLUMNS = ["lit_id", "name", "segment", "forward_primer", "reverse_primer", "probe", "probe_dyes", "target",
-           "citation", "doi", "pmid", "verified", "verified_note", "remark"]
+           "citation", "doi", "pmid", "license", "verified", "verified_note", "remark"]
 VIRUSES = {"lasv": {"label": "LASV", "segments": ("S", "L"), "prefix": "LIT-LASV-"},
            "nipah": {"label": "Nipah", "segments": ("GENOME",), "prefix": "LIT-NIPAH-"}}
 SEQ_FIELDS = (("forward_primer", "Forward"), ("reverse_primer", "Reverse"), ("probe", "Probe"))
@@ -32,11 +33,20 @@ def _seq(v):
     return re.sub(r"[\s\-]", "", str(v or "")).upper().replace("U", "T")
 
 
+def example_path(root, virus):
+    return Path(root) / "examples" / "literature" / f"{virus}.tsv"
+
+
 def load(root, virus):
-    """Rows of config/literature/<virus>.tsv (every column present, strings). Missing file = empty list."""
+    """Rows of config/literature/<virus>.tsv (every column present, strings). Without that file the shipped example list (if any) is
+    used; with neither, the list is empty."""
     p = file_path(root, virus)
-    if virus not in VIRUSES or not p.exists():
+    if virus not in VIRUSES:
         return []
+    if not p.exists():
+        p = example_path(root, virus)
+        if not p.exists():
+            return []
     with open(p, newline="", encoding="utf-8") as fh:
         return [{c: (r.get(c) or "").strip() for c in COLUMNS} for r in csv.DictReader(fh, delimiter="\t")]
 

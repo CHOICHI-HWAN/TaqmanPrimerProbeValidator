@@ -185,7 +185,7 @@ snakemake --cores 4 output/primers/P001/final/validated_ids.txt
 curl 'http://localhost:8767/api/sets?host=animal'
 ```
 
-**문헌 프라이머** — 사이드바 **📚 문헌 프라이머**: 이 바이러스의 논문 속 TaqMan 프라이머·프로브 세트와 출처를 정리하는 목록입니다. 처음에는 비어 있고 이 컴퓨터에만 저장됩니다(`config/literature/<virus>.tsv`, git 제외). 모든 항목에 출처가 필요하고, ‘원문 대조 완료’는 확인한 위치(예: 표 번호)를 적어야만 표시할 수 있으며 나머지는 *미검증*으로 보입니다. 버튼 한 번으로 분석 목록에 추가합니다.
+**문헌 프라이머** — 사이드바 **📚 문헌 프라이머**: 이 바이러스의 논문 속 TaqMan 프라이머·프로브 세트와 출처를 정리하는 목록입니다. 처음에는 비어 있고 이 컴퓨터에만 저장됩니다(`config/literature/<virus>.tsv`, git 제외). 모든 항목에 출처가 필요하고, ‘원문 대조 완료’는 확인한 위치(예: 표 번호)를 적어야만 표시할 수 있으며 나머지는 *미검증*으로 보입니다. 버튼 한 번으로 분석 목록에 추가합니다. 이 에디션에는 메뉴를 바로 시험할 수 있도록, 재배포가 허용된 논문의 예시 세트 몇 개가 출처와 함께 들어 있습니다([examples/literature/SOURCES.md](examples/literature/SOURCES.md)).
 
 **신뢰하는 네트워크의 다른 컴퓨터에서 대시보드 열기**
 
@@ -207,7 +207,7 @@ python3 webapp/server.py --host 0.0.0.0 --port 8767
 ## 이 저장소에 없는 것
 
 프라이머·프로브·표준물질·게놈(FASTA) **서열과 분석 결과는 버전 관리에서 제외합니다.** `config/`, `data/`, `output/`에 두고(git 제외),
-서열이 섞이면 `tests/test_no_sequences_in_repo.py`가 실패하도록 자동 검사합니다. 테스트의 염기서열은 `tests/seqgen.py`가 만들어 씁니다. 공개 저장소의 업체명은 일반 이름(VendorA …)입니다.
+서열이 섞이면 `tests/test_no_sequences_in_repo.py`가 실패하도록 자동 검사합니다. 테스트의 염기서열은 `tests/seqgen.py`가 만들어 씁니다. 공개 저장소의 업체명은 일반 이름(VendorA …)입니다. 이 저장소에 있는 서열은 `examples/literature/`의 재배포가 허용된 논문 예시(출처 표기)뿐입니다. 이 저장소에 있는 서열은 `examples/literature/`의 재배포가 허용된 논문 예시(출처 표기)뿐입니다.
 
 ## 서드파티 소프트웨어·데이터와 한계
 

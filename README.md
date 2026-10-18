@@ -184,7 +184,7 @@ snakemake --cores 4 output/primers/P001/final/validated_ids.txt
 curl 'http://localhost:8767/api/sets?host=animal'
 ```
 
-**Literature primers** — sidebar **📚 Literature primers**: a list of this virus's TaqMan primer/probe sets collected from papers, with the source of each. The list starts empty and is stored only on your computer (`config/literature/<virus>.tsv`, git-ignored). Every entry needs a source; “verified against the paper” can only be ticked together with the place where you checked it (e.g. a table), and everything else is shown as *unverified*. One click adds an entry to the analysis list.
+**Literature primers** — sidebar **📚 Literature primers**: a list of this virus's TaqMan primer/probe sets collected from papers, with the source of each. The list starts empty and is stored only on your computer (`config/literature/<virus>.tsv`, git-ignored). Every entry needs a source; “verified against the paper” can only be ticked together with the place where you checked it (e.g. a table), and everything else is shown as *unverified*. One click adds an entry to the analysis list. This edition ships a few openly licensed example sets from papers (credits in [examples/literature/SOURCES.md](examples/literature/SOURCES.md)) so the menu can be tried right away.
 
 **Open the dashboard from another computer on a trusted network**
 
@@ -206,7 +206,7 @@ python3 webapp/server.py --host 0.0.0.0 --port 8767
 ## What is not in this repository
 
 Primer, probe, standard-material and genome (FASTA) **sequences and analysis results are kept out of version control** — they live in `config/`, `data/` and `output/`, which are git-ignored,
-and `tests/test_no_sequences_in_repo.py` checks automatically and fails if a sequence slips in. Tests generate their nucleotide strings (`tests/seqgen.py`). Vendor names in this public copy are neutral (VendorA …).
+and `tests/test_no_sequences_in_repo.py` checks automatically and fails if a sequence slips in. Tests generate their nucleotide strings (`tests/seqgen.py`). Vendor names in this public copy are neutral (VendorA …). The only sequences in this repository are the openly licensed, credited literature examples in `examples/literature/`.
 
 ## Third-party software, data and limitations
 
