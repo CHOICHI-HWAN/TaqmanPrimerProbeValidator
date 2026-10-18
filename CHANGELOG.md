@@ -5,6 +5,8 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-10-18
+
 ### Changed (licence / limits)
 - "대외비 — 외부 공유 금지" 배너를 제거하고(대시보드·PDF 표지) "in silico 예측 — 실험으로 확인 필요" 안내로 바꿨습니다. README에 "서드파티 소프트웨어·데이터와 한계" 절(MFEprimer 별도 설치, 데이터 출처·재사용 주의, in silico 한계·연구용)을 추가하고, MFEprimer·"커밋하지 않습니다" 문구를 사실대로 고쳤습니다.
 
