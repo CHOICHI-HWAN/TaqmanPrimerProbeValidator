@@ -25,6 +25,7 @@ import shutil
 import socket
 import struct
 import subprocess
+import tempfile
 import sys
 import time
 import urllib.request
@@ -1250,6 +1251,8 @@ def _ws_recv(sock):
 CHROME_CANDIDATES = (
     "google-chrome", "google-chrome-stable", "chromium", "chromium-browser",
     "chromium-browser-stable", "/snap/bin/chromium",
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    r"C:\Program Files\Google\Chrome\Application\chrome.exe",
 )
 
 
@@ -1279,7 +1282,7 @@ def print_to_pdf_via_cdp(chrome_bin, html_path: Path, out_pdf: Path, port=9333):
     (Page.printToPDF, displayHeaderFooter=False) -- the `--print-to-pdf-no-header` CLI
     flag doesn't suppress the header/footer on this Chrome build, but the CDP parameter
     does."""
-    profile_dir = Path("/tmp") / f"lasv-report-chrome-profile-{os.getpid()}"
+    profile_dir = Path(tempfile.gettempdir()) / f"lasv-report-chrome-profile-{os.getpid()}"
     proc = subprocess.Popen([
         chrome_bin, "--headless", "--disable-gpu", "--no-sandbox",
         f"--remote-debugging-port={port}", "--remote-allow-origins=*",

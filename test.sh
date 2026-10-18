@@ -9,7 +9,7 @@
 #
 # Exit status 0 only if every check passed. Run ./setup.sh first on a new machine.
 set -uo pipefail
-cd "$(dirname "$(readlink -f "$0")")"
+cd "$(cd "$(dirname "$0")" && pwd -P)"   # portable (macOS has no readlink -f before 12.3)
 
 FULL=0
 for a in "$@"; do

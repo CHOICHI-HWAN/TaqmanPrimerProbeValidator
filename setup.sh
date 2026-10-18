@@ -17,7 +17,7 @@
 # Safe to re-run: an existing env is kept, the config lines are simply rewritten. The mfeprimer path can also
 # be changed later on the web app's "Analysis Parameters" page.
 set -euo pipefail
-cd "$(dirname "$(readlink -f "$0")")"
+cd "$(cd "$(dirname "$0")" && pwd -P)"   # portable (macOS has no readlink -f before 12.3)
 
 ENV_NAME="primer_validation"; NS_ENV_NAME="${ENV_NAME}_nextstrain"
 MFE_ARG=""; UPDATE=0; NS_MODE="ask"; YES=0
@@ -38,6 +38,7 @@ done
 say()  { printf '\n\033[1m== %s\033[0m\n' "$*"; }
 warn() { printf '\033[33m[주의] %s\033[0m\n' "$*" >&2; }
 die()  { printf '\033[31m[error] %s\033[0m\n' "$*" >&2; exit 1; }
+abspath() { python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$1" 2>/dev/null || printf '%s' "$1"; }
 ask()  { local reply; read -r -p "$1" reply || reply=""; printf '%s' "$reply"; }
 
 [ -f config/config.yaml ] || die "config/config.yaml이 없습니다 -- 프로젝트 폴더 안에서 실행하세요."
@@ -130,8 +131,8 @@ mfe_ok() {   # path -> 0 if it runs as mfeprimer
 }
 MFE_DEFAULT="${MFE_ARG:-${MFEPRIMER_BIN:-$(get_cfg mfeprimer_bin)}}"
 if [ -z "$MFE_DEFAULT" ] || [ ! -f "${MFE_DEFAULT/#\~/$HOME}" ]; then
-    for cand in ../*/mfeprimer/mfeprimer-*/mfeprimer-*-linux-amd64 ../../*/mfeprimer/mfeprimer-*/mfeprimer-*-linux-amd64 "$(command -v mfeprimer 2>/dev/null || true)"; do
-        [ -n "$cand" ] && [ -f "$cand" ] && { MFE_DEFAULT="$(readlink -f "$cand")"; break; }
+    for cand in ../*/mfeprimer/mfeprimer-*/mfeprimer-*-{linux,darwin}-* ../../*/mfeprimer/mfeprimer-*/mfeprimer-*-{linux,darwin}-* "$(command -v mfeprimer 2>/dev/null || true)"; do
+        [ -n "$cand" ] && [ -f "$cand" ] && { MFE_DEFAULT="$(abspath "$cand")"; break; }
     done
 fi
 MFE_FINAL=""
@@ -143,7 +144,7 @@ else
         reply="${reply:-$MFE_DEFAULT}"
         [ "$reply" = "skip" ] && break
         [ -n "$reply" ] || { echo "  경로를 입력하세요."; continue; }
-        if mfe_ok "$reply"; then MFE_FINAL="$(readlink -f "${reply/#\~/$HOME}")"; break; fi
+        if mfe_ok "$reply"; then MFE_FINAL="$(abspath "${reply/#\~/$HOME}")"; break; fi
     done
 fi
 if [ -n "$MFE_FINAL" ]; then

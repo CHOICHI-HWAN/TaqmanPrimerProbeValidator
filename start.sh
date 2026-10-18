@@ -14,7 +14,7 @@ PORT="${1:-8767}"
 
 # Always run from this script's own directory, so it works after copying the whole project
 # folder anywhere else (USB stick, another machine) regardless of where it's launched from.
-cd "$(dirname "$(readlink -f "$0")")"
+cd "$(cd "$(dirname "$0")" && pwd -P)"   # portable (macOS has no readlink -f before 12.3)
 
 if ! command -v python3 >/dev/null 2>&1; then
     echo "[error] python3를 찾을 수 없습니다. Python 3.8 이상을 설치한 뒤 다시 실행하세요." >&2
@@ -56,4 +56,4 @@ else
     echo "[주의] conda 환경이 설정되어 있지 않습니다 (./setup.sh). 이미 PATH에 있는 snakemake/mafft를 사용합니다." >&2
 fi
 
-exec python3 webapp/server.py --port "$PORT"
+exec python3 webapp/server.py --host "${HOST:-127.0.0.1}" --port "$PORT"

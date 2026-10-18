@@ -86,7 +86,7 @@ def find_mfeprimer(configured: str, pipeline_root: Path) -> str:
     env = os.environ.get("MFEPRIMER_BIN")
     if env and Path(env).exists():
         return env
-    candidates = sorted(pipeline_root.parent.glob("*/mfeprimer/mfeprimer-*/mfeprimer-*-linux-amd64"))
+    candidates = sorted([c for pat in ("linux", "darwin") for c in pipeline_root.parent.glob(f"*/mfeprimer/mfeprimer-*/mfeprimer-*-{pat}-*")])
     if candidates:
         return str(candidates[0])
     import shutil
