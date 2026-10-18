@@ -15,6 +15,20 @@ Detailed documentation (pipeline steps, settings, dashboard features, directory 
 
 1) **Exact mismatch counting.** mfeprimer's reported primer text hides mismatches toward the 5′ end and sites its seed step misses. Every site is therefore recounted on the **genome bases**, and mfeprimer and an independent genome scan are both run (the better result is kept). A probe only counts when it lies inside the amplicon.
 
+   <details><summary><b>▶ Example: real cases from this tool's results</b></summary>
+
+   Each square is one base of a primer (5′ → 3′); **grey** = matches the genome, **red** = does not. No sequences are drawn (see [What is not in this repository](#what-is-not-in-this-repository)). Generated from the pipeline's own results by [`docs/make_examples.py`](docs/make_examples.py).
+
+   **① A mismatch that mfeprimer's report does not show.** mfeprimer's report text is the primer itself, so only mismatches inside its 3′ seed appear in it. The recount on the genome bases finds the second mismatch toward the 5′ end, and the genome no longer passes the ≤ 1 rule. (In this edition's data, 1 genome of this set behaves like this.)
+
+   ![A mismatch hidden in mfeprimer's report](docs/media/example_hidden_mismatch.svg)
+
+   **② A binding site that mfeprimer misses.** mfeprimer found no amplicon in this genome at all, so on its own it would count the genome as *not detected*. The independent whole-genome scan finds a primer pair (1 mismatch each, 3′ ends intact) with an exact probe inside the amplicon. (Shown from the LASV edition: no genome of the Nipah data needed this rescue.)
+
+   ![A site mfeprimer misses](https://raw.githubusercontent.com/CHOICHI-HWAN/TaqmanPrimerProbeValidator/main/docs/media/example_missed_site.svg)
+
+   </details>
+
 2) **A simple, explicit pass/fail rule.** *Validated* = forward and reverse primer each ≤ 1 mismatch with an intact 3′ end **and** an exact probe match. Genomes that bind but only just miss the rule are shown separately (“caution”).
 
 3) **Host-aware coverage.** Coverage is counted on **human-derived genomes by default**; switch to animal, unknown or all with one click. Laboratory-host genomes are excluded everywhere.
