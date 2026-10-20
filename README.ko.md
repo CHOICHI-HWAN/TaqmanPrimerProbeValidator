@@ -68,7 +68,7 @@ Nipah 에디션은 비분절 유전체를 다루며, 클레이드는 공식 next
 
 ### 현재 버전
 
-코드: **v0.22.0 (Nipah 에디션)**   ·   Ubuntu 24.04, x86_64에서 테스트
+코드: **v0.22.1 (Nipah 에디션)**   ·   Ubuntu 24.04, x86_64에서 테스트
 
 ### 필요한 것
 
@@ -229,7 +229,7 @@ python3 webapp/server.py --host 0.0.0.0 --port 8767
   author  = {Choi, Chihwan},
   title   = {TaqMan Primer/Probe Validator (Nipah edition)},
   year    = {2026},
-  version = {0.22.0},
+  version = {0.22.1},
   url     = {https://github.com/CHOICHI-HWAN/TaqmanPrimerProbeValidator/tree/nipah}
 }
 ```

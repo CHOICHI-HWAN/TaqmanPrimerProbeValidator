@@ -61,6 +61,10 @@ async function setHostScope(scope) {
   if (type === "set" && id) return selectSet(id);
   if (type === "group" && id) return selectGroup(id);
   if (!$("#overview").hidden) return showOverview();
+  // any other page (Venn diagram, re-design, ...) shows numbers of the host scope too: open it again through its own menu button
+  const open = MAIN_VIEW_IDS.find((v) => !$(`#${v}`).hidden);
+  const btn = open && NAV_VIEW_BTN[open] && document.getElementById(NAV_VIEW_BTN[open]);
+  if (btn) btn.click();
   return null;
 }
 // A one-line statement of what the numbers on the page count (detail / group / overview headers).
