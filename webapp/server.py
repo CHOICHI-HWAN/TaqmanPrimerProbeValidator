@@ -292,6 +292,313 @@ def run_report_job(job_id, base_url):
             JOBS[job_id]["log_path"] = str(log_path)
 
 
+_PD_SEQ_RE = re.compile(r"^[ACGTRYSWKMBDHVN]{10,60}$")
+_PD_ID_RE = re.compile(r"^[A-Za-z0-9_\-]+$")
+
+
+def _pd_slug(seq):
+    import hashlib  # noqa: PLC0415
+    return hashlib.sha1(seq.encode()).hexdigest()[:10]
+
+
+def pd_scope(set_id, host):
+    """(scope, ids) for a probe-design request: the same host scope the dashboard toggle uses (human by default; anything
+    unknown means the primary scope), and the accessions of that scope. Background jobs get it passed in because they
+    outlive the request."""
+    with open(ROOT / "input_primers" / f"{set_id}.tsv", encoding="utf-8") as fh:
+        seg = next(csv.DictReader(fh, delimiter="\t"))["segment"].lower()
+    v = scope_ctx()
+    scope = host if host in scope_view.H.SCOPES else v.primary(seg)
+    return scope, v.ids(seg, scope)
+
+
+def validate_oligos(segment, f_seq, r_seq, p_seq, out_dir, name, progress=None, scope=None, ids=None):
+    """Runs the real validation (live_analyze.analyze_set: the same mfeprimer searches, MSA, KDCA standard check and
+    dimer/hairpin check as a registered set) for one F/R/Probe triple, counting only the genomes of the host scope.
+    result.json (everything, for the MSA modal) and summary.json (the numbers) go to out_dir. -> the summary dict"""
+    params = load_params()
+    result = analyze_set(
+        name=name, segment=segment, f_id=f"{name}_F", f_seq=f_seq, r_id=f"{name}_R", r_seq=r_seq, p_id=f"{name}_P", p_seq=p_seq,
+        root=ROOT, out_dir=out_dir, primer_mismatch_pass=params["primer_mismatch_pass"],
+        probe_mismatch=params["probe_mismatch"], three_prime_n=params["three_prime_consecutive_match"],
+        cpu=params["mfeprimer_cpu"], progress=progress)
+    pass_mm, probe_mm = params["primer_mismatch_pass"], params["probe_mismatch"]
+    genomes = result.get("genomes") or []
+    if ids is not None:                                    # host scope: count only the genomes of the active scope
+        genomes = [g for g in genomes if g.get("genome_id") in ids]
+        scoped = scope_ctx().summary_from_rows(segment.lower(), {g["genome_id"]: g for g in genomes}, scope)
+        result["summary"] = {**(result.get("summary") or {}), **scoped}
+
+    def num(v):
+        try:
+            return int(v)
+        except (TypeError, ValueError):
+            return None
+    lineages, validated_ids = {}, []
+    for g in genomes:
+        f, p, r = num(g.get("f_mismatch")), num(g.get("p_mismatch")), num(g.get("r_mismatch"))
+        ok = (f is not None and f <= pass_mm and r is not None and r <= pass_mm and p is not None and p <= probe_mm
+              and g.get("f_3p_ok") is not False and g.get("r_3p_ok") is not False)
+        rec = lineages.setdefault(g.get("lineage") or "NA", [0, 0])
+        rec[0] += 1
+        rec[1] += 1 if ok else 0
+        if ok:
+            validated_ids.append(g["genome_id"])
+    summary = {"validated_ids": validated_ids,
+        "generated": time.strftime("%Y-%m-%d %H:%M:%S"), "host_scope": scope, "summary": result.get("summary"),
+        "standard": result.get("standard"), "dimer_hairpin": result.get("dimer_hairpin"),
+        "probe_mismatch": probe_mm, "primer_mismatch_pass": pass_mm,
+        "lineages": [{"lineage": k, "total": v[0], "validated": v[1]} for k, v in sorted(lineages.items())],
+    }
+    (out_dir / "result.json").write_text(json.dumps(result), encoding="utf-8")
+    (out_dir / "summary.json").write_text(json.dumps(summary), encoding="utf-8")
+    return summary
+
+
+def probe_validate_one(set_id, seq, progress=None, scope=None, ids=None):
+    """The set's registered F/R plus one designed probe. The result lives ONLY under output/probe_design/<set>/validation/<slug>/
+    -- it is not a set, so it never reaches the overview, summaries or reports."""
+    with open(ROOT / "input_primers" / f"{set_id}.tsv", encoding="utf-8") as fh:
+        row = next(csv.DictReader(fh, delimiter="\t"))
+    out_dir = ROOT / "output" / "probe_design" / set_id / "validation" / _pd_slug(seq)
+    summary = validate_oligos(row["segment"], row["forward_primer"], row["reverse_primer"], seq, out_dir, f"{set_id}_PD",
+                              progress, scope, ids)
+    summary.update({"set_id": set_id, "seq": seq, "slug": _pd_slug(seq)})
+    (out_dir / "summary.json").write_text(json.dumps(summary), encoding="utf-8")
+    return summary
+
+
+def run_probe_validate_job(job_id, set_id, seq, scope=None, ids=None):
+    def progress(msg):
+        with JOBS_LOCK:
+            JOBS[job_id]["progress"] = msg
+
+    try:
+        probe_validate_one(set_id, seq, progress, scope, ids)
+        with JOBS_LOCK:
+            JOBS[job_id]["status"] = "done"
+            JOBS[job_id]["progress"] = "완료"
+    except Exception as exc:  # noqa: BLE001
+        traceback.print_exc()
+        with JOBS_LOCK:
+            JOBS[job_id]["status"] = "error"
+            JOBS[job_id]["error"] = str(exc)
+            JOBS[job_id]["progress"] = f"실행 실패: {exc}"
+
+
+def _pd_rank_key(v):
+    sm, std = v.get("summary") or {}, v.get("standard") or {}
+    return (-(sm.get("validated") or 0), 0 if std.get("ok") else 1, -(sm.get("probe_coverage_mm0_pct") or 0),
+            sm.get("probe_dropout") or 0, v.get("n_iupac", 0))
+
+
+def run_probe_best_job(job_id, set_id, opts, scope=None, ids=None):
+    """Design candidates, run the real validation for EVERY one of them, and rank the results: most validated genomes first,
+    then standard-material match, Probe coverage, fewer dropouts, fewer IUPAC positions. Everything stays in the probe-design card."""
+    import probe_designer  # noqa: PLC0415 -- scripts/ is on sys.path
+
+    def progress(msg):
+        with JOBS_LOCK:
+            JOBS[job_id]["progress"] = msg
+
+    try:
+        progress("후보 설계 중...")
+        design = probe_designer.run_design(set_id, ids=ids, scope=scope, **opts)
+        cands = design["candidates"]
+        ranking = []
+        for i, c in enumerate(cands, 1):
+            prefix = f"{i}/{len(cands)} 후보 검증 중 ({c['seq']}): "
+            v = probe_validate_one(set_id, c["seq"], lambda m, prefix=prefix: progress(prefix + m), scope, ids)
+            v["n_iupac"], v["tm"], v["source"] = c.get("n_iupac", 0), c.get("tm"), c.get("source", "own")
+            ranking.append(v)
+        ranking.sort(key=_pd_rank_key)
+        best = {
+            "set_id": set_id, "generated": time.strftime("%Y-%m-%d %H:%M:%S"), "host_scope": scope, "n_tested": len(ranking),
+            "options": {k: opts[k] for k in ("top", "max_iupac", "probe_mismatch", "method") if k in opts},
+            "tm_above": design.get("tm_above"),
+            "ranking": [{"seq": v["seq"], "tm": v.get("tm"), "source": v.get("source", "own"), "n_iupac": v.get("n_iupac", 0),
+                         "validated": (v.get("summary") or {}).get("validated"),
+                         "validated_pct": (v.get("summary") or {}).get("validated_pct"),
+                         "probe_pct": (v.get("summary") or {}).get("probe_coverage_mm0_pct"),
+                         "dropout": (v.get("summary") or {}).get("probe_dropout"),
+                         "std_ok": bool((v.get("standard") or {}).get("ok"))} for v in ranking],
+        }
+        (ROOT / "output" / "probe_design" / set_id / "best.json").write_text(json.dumps(best), encoding="utf-8")
+        with JOBS_LOCK:
+            JOBS[job_id]["status"] = "done"
+            JOBS[job_id]["progress"] = "완료"
+    except Exception as exc:  # noqa: BLE001
+        traceback.print_exc()
+        with JOBS_LOCK:
+            JOBS[job_id]["status"] = "error"
+            JOBS[job_id]["error"] = str(exc)
+            JOBS[job_id]["progress"] = f"실행 실패: {exc}"
+
+
+def _ph_designs(rph, members, out_dir, opts, seg, ids, scope, progress):
+    """PrimerHunter F/R pairs for one lineage (on a diverse sample of it), each completed with a designed probe."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    n_sample = opts.get("ph_sample", 25)
+    if len(members) > n_sample:
+        progress(f"MAFFT 정렬로 대표 게놈 {n_sample}개 고르는 중 ({len(members)}개 중)...")
+        from mfe_common import find_mafft  # noqa: PLC0415
+        fa, aln = out_dir / "members.fa", out_dir / "aligned.fa"
+        fa.write_text("".join(f">{k}\n{v}\n" for k, v in members.items()), encoding="utf-8")
+        with open(aln, "w", encoding="utf-8") as fh:
+            subprocess.run([find_mafft(), "--auto", "--thread", "4", str(fa)], stdout=fh, stderr=subprocess.DEVNULL, check=True)
+        reps = rph.pick_representatives(rph.read_fasta(aln), n_sample)
+        targets = {k: members[k] for k in reps}
+    else:
+        targets = dict(members)
+    res = rph.design_pairs(targets, out_dir / "primerhunter", threads=opts.get("ph_threads", 12), top=opts["top"],
+                           min_cov=opts.get("ph_min_cov", 80.0), min_tm=opts.get("ph_min_tm", 56.0), max_tm=opts.get("ph_min_tm", 56.0) + 14, progress=progress)
+    designs = []
+    for i, pr in enumerate(res["pairs"], 1):
+        progress(f"프라이머 쌍 {i}/{len(res['pairs'])}: Probe 설계 중...")
+        probe = probe_for_pair(seg, pr["F"], pr["R"], ids, scope, out_dir / "probe_work" / pr["name"])
+        if not probe:
+            continue
+        designs.append({**pr, "P": probe["seq"], "P_tm": probe["tm"], "P_source": probe["source"], "P_iupac": probe["n_iupac"], "P_note": probe["note"]})
+    status = "ok" if designs else ("none" if res["status"] == "ok" else res["status"])
+    msg = res["message"] or ("" if designs else "프라이머 쌍은 나왔지만 이 쌍들 사이에서 조건에 맞는 Probe를 찾지 못했습니다.")
+    return {"status": status, "designs": designs, "message": msg, "sample_n": len(targets), "threshold": None}
+
+
+def redesign_scope(seg, host):
+    v = scope_ctx()
+    scope = host if host in scope_view.H.SCOPES else v.primary(seg)
+    return scope, v.ids(seg, scope)
+
+
+def _rd_dir(seg, scope, engine="varvamp"):
+    base = ROOT / "output" / "redesign" / seg / scope
+    return base / "primerhunter" if engine == "primerhunter" else base
+
+
+def probe_for_pair(seg, f_seq, r_seq, ids, scope, work_dir):
+    """PrimerHunter designs primers only. For a F/R pair: run the pipeline once with a placeholder probe to get the amplicon alignment,
+    then let the probe designer (own rules + Primer3, IUPAC allowed) pick the probe that matches the most genomes of the scope.
+    -> {"seq", "tm", "source", "n_iupac", "msa_cov0"} or None"""
+    import probe_designer  # noqa: PLC0415 -- scripts/ is on sys.path
+    params = load_params()
+    res = analyze_set(
+        name="ph_probe", segment=seg, f_id="F", f_seq=f_seq, r_id="R", r_seq=r_seq, p_id="P", p_seq=f_seq, root=ROOT,
+        out_dir=work_dir, primer_mismatch_pass=params["primer_mismatch_pass"], probe_mismatch=params["probe_mismatch"],
+        three_prime_n=params["three_prime_consecutive_match"], cpu=params["mfeprimer_cpu"])
+    msa = res.get("msa")
+    if not msa or not msa.get("rows"):
+        return None
+    # PrimerHunter's primers are short-amplicon, relatively high-Tm: ask for a probe above the primers first, then accept one a bit
+    # below them (flagged) rather than giving no probe at all.
+    for above, note in (((0.0, 12.0), ""), ((-3.0, 15.0), "Probe Tm이 프라이머와 비슷하거나 약간 낮음 (조건을 완화해 설계)")):
+        try:
+            d = probe_designer.design("", top=6, max_iupac=2, method="both", ids=ids, msa=msa, tm_above=above)
+        except SystemExit:
+            return None
+        if d["candidates"]:
+            c = d["candidates"][0]
+            return {"seq": c["seq"], "tm": c.get("tm"), "source": c.get("source"), "n_iupac": c.get("n_iupac", 0),
+                    "msa_cov0": c.get("msa_cov0"), "note": note, "primer_tm": round(d["primer_tm"], 1)}
+    return None
+
+
+def _set_cover(ids_by_design, targets):
+    """Greedy set cover over the designs of one lineage: which designs together pass (real validation) the most genomes of
+    `targets`, in the order they add genomes. -> {"steps": [{"name", "added", "covered", "pct"}], "covered", "total", "pct"}"""
+    left, steps, covered = set(targets), [], set()
+    pool = {k: v & targets for k, v in ids_by_design.items()}
+    while pool:
+        name, best = max(pool.items(), key=lambda kv: len(kv[1] & left))
+        gain = best & left
+        if not gain:
+            break
+        covered |= gain
+        left -= gain
+        steps.append({"name": name, "added": len(gain), "covered": len(covered),
+                      "pct": round(100.0 * len(covered) / len(targets), 1) if targets else 0.0})
+        del pool[name]
+    total = len(targets)
+    return {"steps": steps, "covered": len(covered), "total": total, "pct": round(100.0 * len(covered) / total, 1) if total else 0.0}
+
+
+def run_redesign_job(job_id, seg, scope, ids, opts):
+    """varVAMP redesign per lineage (and optionally for all genomes together), every design validated with the real pipeline
+    validation. Results: output/redesign/<seg>/<scope>/run.json (+ one folder per lineage/design) -- shown only in the redesign page."""
+    import redesign_varvamp  # noqa: PLC0415 -- scripts/ is on sys.path
+    import redesign_primerhunter  # noqa: PLC0415
+    from mfe_common import read_fasta_seqs  # noqa: PLC0415
+    engine = opts.get("engine", "varvamp")
+
+    def progress(msg):
+        with JOBS_LOCK:
+            JOBS[job_id]["progress"] = msg
+
+    try:
+        v = scope_ctx()
+        lin = v.lineage_of(seg)
+        seqs = read_fasta_seqs(ROOT / "data" / "filtered" / f"{seg}_filtered.fasta")
+        counts = {}
+        for i in ids:
+            counts[lin.get(i, "NA")] = counts.get(lin.get(i, "NA"), 0) + 1
+        wanted = opts.get("lineages") or sorted(counts)
+        groups = [(L, sorted(i for i in ids if lin.get(i, "NA") == L)) for L in wanted if L in counts]       # sorted: reproducible sampling
+        if opts.get("include_all"):
+            groups.append(("ALL", sorted(ids)))
+        base = _rd_dir(seg, scope, engine)
+        base.mkdir(parents=True, exist_ok=True)
+        run = {"engine": engine, "segment": seg.upper(), "host_scope": scope, "generated": time.strftime("%Y-%m-%d %H:%M:%S"),
+               "population_n": len(ids), "params": {k: opts[k] for k in ("threshold", "min_threshold", "ambig", "probe_ambig", "top", "min_n", "ph_sample", "ph_min_cov", "ph_min_tm") if k in opts},
+               "lineages": [], "done": False}
+        (base / "run.json").write_text(json.dumps(run), encoding="utf-8")
+        for gi, (L, members) in enumerate(groups, 1):
+            tag = f"[{gi}/{len(groups)}] {L} ({len(members)}개) "
+            entry = {"lineage": L, "n": len(members), "designs": []}
+            if len(members) < opts["min_n"]:
+                entry.update(status="skipped", message=f"게놈이 {len(members)}개라 최소 {opts['min_n']}개 기준에 못 미쳐 건너뜀")
+            else:
+                ids_by_design = {}
+                if engine == "primerhunter":
+                    res = _ph_designs(redesign_primerhunter, {k: seqs[k] for k in members if k in seqs}, base / L, opts, seg, ids, scope,
+                                      lambda m, tag=tag: progress(tag + m))
+                else:
+                    res = redesign_varvamp.design_lineage(
+                        {k: seqs[k] for k in members if k in seqs}, base / L, opts["threshold"], opts["min_threshold"],
+                        ambig=opts["ambig"], probe_ambig=opts["probe_ambig"], top=opts["top"],
+                        threads=4, progress=lambda m, tag=tag: progress(tag + m))
+                entry.update(status=res["status"], threshold=res.get("threshold"), message=res["message"],
+                             sample_n=res.get("sample_n"))
+                for di, d in enumerate(res["designs"], 1):
+                    out = base / L / "designs" / d["name"]
+                    val = validate_oligos(seg, d["F"], d["R"], d["P"], out, f"RD_{seg}_{L}_{d['name']}",
+                                          lambda m, tag=tag, di=di, n=len(res["designs"]): progress(f"{tag}설계 {di}/{n} 검증: {m}"),
+                                          scope, ids)
+                    ids_by_design[d["name"]] = set(val.get("validated_ids") or [])
+                    per = {x["lineage"]: x for x in val["lineages"]}
+                    own = per.get(L) if L != "ALL" else None
+                    sm = val.get("summary") or {}
+                    entry["designs"].append({**d, "validated": sm.get("validated"), "validated_pct": sm.get("validated_pct"),
+                                             "probe_pct": sm.get("probe_coverage_mm0_pct"), "dropout": sm.get("probe_dropout"),
+                                             "std_ok": bool((val.get("standard") or {}).get("ok")),
+                                             "own_validated": own["validated"] if own else None, "own_total": own["total"] if own else None,
+                                             "lineages": val["lineages"], "dir": f"{L}/designs/{d['name']}"})
+                entry["cover"] = _set_cover(ids_by_design, set(members))
+                entry["designs"].sort(key=lambda x: (-(x.get("own_validated") if x.get("own_validated") is not None else x.get("validated") or 0),
+                                                     -(x.get("validated") or 0)))
+            run["lineages"].append(entry)
+            (base / "run.json").write_text(json.dumps(run), encoding="utf-8")
+        run["done"] = True
+        (base / "run.json").write_text(json.dumps(run), encoding="utf-8")
+        with JOBS_LOCK:
+            JOBS[job_id]["status"] = "done"
+            JOBS[job_id]["progress"] = "완료"
+    except Exception as exc:  # noqa: BLE001
+        traceback.print_exc()
+        with JOBS_LOCK:
+            JOBS[job_id]["status"] = "error"
+            JOBS[job_id]["error"] = str(exc)
+            JOBS[job_id]["progress"] = f"실행 실패: {exc}"
+
+
 def tail_progress(log_path: Path) -> str:
     try:
         text = log_path.read_text(encoding="utf-8", errors="replace")
@@ -559,6 +866,66 @@ def save_ui_state(state):
 EVALUATION_LABEL = {"ok": "통과", "warn": "보류", "bad": "실패"}
 
 
+def _set_parents_path():
+    return ROOT / "config" / "set_parents.json"
+
+
+def load_set_parents():
+    """Manual parent assignments {child_set_id: parent_set_id or ""} (an empty string = "no parent", overriding the name-based guess)."""
+    try:
+        data = json.loads(_set_parents_path().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def save_set_parent(child, parent):
+    data = load_set_parents()
+    data[child] = parent
+    tmp = _set_parents_path().with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+    tmp.replace(_set_parents_path())
+
+
+def annotate_set_relations(sets):
+    """Adds the hierarchy facts the sidebar/overview use, without touching any pipeline data:
+    parent_id (+ parent_origin "name"|"manual"): a variant is a set named "<parent name>-<n>" (or set by hand), one level deep only;
+    duplicate_of / duplicate_ids: sets whose F, R and probe are identical to another set's (only the lowest id has duplicate_of = None)."""
+    by_id = {x["set_id"]: x for x in sets}
+    names = {(x.get("display_name") or x["set_id"]): x["set_id"] for x in sets}
+    manual = load_set_parents()
+    for x in sets:
+        pid, origin = None, ""
+        if x["set_id"] in manual:
+            pid, origin = (manual[x["set_id"]] or None), ("manual" if manual[x["set_id"]] else "")
+        else:
+            m = re.match(r"^(.+)-(\d+)$", x.get("display_name") or "")
+            if m and m.group(1) in names and names[m.group(1)] != x["set_id"]:
+                pid, origin = names[m.group(1)], "name"
+        if pid and (pid not in by_id or by_id[pid].get("segment") != x.get("segment") or pid == x["set_id"]):
+            pid, origin = None, ""
+        x["parent_id"], x["parent_origin"] = pid, origin
+    for x in sets:                                              # one level only: a parent that is itself a variant -> its root
+        seen = {x["set_id"]}
+        while x["parent_id"] and by_id[x["parent_id"]].get("parent_id") and x["parent_id"] not in seen:
+            seen.add(x["parent_id"])
+            x["parent_id"] = by_id[x["parent_id"]]["parent_id"]
+    def num(i):
+        m = re.search(r"\d+", i)
+        return (int(m.group()) if m else 10**9, i)
+    same = {}
+    for x in sets:
+        key = tuple((x.get(k) or "").strip().upper() for k in ("F_seq", "R_seq", "P_seq"))
+        if all(key):
+            same.setdefault(key, []).append(x["set_id"])
+    for ids in same.values():
+        ids.sort(key=num)
+        for sid in ids:
+            by_id[sid]["duplicate_of"] = ids[0] if sid != ids[0] else None
+            by_id[sid]["duplicate_ids"] = [i for i in ids if i != sid]
+    return sets
+
+
 def load_builtin_sets():
     """Merge all the precomputed pipeline outputs into the same shape /api/sets returns
     for a live-analyzed user set, so the frontend can treat both uniformly."""
@@ -650,7 +1017,7 @@ def load_builtin_sets():
                 sets.append(_slim(data))
             except Exception:
                 continue
-    return sets
+    return annotate_set_relations(sets)
 
 
 def _slim(full):
@@ -1139,6 +1506,59 @@ def load_set_lineage_rows():
         for lin, cnt in sorted(view.lineage_counts(seg, ids).items(), key=lambda kv: -kv[1]):
             rows.append({"set_id": sid, "segment": r["segment"].upper(), "lineage": lin, "validated_count": str(cnt)})
     return rows
+
+
+FINAL_VERDICTS = ("adopt", "hold", "reject")
+
+
+def _final_results_path():
+    return ROOT / "config" / "final_results.json"
+
+
+def load_final_results():
+    """The user's own final call per primer set / group: {id: {"verdict": adopt|hold|reject, "note": str, "updated": "YYYY-MM-DD HH:MM"}}.
+    Purely a label the people using the dashboard set; nothing in the pipeline reads it."""
+    try:
+        data = json.loads(_final_results_path().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def save_final_result(item_id, verdict, note):
+    data = load_final_results()
+    if verdict in FINAL_VERDICTS or (note or "").strip():
+        data[item_id] = {"verdict": verdict if verdict in FINAL_VERDICTS else "", "note": (note or "").strip()[:500],
+                         "updated": time.strftime("%Y-%m-%d %H:%M")}
+    else:
+        data.pop(item_id, None)                                   # nothing set any more: the entry disappears
+    tmp = _final_results_path().with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+    tmp.replace(_final_results_path())
+    return data.get(item_id)
+
+
+def load_venn(seg):
+    """Everything the coverage-Venn page needs for one segment, in the active host scope: the population (accession, lineage, country)
+    and, per primer set and per group, the genomes it validates (a group counts its cross-binding genomes too, like the overview)."""
+    v = scope_ctx()
+    keep = v.ids(seg)
+    lin = v.lineage_of(seg)
+    pop = {r["accession"]: r for r in v.population(seg)}
+    genomes = [[i, lin.get(i, "NA"), (pop.get(i) or {}).get("country") or ""] for i in sorted(keep)]
+    items = []
+    for st in load_builtin_sets():
+        if str(st.get("segment", "")).lower() != seg:
+            continue
+        path = ROOT / "output" / "primers" / st["set_id"] / "final" / "validated_ids.txt"
+        ids = {ln.strip() for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()} if path.exists() else set()
+        items.append({"key": st["set_id"], "kind": "set", "name": st.get("display_name") or st["set_id"], "ids": sorted(ids & keep)})
+    for g in load_groups_config():
+        if str(g.get("segment", "")).lower() != seg:
+            continue
+        ids = (_read_validated_ids(g["group_id"]) | group_cross_ids(g["group_id"])) & keep
+        items.append({"key": g["group_id"], "kind": "group", "name": g.get("label") or g["group_id"], "ids": sorted(ids)})
+    return {"segment": seg.upper(), "host_scope": v.info(seg), "genomes": genomes, "items": items}
 
 
 def load_overview():
@@ -2003,6 +2423,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
+        # revalidate on every load: without this browsers keep an old app.js/style.css after an update (new buttons "missing")
+        self.send_header("Cache-Control", "no-cache")
         if download_name:
             self.send_header("Content-Disposition", f'attachment; filename="{download_name}"')
         self.end_headers()
@@ -2103,6 +2525,14 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_json({"scopes": ["human", "animal", "unknown", "all"], "segments": host_scope_info()})
         if path == "/api/overview":
             return self._send_json(load_overview())
+        if path == "/api/final-results":
+            return self._send_json(load_final_results())
+        m = re.match(r"^/api/venn/(\w+)$", path)
+        if m:
+            seg = m.group(1).lower()
+            if seg not in seg_keys():
+                return self._send_json({"error": "bad segment"}, 400)
+            return self._send_json(load_venn(seg))
 
         if path == "/api/requirements":
             f = ROOT / "docs" / "requirements_log.json"
@@ -2278,6 +2708,90 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             return self._handle_get_verification_image(m.group(1), m.group(2), m.group(3))
 
+        m = re.match(r"^/api/redesign/(\w+)/run$", path)
+        if m:
+            seg = m.group(1).lower()
+            if seg not in seg_keys():
+                return self._send_json({"error": "bad segment"}, 400)
+            scope, _ids = redesign_scope(seg, (qs.get("host") or [None])[0])
+            engine = "primerhunter" if (qs.get("engine") or [""])[0] == "primerhunter" else "varvamp"
+            f = _rd_dir(seg, scope, engine) / "run.json"
+            out = json.loads(f.read_text(encoding="utf-8")) if f.exists() else {"generated": None}
+            out["host_scope"] = out.get("host_scope") or scope
+            counts = {}
+            lin = scope_ctx().lineage_of(seg)
+            for i in _ids:
+                counts[lin.get(i, "NA")] = counts.get(lin.get(i, "NA"), 0) + 1
+            out["available"] = dict(sorted(counts.items()))        # lineage -> genomes in the active host scope
+            out["active_scope"] = scope
+            return self._send_json(out)
+
+        m = re.match(r"^/api/redesign/(\w+)/msa$", path)
+        if m:
+            seg = m.group(1).lower()
+            rel = (qs.get("dir") or [""])[0]
+            if seg not in seg_keys() or not re.fullmatch(r"[A-Za-z0-9_\-]+/designs/[A-Za-z0-9_\-]+", rel):
+                return self._send_json({"error": "bad request"}, 400)
+            scope, _ids = redesign_scope(seg, (qs.get("host") or [None])[0])
+            engine = "primerhunter" if (qs.get("engine") or [""])[0] == "primerhunter" else "varvamp"
+            f = _rd_dir(seg, scope, engine) / rel / "result.json"
+            if not f.exists():
+                return self._send_json({"error": "결과가 없습니다."}, 404)
+            data = json.loads(f.read_text(encoding="utf-8"))
+            v = scope_ctx()
+            msa = dict(data.get("msa") or {})
+            msa["rows"] = v.tag_and_filter(seg, msa.get("rows") or [])
+            genomes = v.tag_and_filter(seg, data.get("genomes") or [])
+            _coerce_numeric_strings(msa["rows"])
+            _coerce_numeric_strings(genomes)
+            return self._send_json({"set_id": rel, "segment": data.get("segment"), "msa": msa, "genomes": genomes,
+                                    "gene": data.get("gene"), "summary": data.get("summary"), "host_scope": v.info(seg)})
+
+        m = re.match(r"^/api/sets/([^/]+)/probe-design/msa$", path)
+        if m:
+            seq = (qs.get("seq") or [""])[0].strip().upper()
+            f = ROOT / "output" / "probe_design" / m.group(1) / "validation" / (_pd_slug(seq) if _PD_SEQ_RE.match(seq) else "-") / "result.json"
+            if not _PD_ID_RE.fullmatch(m.group(1)) or not f.exists():
+                return self._send_json({"error": "이 Probe의 검증 결과가 없습니다. 먼저 \"검증\"을 실행하세요."}, 404)
+            data = json.loads(f.read_text(encoding="utf-8"))
+            seg = (data.get("segment") or "").lower()
+            v = scope_ctx()
+            msa = dict(data.get("msa") or {})
+            msa["rows"] = v.tag_and_filter(seg, msa.get("rows") or [])         # only the genomes of the active host scope
+            genomes = v.tag_and_filter(seg, data.get("genomes") or [])
+            _coerce_numeric_strings(msa["rows"])
+            _coerce_numeric_strings(genomes)
+            return self._send_json({"set_id": m.group(1), "segment": data.get("segment"), "msa": msa, "genomes": genomes,
+                                    "gene": data.get("gene"), "summary": data.get("summary"), "P_seq": seq,
+                                    "host_scope": v.info(seg)})
+
+        m = re.match(r"^/api/sets/([^/]+)/probe-design/best$", path)
+        if m:
+            if not _PD_ID_RE.fullmatch(m.group(1)):
+                return self._send_json({"error": "bad id"}, 400)
+            f = ROOT / "output" / "probe_design" / m.group(1) / "best.json"
+            return self._send_json(json.loads(f.read_text(encoding="utf-8")) if f.exists() else {"generated": None})
+
+        m = re.match(r"^/api/sets/([^/]+)/probe-design/validations$", path)
+        if m:
+            if not _PD_ID_RE.fullmatch(m.group(1)):
+                return self._send_json({"error": "bad id"}, 400)
+            items = []
+            for f in (ROOT / "output" / "probe_design" / m.group(1) / "validation").glob("*/summary.json"):
+                try:
+                    items.append(json.loads(f.read_text(encoding="utf-8")))
+                except ValueError:
+                    pass
+            items.sort(key=lambda x: x.get("generated", ""), reverse=True)
+            return self._send_json(items)
+
+        m = re.match(r"^/api/sets/([^/]+)/probe-design$", path)
+        if m:
+            f = ROOT / "output" / "probe_design" / m.group(1) / "result.json"
+            if not re.fullmatch(r"[A-Za-z0-9_\-]+", m.group(1)):
+                return self._send_json({"error": "bad id"}, 400)
+            return self._send_json(json.loads(f.read_text(encoding="utf-8")) if f.exists() else {"set_id": m.group(1), "generated": None})
+
         m = re.match(r"^/api/sets/([^/]+)$", path)
         if m:
             detail = load_set_detail(m.group(1))
@@ -2349,6 +2863,17 @@ class Handler(BaseHTTPRequestHandler):
         m = re.match(r"^/api/groups/([^/?]+)/analyze(?:\?(.*))?$", self.path)
         if m:
             return self._handle_group_analyze(m.group(1), "force=1" in (m.group(2) or ""))
+        if self.path == "/api/redesign":
+            return self._handle_redesign()
+        m = re.match(r"^/api/sets/([^/?]+)/probe-design/best$", self.path)
+        if m:
+            return self._handle_probe_best(m.group(1))
+        m = re.match(r"^/api/sets/([^/?]+)/probe-design/validate$", self.path)
+        if m:
+            return self._handle_probe_validate(m.group(1))
+        m = re.match(r"^/api/sets/([^/?]+)/probe-design$", self.path)
+        if m:
+            return self._handle_probe_design(m.group(1))
         m = re.match(r"^/api/sets/([^/?]+)/analyze(?:\?(.*))?$", self.path)
         if m:
             return self._handle_set_analyze(m.group(1), "force=1" in (m.group(2) or ""))
@@ -2358,6 +2883,27 @@ class Handler(BaseHTTPRequestHandler):
             return self._handle_generate_report()
         if self.path == "/api/groups":
             return self._handle_create_group()
+        m = re.match(r"^/api/set-parent/([A-Za-z0-9_\-]+)$", self.path)
+        if m:
+            try:
+                payload = self._read_json_body()
+            except json.JSONDecodeError:
+                return self._send_json({"error": "invalid JSON"}, 400)
+            parent = str(payload.get("parent", "")).strip()
+            sets = {x["set_id"]: x for x in load_builtin_sets()}
+            if m.group(1) not in sets or (parent and (parent not in sets or parent == m.group(1) or sets[parent].get("segment") != sets[m.group(1)].get("segment"))):
+                return self._send_json({"error": "부모 세트가 올바르지 않습니다 (같은 segment의 다른 세트여야 합니다)."}, 400)
+            if parent and sets[parent].get("parent_id") == m.group(1):
+                return self._send_json({"error": "서로를 부모로 지정할 수 없습니다."}, 400)
+            save_set_parent(m.group(1), parent)
+            return self._send_json({"ok": True})
+        m = re.match(r"^/api/final-results/([A-Za-z0-9_\-]+)$", self.path)
+        if m:
+            try:
+                payload = self._read_json_body()
+            except json.JSONDecodeError:
+                return self._send_json({"error": "invalid JSON"}, 400)
+            return self._send_json({"id": m.group(1), "result": save_final_result(m.group(1), str(payload.get("verdict", "")), str(payload.get("note", "")))})
         if self.path == "/api/ui-state/order":
             return self._handle_save_order()
         if self.path == "/api/params":
@@ -2867,6 +3413,117 @@ class Handler(BaseHTTPRequestHandler):
                                    kwargs={"on_success": on_success}, daemon=True)
         thread.start()
         return self._send_json({"job_id": job_id})
+
+    def _handle_redesign(self):
+        length = int(self.headers.get("Content-Length", 0))
+        try:
+            o = json.loads(self.rfile.read(length) or b"{}")
+        except ValueError:
+            o = {}
+        seg = str(o.get("segment", "")).lower()
+        if seg not in seg_keys():
+            return self._send_json({"error": "segment가 올바르지 않습니다."}, 400)
+        with JOBS_LOCK:
+            if any(j.get("kind") == "redesign" and j.get("status") == "running" for j in JOBS.values()):
+                return self._send_json({"error": "다른 재설계가 이미 실행 중입니다."}, 409)
+
+        def num(key, default, lo, hi, cast=float):
+            try:
+                return min(hi, max(lo, cast(o.get(key, default))))
+            except (TypeError, ValueError):
+                return default
+        thr = num("threshold", 0.9, 0.3, 1.0)
+        opts = {"threshold": thr, "min_threshold": min(thr, num("min_threshold", 0.6, 0.3, 1.0)),
+                "ambig": num("ambig", 2, 0, 8, int), "probe_ambig": num("probe_ambig", 1, 0, 6, int),
+                "top": num("top", 3, 1, 8, int), "min_n": num("min_n", 5, 3, 1000, int),
+                "include_all": bool(o.get("include_all")), "engine": "primerhunter" if o.get("engine") == "primerhunter" else "varvamp",
+                "ph_sample": num("ph_sample", 25, 5, 100, int), "ph_threads": num("ph_threads", 12, 1, 32, int),
+                "ph_min_cov": num("ph_min_cov", 80.0, 10.0, 100.0), "ph_min_tm": num("ph_min_tm", 56.0, 40.0, 70.0),
+                "lineages": [x for x in (o.get("lineages") or []) if isinstance(x, str) and re.fullmatch(r"[A-Za-z0-9_\-]+", x)]}
+        scope, ids = redesign_scope(seg, o.get("host"))
+        job_id = uuid.uuid4().hex[:12]
+        with JOBS_LOCK:
+            JOBS[job_id] = {"status": "running", "kind": "redesign", "label": f"{seg.upper()} 리니지별 프라이머·프로브 재설계 ({'PrimerHunter' if opts['engine'] == 'primerhunter' else 'varVAMP'})",
+                            "progress": "시작...", "started": time.time()}
+        threading.Thread(target=run_redesign_job, args=(job_id, seg, scope, ids, opts), daemon=True).start()
+        return self._send_json({"job_id": job_id})
+
+    def _handle_probe_best(self, set_id):
+        length = int(self.headers.get("Content-Length", 0))
+        try:
+            o = json.loads(self.rfile.read(length) or b"{}")
+        except ValueError:
+            o = {}
+        if not _PD_ID_RE.fullmatch(set_id) or not (ROOT / "input_primers" / f"{set_id}.tsv").exists():
+            return self._send_json({"error": "세트를 찾을 수 없습니다."}, 404)
+        with JOBS_LOCK:
+            if any(j.get("kind") == "probe_best" and j.get("status") == "running" and j.get("set_id") == set_id for j in JOBS.values()):
+                return self._send_json({"error": "이 세트의 최적 Probe 탐색이 이미 실행 중입니다."}, 409)
+
+        def num(key, default, lo, hi, cast=float):
+            try:
+                return min(hi, max(lo, cast(o.get(key, default))))
+            except (TypeError, ValueError):
+                return default
+        lo = num("tm_above_min", 3.0, -5.0, 30.0)
+        opts = {"top": num("top", 20, 1, 30, int), "max_iupac": num("max_iupac", 2, 0, 4, int),
+                "probe_mismatch": num("probe_mismatch", 0, 0, 3, int),
+                "method": o.get("method") if o.get("method") in ("own", "primer3", "both") else "both",
+                "tm_above": (lo, max(lo, num("tm_above_max", 10.0, -5.0, 30.0)))}
+        job_id = uuid.uuid4().hex[:12]
+        with JOBS_LOCK:
+            JOBS[job_id] = {"status": "running", "kind": "probe_best", "set_id": set_id,
+                            "label": f"{set_id} 최적 Probe 탐색 (후보 {opts['top']}개 전체 검증)",
+                            "progress": "시작...", "started": time.time()}
+        scope, ids = pd_scope(set_id, o.get("host"))
+        threading.Thread(target=run_probe_best_job, args=(job_id, set_id, opts, scope, ids), daemon=True).start()
+        return self._send_json({"job_id": job_id})
+
+    def _handle_probe_validate(self, set_id):
+        length = int(self.headers.get("Content-Length", 0))
+        try:
+            body = json.loads(self.rfile.read(length) or b"{}")
+            seq, host = str(body.get("seq", "")).strip().upper(), body.get("host")
+        except ValueError:
+            seq, host = "", None
+        if not _PD_ID_RE.fullmatch(set_id) or not (ROOT / "input_primers" / f"{set_id}.tsv").exists():
+            return self._send_json({"error": "세트를 찾을 수 없습니다."}, 404)
+        if not _PD_SEQ_RE.match(seq):
+            return self._send_json({"error": "Probe 서열은 10-60nt의 IUPAC 문자(ACGTRYSWKMBDHVN)여야 합니다."}, 400)
+        job_id = uuid.uuid4().hex[:12]
+        with JOBS_LOCK:
+            JOBS[job_id] = {"status": "running", "kind": "probe_validate", "label": f"{set_id} 설계 Probe 검증 ({seq})",
+                            "progress": "시작...", "started": time.time()}
+        scope, ids = pd_scope(set_id, host)
+        threading.Thread(target=run_probe_validate_job, args=(job_id, set_id, seq, scope, ids), daemon=True).start()
+        return self._send_json({"job_id": job_id})
+
+    def _handle_probe_design(self, set_id):
+        """Design TaqMan probe candidates for this set's F/R (scripts/probe_designer.py) and test them against the population.
+        Takes about a second, so it runs inside the request instead of as a background job."""
+        import probe_designer  # noqa: PLC0415 -- scripts/ is on sys.path
+        length = int(self.headers.get("Content-Length", 0))
+        try:
+            opts = json.loads(self.rfile.read(length) or b"{}")
+        except ValueError:
+            opts = {}
+        if not re.fullmatch(r"[A-Za-z0-9_\-]+", set_id):
+            return self._send_json({"error": "bad id"}, 400)
+        def num(key, default, lo, hi, cast=float):
+            try:
+                return min(hi, max(lo, cast(opts.get(key, default))))
+            except (TypeError, ValueError):
+                return default
+        try:
+            scope, ids = pd_scope(set_id, opts.get("host"))
+            result = probe_designer.run_design(
+                set_id, ids=ids, scope=scope, top=num("top", 10, 1, 30, int), min_len=num("min_len", 18, 15, 40, int),
+                max_len=num("max_len", 30, 15, 40, int), probe_mismatch=num("probe_mismatch", 0, 0, 3, int),
+                max_iupac=num("max_iupac", 2, 0, 4, int), method=(opts.get("method") if opts.get("method") in ("own", "primer3", "both") else "both"),
+                tm_above=(num("tm_above_min", 3.0, -5.0, 30.0), max(num("tm_above_min", 3.0, -5.0, 30.0), num("tm_above_max", 10.0, -5.0, 30.0))))
+        except (FileNotFoundError, SystemExit) as exc:
+            return self._send_json({"error": str(exc) or "분석 결과(MSA)가 없습니다. 먼저 이 세트를 분석하세요."}, 400)
+        return self._send_json(result)
 
     def _handle_set_analyze(self, set_id, force):
         """Analyse (or force-re-analyse) ONE primer set: only its own jobs plus the pipeline-wide summary tables that

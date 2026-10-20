@@ -18,9 +18,11 @@
 </script>
 </head>
 <body>
-  <div class="app">
+  <div class="app" id="appRoot">
+    <button id="sidebarOpenBtn" class="sidebar-open-btn" title="사이드바 열기 (Ctrl+B)" hidden>&raquo;</button>
     <aside class="sidebar">
       <div class="sidebar-header">
+        <button id="sidebarCollapseBtn" class="theme-toggle-btn sidebar-collapse-btn" title="사이드바 접기 (Ctrl+B)">&laquo;</button>
         <button id="themeToggleBtn" class="theme-toggle-btn" title="라이트/다크 모드 전환 (Toggle light/dark mode)">&#9789;</button>
         <button id="langToggleBtn" class="theme-toggle-btn lang-toggle-btn" title="한국어 / English">EN</button>
         <a href="http://localhost:8760" target="_blank" rel="noopener" class="back-to-entry">&larr; 전체 파이프라인 목록</a>
@@ -34,20 +36,34 @@
       <div id="hostScopeBox" class="host-scope-box" hidden></div>
       <button id="overviewBtn" class="btn btn-secondary btn-block">전체 대시보드</button>
       <button id="addSetBtn" class="btn btn-primary btn-block">+ 새 프라이머 세트 분석</button>
-      <button id="primersBtn" class="btn btn-secondary btn-block">📝 프라이머 입력 / 관리</button>
-      <button id="stdMgrBtn" class="btn btn-secondary btn-block">🧫 표준물질 입력 / 관리</button>
-      <button id="litBtn" class="btn btn-secondary btn-block">📚 문헌 프라이머</button>
-      <button id="guideBtn" class="btn btn-secondary btn-block">📖 파이프라인 개요 / 가이드</button>
-      <button id="tourBtn" class="btn btn-secondary btn-block" title="화면 구성과 주요 기능을 단계별로 안내합니다">🧭 UI 사용 안내 (투어)</button>
-      <button id="standardsBtn" class="btn btn-secondary btn-block">🧪 표준물질 대표성</button>
-      <button id="diversityBtn" class="btn btn-secondary btn-block">🧬 리니지별 유전체 다양성</button>
-      <button id="geneConsBtn" class="btn btn-secondary btn-block">🧬 유전자 보존영역</button>
-      <button id="metaTableBtn" class="btn btn-secondary btn-block">📊 메타데이터 표</button>
-      <button id="metadataBtn" class="btn btn-secondary btn-block">🗺 메타데이터 / 지도</button>
-      <button id="paramsBtn" class="btn btn-secondary btn-block">⚙ 분석 파라미터 설정</button>
-      <button id="changelogBtn" class="btn btn-secondary btn-block">📋 변경 이력 (Changelog)</button>
-      <button id="requirementsBtn" class="btn btn-secondary btn-block">🗂 요구사항 기록</button>
-      <button id="reportBtn" class="btn btn-secondary btn-block" title="모든 세트의 종합 분석 결과를 세트당 1페이지씩 PDF로 정리합니다">📄 종합 리포트 PDF 생성</button>
+      <details class="menu-group" data-menu="analyze" open>
+        <summary>🔬 분석 · 검증</summary>
+        <button id="primersBtn" class="btn btn-secondary btn-block">📝 프라이머 입력 / 관리</button>
+        <button id="stdMgrBtn" class="btn btn-secondary btn-block">🧫 표준물질 입력 / 관리</button>
+        <button id="vennBtn" class="btn btn-secondary btn-block" title="프라이머 세트·그룹이 전체와 리니지별로 얼마나 덮는지 벤 다이어그램(합집합·교집합·못 잡는 유전체)으로 봅니다">🔵 커버리지 벤 다이어그램</button>
+      </details>
+      <details class="menu-group" data-menu="design">
+        <summary>🛠 설계</summary>
+        <button id="litBtn" class="btn btn-secondary btn-block">📚 문헌 프라이머</button>
+        <button id="redesignBtn" class="btn btn-secondary btn-block" title="리니지(클레이드)별로 varVAMP로 프라이머·프로브를 새로 설계하고 실제 검증 결과를 봅니다">🛠 리니지별 재설계 (varVAMP)</button>
+      </details>
+      <details class="menu-group" data-menu="info">
+        <summary>📊 데이터 · 정보</summary>
+        <button id="diversityBtn" class="btn btn-secondary btn-block">🧬 리니지별 유전체 다양성</button>
+        <button id="geneConsBtn" class="btn btn-secondary btn-block">🧬 유전자 보존영역</button>
+        <button id="standardsBtn" class="btn btn-secondary btn-block">🧪 표준물질 대표성</button>
+        <button id="metaTableBtn" class="btn btn-secondary btn-block">📊 메타데이터 표</button>
+        <button id="metadataBtn" class="btn btn-secondary btn-block">🗺 메타데이터 / 지도</button>
+        <button id="guideBtn" class="btn btn-secondary btn-block">📖 파이프라인 개요 / 가이드</button>
+        <button id="tourBtn" class="btn btn-secondary btn-block" title="화면 구성과 주요 기능을 단계별로 안내합니다">🧭 UI 사용 안내 (투어)</button>
+      </details>
+      <details class="menu-group" data-menu="manage">
+        <summary>⚙ 관리 · 보고서</summary>
+        <button id="paramsBtn" class="btn btn-secondary btn-block">⚙ 분석 파라미터 설정</button>
+        <button id="changelogBtn" class="btn btn-secondary btn-block">📋 변경 이력 (Changelog)</button>
+        <button id="requirementsBtn" class="btn btn-secondary btn-block">🗂 요구사항 기록</button>
+        <button id="reportBtn" class="btn btn-secondary btn-block" title="모든 세트의 종합 분석 결과를 세트당 1페이지씩 PDF로 정리합니다">📄 종합 리포트 PDF 생성</button>
+      </details>
       <div class="pipeline-btn-row">
         <button id="fetchDataBtn" class="btn btn-secondary" title="Nextstrain에서 최신 서열/메타데이터를 새로 받고 mfeprimer 인덱스를 다시 만듭니다">데이터 업데이트</button>
         <button id="rerunBtn" class="btn btn-secondary" title="현재 데이터로 전체 세트 분석을 처음부터 다시 계산합니다">분석 다시하기</button>
@@ -64,7 +80,7 @@
       </div>
       <input id="searchBox" class="search-box" type="text" placeholder="세트 검색 (이름, 벤더)...">
       <div id="setList" class="set-list"></div>
-      <div class="sidebar-footer">&copy; 2026 Chihwan Choi &middot; MIT License &middot; v0.20.0<br><button id="skinToggleBtn" class="skin-toggle" title="화면 스타일 전환 (Vaadin Lumo / 기본)">스타일: Lumo</button></div>
+      <div class="sidebar-footer">&copy; 2026 Chihwan Choi &middot; MIT License &middot; v0.21.0<br><button id="skinToggleBtn" class="skin-toggle" title="화면 스타일 전환 (Vaadin Lumo / 기본)">스타일: Lumo</button></div>
     </aside>
 
     <main class="main">
@@ -78,6 +94,8 @@
 
       <div id="diversityView" class="diversity-view" hidden></div>
       <div id="geneConsView" class="diversity-view" hidden></div>
+      <div id="redesignView" class="diversity-view" hidden></div>
+      <div id="vennView" class="diversity-view" hidden></div>
 
       <div id="metadataView" class="metadata-view" hidden></div>
 

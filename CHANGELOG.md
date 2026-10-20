@@ -5,6 +5,33 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-10-20
+
+### Added
+- **사이드바·개요를 그룹 → 세트 트리로**: 세트는 자기가 속한 가장 작은 그룹 아래에 표시되고(ALL 그룹은 하위 그룹을 안내만), 그룹이 없는 세트는 벤더별로 묶입니다. 그룹은 ▾/▸로 접습니다(기억됨). 이름이 `<부모 이름>-숫자`인 세트(변이체)는 부모 행의 "+N 변이" 배지로 접혀 펼치면 아래에 나옵니다. 개요의 두 표(히트맵, 세트별 상세 요약)도 같은 순서로(그룹 머리글 행 → 구성 세트 → 그룹 없음·벤더) 정렬하며, 이전의 validated 내림차순은 없앴습니다.
+- **중복·부모 정보**: 서버가 세트마다 `parent_id`(이름 규칙 또는 직접 지정, 한 단계만)와 `duplicate_of`/`duplicate_ids`(F/R/Probe 서열이 같은 세트)를 계산합니다. 사이드바와 개요에 "= P003"·"동일 서열 +n" 배지, 세트 상세에 부모·변이·동일 서열 안내와 "부모 세트 지정/변경"(`POST /api/set-parent/<ID>`, `config/set_parents.json`)이 생겼습니다. 파이프라인 데이터와 이름은 바꾸지 않습니다.
+- **세트 상세 화면 순서**: 요약 → 결합 근거(게놈별 미스매치 표 + MSA) → 표준물질 → 다양성·계통(pixy, 계통수) → 실험·메모 → Probe 설계(접힘, 기본 닫힘)로 재배열하고, 위쪽에 구역 이동 막대(요약/결합 근거/…)를 붙였습니다. 카드는 옮기기만 해서 기존 연동 기능은 그대로입니다.
+- **사이드바 메뉴 묶음**: 17개 버튼을 분석·검증 / 설계 / 데이터·정보 / 관리·보고서 4개 접이식 묶음으로 정리하고 열림 상태를 기억합니다(세트 목록이 위로 올라옵니다).
+- **사이드바 접기**: 사이드바 머리글의 « 버튼(또는 Ctrl+B)으로 옆으로 접고, 왼쪽 위 » 버튼으로 다시 펼칩니다. 선택은 이 브라우저에 기억됩니다.
+- **상세 창(모달) 도구**: 게놈 결합 상세 등 상세 창에 📋 복사(텍스트), 📷 화면 저장(PNG, 스크롤 밖 부분까지 전체), 🖼 이미지 복사, ⇔ 맞춤, ━ 최소화(왼쪽 아래로 접힘, 여러 개 나란히), ⛶ 최대화를 추가했습니다. 내용이 창보다 넓으면 창을 먼저 넓히고(화면 폭까지) 그래도 넘치면 축소해서 맞춥니다(⇔ 맞춤으로 끌 수 있음). 외부 라이브러리 없이 브라우저가 직접 그립니다(`domToPngBlob`).
+- **사용자 최종 결과**: 세트·그룹 상세 화면에서 채택 / 보류 / 탈락 / 미정과 한 줄 메모를 직접 표시하고, 개요의 세트·조합 표에 "최종 결과" 열로 보여 줍니다. `config/final_results.json`에 저장되며 파이프라인 계산에는 쓰이지 않습니다. API: `GET /api/final-results`, `POST /api/final-results/<ID>`.
+- **🔵 커버리지 벤 다이어그램** 페이지(사이드바): 프라이머 세트와 그룹(교차 결합 포함)을 골라 실제 검증을 통과한 유전체를 벤 다이어그램으로 겹쳐 봅니다(그림은 4개까지, 더 고르면 표). 합집합·교집합·영역별 단독/겹침 개수와 비율, 어느 것도 못 잡는 유전체(차집합)를 보여 주고, 다이어그램의 영역이나 표 행을 누르면 그 유전체 목록(accession·리니지·나라)을 복사/CSV로 내려받을 수 있습니다. 범위를 "전체" 또는 리니지 하나로 바꿀 수 있고, 아래 "리니지별 커버리지" 표(세트별·합집합·교집합·못 잡음)에서 리니지 이름이나 못 잡음 수를 누르면 그 리니지로 이동합니다. 숙주 기준을 따릅니다. API: `GET /api/venn/<segment>`.
+- **PrimerHunter 연동**: 재설계 페이지의 "도구"에서 PrimerHunter 1.0.2(UConn, GPL; `tools/primerhunter/`에 소스를 받아 빌드, 출처·SHA256은 그곳 README)를 고를 수 있습니다. PrimerHunter가 매우 느려서(리니지당 약 10분 이상) 리니지에서 가장 다양한 대표 게놈 N개(기본 25)로 설계하고, 소스 서열 위치 구간을 나눠 병렬로 실행하며(`scripts/redesign_primerhunter.py`), 같은 입력이면 이전 결과를 재사용합니다. PrimerHunter는 프라이머만 설계하므로 쌍마다 이 도구의 Probe 설계기(자체 규칙+Primer3, IUPAC)로 Probe를 붙이고(프라이머보다 높은 Tm이 불가능하면 조건을 완화하고 표시) 리니지 전체로 실제 검증합니다. 옵션: 대표 표본 수, 최소 커버리지, 최소 Tm. 결과는 `output/redesign/<segment>/<scope>/primerhunter/`.
+- **Probe 설계 수정**: 정렬 consensus에 gap(`-`)이 있으면 Primer3가 거부하던 오류를 고쳤습니다(gap을 N으로 바꿔 전달).
+- **🛠 리니지별 재설계 (varVAMP)** 페이지(사이드바): 리니지(클레이드)마다 그 리니지의 전체 게놈(숙주 기준 적용)을 MAFFT로 정렬하고 `varvamp qpcr`로 degenerate F/R 프라이머 + TaqMan Probe를 새로 설계합니다(consensus 임계값을 0.9부터 0.6까지 낮춰 가며 시도, 리니지당 설계 수·IUPAC 수·최소 게놈 수 조절, 전체(pan) 설계도 선택). 설계마다 이 파이프라인의 실제 검증(`live_analyze.analyze_set`)을 돌려 "이 리니지 Validated", 전체 Validated와 통과한 리니지, Probe 일치, 표준물질을 보여주고 "MSA 보기" 모달을 제공합니다. 결과는 `output/redesign/<segment>/<scope>/`에만 저장되고 이 페이지에서만 보입니다. `scripts/redesign_varvamp.py`, API: `POST /api/redesign`, `GET /api/redesign/<seg>/run|msa`. `varvamp==1.3.2`를 `environment.yml`에 추가했습니다.
+- **Probe 자동 설계 모듈(초안, 명령줄)**: `scripts/probe_designer.py <세트ID>` — 등록된 F/R 사이의 정렬 consensus에서 18-30nt 창을 양 가닥으로 훑어 TaqMan 규칙(Tm은 프라이머보다 1-12℃ 높게, GC 30-80%, 5′ G 금지, 4개 이상 연속 동일 염기 금지)으로 거른 뒤, 정렬 기준(0/1 mismatch 게놈 수)으로 순위를 매기고 상위 후보를 MFEprimer로 전체 population에 다시 검증합니다. 결과: `output/probe_design/<세트ID>/candidates.tsv`. 세트 상세 화면의 **"Probe 자동 설계 · 테스트" 카드**(MSA 아래)에서 후보 수·mismatch를 정하고 "▶ Probe 설계 실행"을 누르면 결과 표(서열 복사 버튼, 정렬 완전 일치/1 mm 이하, MFEprimer population 커버리지, 등록된 Probe와 비교)가 나타납니다. API: `GET/POST /api/sets/<ID>/probe-design`.
+  - **IUPAC 허용 수** 파라미터(기본 2, 0-4): 변이가 많은 자리를 이염기 코드(R/Y/S/W/K/M)로 바꿔 더 많은 게놈을 덮는 후보를 만듭니다(`--max-iupac`). Tm/GC는 모든 해석의 평균, 5′ G·연속 염기 규칙은 모든 해석에 적용합니다.
+  - **🏆 최적 Probe 자동 탐색** 버튼: 조건에 맞는 후보(기본 20개) 전부를 실제 검증 과정에 태워 최종 Validated 수 → 표준물질 매치 → Probe 완전 일치 → dropout → IUPAC 수 순으로 순위를 매기고 1위를 보여줍니다(후보당 약 7초, 진행 상황 표시). 같은 카드 안에만 저장(`best.json`). API: `POST/GET /api/sets/<ID>/probe-design/best`.
+  - **Primer3 후보**: 카드의 "후보 출처"(둘 다 / Primer3 / 자체 규칙, 기본 둘 다 = 절반씩)에서 고릅니다. Primer3(`primer3-py` 2.3.1, `environment.yml`에 추가)의 internal oligo 설계로 F/R 사이 consensus에서 후보를 뽑고(Tm·GC·poly-X·hairpin·penalty), 5′ G인 가닥은 빼고, IUPAC는 자체 방식으로 뒤에 넣습니다. 표에 출처·penalty·hairpin·Primer3 Tm을 표시하고 같은 서열은 한 줄로 합칩니다. 최적 Probe 탐색에도 같은 출처 설정이 적용됩니다.
+  - **숙주 기준 적용**: Probe 설계·검증·최적 탐색이 대시보드의 숙주 기준(사람/동물/미상/전체, 기본 사람)을 따릅니다. 이전에는 전체 population(662개)으로 세던 것을 해당 기준의 게놈만(예: 사람 571개)으로 세고, 결과에 "숙주 기준" 배지를 붙입니다(지금 화면의 기준과 다르면 노란색으로 다시 실행을 안내).
+  - **검증 결과 위치/MSA 모달**: 검증 결과를 해당 후보 행 바로 아래에 표시하고(진행 상황도 그 행에), 결과의 "🧬 MSA 보기" 버튼이 그 Probe의 전체 게놈 정렬을 모달로 보여줍니다(검색·열 필터·컬럼 선택·이미지 저장/복사 포함). `GET /api/sets/<ID>/probe-design/msa?seq=`.
+  - **Probe Tm 기준**: 두 프라이머 중 더 높은 쪽보다 +3 ~ +10 ℃(기본, 카드에서 조절 가능)로 제한합니다. 이전에는 프라이머 평균 +1 ~ +12 ℃였습니다.
+  - **후보별 "▶ 검증"**: 선택한 Probe와 세트의 F/R로 실제 검증 과정(`live_analyze.analyze_set`: population 검색, MSA, 표준물질, dimer/hairpin)을 백그라운드 작업으로 실행하고, 결과(최종 Validated·Probe 일치·표준물질·리니지별 통과 수, 등록 Probe 세트와 비교)를 이 카드 아래에만 보여줍니다. `output/probe_design/<ID>/validation/` 에만 저장되어 개요·요약·보고서에는 들어가지 않습니다. API: `POST /api/sets/<ID>/probe-design/validate`, `GET .../validations`.
+- **MSA 이미지 저장 / 이미지 복사 / 텍스트 복사**: 정렬 카드 오른쪽 위 버튼. 화면에 그려진 800행에서 잘리지 않고, 검색·열 필터가 적용된 모든 게놈을 PNG(F/Probe/R 음영, mismatch 빨강)로 저장하거나 복사합니다. 컬럼을 드래그로 선택해 두면 그 구간만 내보냅니다. 외부 라이브러리 없이 canvas로 그립니다(`msaSnapshot`, `msaCopyText`).
+
+### Fixed
+- 대시보드를 `http://IP:포트`(LAN)로 열었을 때 클립보드 복사가 조용히 실패하던 문제(브라우저가 http에서는 `navigator.clipboard`를 막음): 텍스트 복사는 대체 방식으로 동작하고, 이미지 복사는 이 경우 PNG 파일로 저장합니다.
+
 ### Changed (provenance)
 - 출처를 확인하지 못한 세트(예전 `PUB_...` preset)와 그 인용 메모를 '알 수 없음'으로 정정했습니다. 문헌 목록은 항목마다 출처가 있고 원문 대조 여부를 구분합니다.
 

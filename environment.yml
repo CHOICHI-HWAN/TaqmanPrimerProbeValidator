@@ -36,3 +36,5 @@ dependencies:
       - dask==2026.8.0
       - pixy @ git+https://github.com/ksamuk/pixy.git@21c7c33dea315a035d6aff86caba018ab668864a
       - pytest==9.1.1
+      - primer3-py==2.3.1     # Probe 자동 설계의 "Primer3" 후보 (없으면 자체 규칙 후보만 나옵니다)
+      - varvamp==1.3.2        # 리니지별 재설계(varVAMP qPCR 모드); biopython·seqfold·pillow가 함께 설치됩니다

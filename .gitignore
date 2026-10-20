@@ -42,3 +42,7 @@ PUBLISHED_PRIMERS.md
 *.numbers
 *.pptx
 *.xlsx
+
+# third-party PrimerHunter source + build (see tools/primerhunter/README.md)
+tools/primerhunter/*.tar.gz
+tools/primerhunter/PrimerHunter/
