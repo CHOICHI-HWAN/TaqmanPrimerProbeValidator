@@ -6,9 +6,10 @@ export const CHUNK = 600 * 1024;
 // Endpoints whose content depends on the host scope are exported once per scope (key suffix "@human" etc.; no suffix = the server's
 // default scope). The read-only site picks the variant from the ?host= the dashboard sends. Everything else is exported once.
 export const SCOPES = ["human", "animal", "unknown", "all"];
-export const SCOPED_RE = /^(?:(?:sets|groups)(?:\/[^/]+)?|overview|host-scope)$/;
+export const SCOPED_RE = /^(?:(?:sets|groups)(?:\/[^/]+)?|overview|host-scope|venn\/[^/]+)$/;
 const FIXED = ["profile", "diversity", "metadata", "metadata/table", "standards/representativeness",
-  "standards/manifest", "primers/manifest", "changelog", "requirements", "params", "jobs/active", "pipeline/freshness", "ui-state"];
+  "standards/manifest", "primers/manifest", "changelog", "requirements", "params", "jobs/active", "pipeline/freshness", "ui-state",
+  "final-results"];
 const FIXED_SCOPED = ["overview", "sets", "groups", "host-scope"];
 const IMG_CT = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
 
@@ -59,6 +60,11 @@ export async function collect(project, get, progress = () => {}) {
       progress(`읽는 중: ${p}${sfx}`);
       const d = await json(p, scope);
       if (d !== null) { await addJson(p + sfx, d); if (!scope) data[p] = d; }
+    }
+    for (const seg of Object.keys((data.profile || {}).segments || {})) {      // coverage Venn data per segment and host scope
+      progress(`벤 다이어그램 ${seg}${sfx}`);
+      const d = await json(`venn/${seg}`, scope);
+      if (d) await addJson(`venn/${seg}${sfx}`, d);
     }
     for (const s of data.sets || []) { progress(`세트 ${s.set_id}${sfx}`); const d = await json(`sets/${encodeURIComponent(s.set_id)}`, scope); if (d) await addJson(`sets/${s.set_id}${sfx}`, d); }
     for (const g of data.groups || []) { progress(`그룹 ${g.group_id}${sfx}`); const d = await json(`groups/${encodeURIComponent(g.group_id)}`, scope); if (d) await addJson(`groups/${g.group_id}${sfx}`, d); }

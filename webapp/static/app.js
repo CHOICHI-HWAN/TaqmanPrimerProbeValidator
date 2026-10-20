@@ -7369,13 +7369,23 @@ $("#redesignBtn").addEventListener("click", showRedesignPage);
 // ---------------------------------------------------------------------------------------
 // 사이드바 접기 / 펼치기 (« / », Ctrl+B) -- 선택은 이 브라우저에 기억됩니다.
 (function initSidebarCollapse() {
-  const app = $("#appRoot"), openBtn = $("#sidebarOpenBtn"), closeBtn = $("#sidebarCollapseBtn");
+  const app = $("#appRoot"), openBtn = $("#sidebarOpenBtn"), closeBtn = $("#sidebarCollapseBtn"), edgeBtn = $("#sidebarEdgeBtn");
+  let expandedW = 320;
+  const placeEdge = (collapsed) => {                  // the handle sits on the sidebar's right edge, whatever width the sidebar has
+    const sb = document.querySelector(".sidebar");
+    if (!collapsed && sb.offsetWidth > 40) expandedW = sb.offsetWidth;
+    edgeBtn.style.left = collapsed ? "0px" : `${expandedW - 1}px`;
+  };
+  window.addEventListener("resize", () => placeEdge(app.classList.contains("sidebar-collapsed")));
   const apply = (collapsed) => {
     app.classList.toggle("sidebar-collapsed", collapsed);
     openBtn.hidden = !collapsed;
+    edgeBtn.innerHTML = collapsed ? "&rsaquo;" : "&lsaquo;";
+    placeEdge(collapsed);
     try { localStorage.setItem("lasv_sidebar_collapsed", collapsed ? "1" : "0"); } catch (e) { /* private mode */ }
   };
   closeBtn.addEventListener("click", () => apply(true));
+  edgeBtn.addEventListener("click", () => apply(!app.classList.contains("sidebar-collapsed")));
   openBtn.addEventListener("click", () => apply(false));
   document.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "b" && !/^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || "")) {

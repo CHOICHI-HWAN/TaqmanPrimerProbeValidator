@@ -5,6 +5,12 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.22.2] - 2026-10-21
+
+### Added
+- **사이드바 숨김 버튼**: 머리글의 "« 숨기기"(Ctrl+B)와, 사이드바 가장자리에 항상 보이는 손잡이(‹/›)로 숨기고 다시 펼칩니다(사이드바 너비를 따라 위치).
+- **Firebase 업로드 대상 확대**: 벤 다이어그램 데이터(`venn/<segment>`, 숙주 기준별)와 사용자 최종 결과(`final-results`)를 업로드/내보내기에 포함하고, 읽기 전용 사이트에서는 쓰는 컨트롤(최종 결과 입력, 부모 지정, Probe 설계, 재설계, LASV/NiV 전환)을 숨깁니다.
+
 ## [0.22.1] - 2026-10-21
 
 ### Fixed
