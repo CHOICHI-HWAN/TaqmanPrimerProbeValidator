@@ -5,6 +5,21 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-10-20
+
+### Added
+- **Firebase 업로드가 아이콘으로**: 모든 화면 오른쪽 위에 떠 있던 버튼을 사이드바 맨 위 "← 전체 파이프라인 목록" 옆 ☁ 아이콘으로 옮겼습니다(진행·오류는 말풍선/상단 메시지로, 단계 로그는 오류일 때만 표시).
+- **ICTV 분류 표기**: 프로필(`profiles/<id>.json`)의 `taxonomy`(Realm › Kingdom › Phylum › Subphylum › Class › Order › Family › (Subfamily) › Genus › Species)를 사이드바 제목 아래 한 줄(종·속, 누르면 전체 목록 창), 개요 머리글, 진입 페이지 카드에 보여 줍니다. ICTV 릴리스마다 이름이 바뀌므로 출처와 이전 종 이름을 함께 적었습니다.
+- **LASV ⇄ NiV 전환**: 사이드바 제목 아래 버튼으로 같은 호스트의 다른 대시보드로 이동합니다(`GET /api/pipelines`, 진입 페이지의 `entry/pipelines.json` 사용). "전체 파이프라인 목록" 링크도 접속한 호스트 주소를 따릅니다.
+- **뒤로 / 앞으로**: 모든 화면 이동을 브라우저 기록에 남기고(Alt+←/→ 포함), 각 화면 위의 막대에서 뒤로/앞으로와 현재 위치(세트·그룹 이름)를 보여 줍니다.
+- **README 움직이는 화면 4개**(`docs/media/`): 이동·개요, 상세 창, Probe 설계, 재설계·벤 다이어그램. 업체명·프라이머/프로브/표준물질 서열은 `docs/demo_blur.js`로 흐리게 처리했고 `docs/make_gif.py`는 프레임 높이를 맞춥니다.
+
+### Changed
+- Nipah 에디션: 표기를 NiV로 통일하고 이 판의 모든 화면 기능(그룹 트리, 최종 결과, 벤 다이어그램, Probe 설계 카드, 상세 창 도구 등)을 같은 코드로 맞췄습니다.
+
+### Fixed
+- 설계 Probe의 MSA 창에서 π 막대를 뺀 뒤 PRIMER/PROBE·CONSENSUS 고정 행이 게놈 행을 가리던 문제.
+
 ## [0.21.0] - 2026-10-20
 
 ### Added

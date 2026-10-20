@@ -26,6 +26,15 @@ def main():
         if im.width != a.width:
             im = im.resize((a.width, round(im.height * a.width / im.width)), Image.LANCZOS)
         imgs.append(im)
+    h = max(im.height for im in imgs)                    # screenshots differ by a few pixels in height: pad them to one size
+    padded = []
+    for im in imgs:
+        if im.height != h:
+            canvas = Image.new("RGB", (im.width, h), (255, 255, 255))
+            canvas.paste(im, (0, 0))
+            im = canvas
+        padded.append(im)
+    imgs = padded
     pal = [im.quantize(colors=160, method=Image.MEDIANCUT, dither=Image.Dither.NONE) for im in imgs]
     out = Path(a.out)
     out.parent.mkdir(parents=True, exist_ok=True)

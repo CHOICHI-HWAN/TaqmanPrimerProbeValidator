@@ -1507,6 +1507,9 @@ async function openProbeMsaModal(setData, seq, urlOverride, titleLabel) {
     if (pi) pi.remove();
     const ruler = card.querySelector(".msa-ruler");
     if (ruler) ruler.style.top = "0";
+    const comb = card.querySelector(".msa-combined-row"), cons = card.querySelector(".msa-consensus");      // the sticky rows move up with the pi track gone
+    if (comb) comb.style.top = "17px";
+    if (cons) cons.style.top = "35px";
     const q = (sel) => card.querySelector(sel);
     q("#msaSearch")?.addEventListener("input", (e) => { state.msaSearch = e.target.value; draw(); });
     card.querySelectorAll(".mt-funnel[data-msa-col]").forEach((b) =>
@@ -2207,7 +2210,63 @@ function renderLineageBreakdownCompact(setData) {
 const MAIN_VIEW_IDS = ["overview", "detail", "addForm", "paramsView", "changelogView", "guideView", "diversityView", "geneConsView", "redesignView", "vennView", "metadataView", "primersView", "litView", "standardsView", "metaTableView", "stdMgrView", "requirementsView"];
 function showMainView(id) {
   for (const v of MAIN_VIEW_IDS) $(`#${v}`).hidden = (v !== id);
+  navRecord(id);
 }
+
+// ---- back / forward: every page change is a browser-history entry (Alt+arrows and the browser buttons work) and the bar on top of the page
+// goes back / forward the same way. A page is {view id, active set/group id}; going back re-opens it through its own menu button.
+const NAV = { idx: 0, max: 0, lock: false, last: null };
+const NAV_VIEW_BTN = { overview: "overviewBtn", addForm: "addSetBtn", paramsView: "paramsBtn", changelogView: "changelogBtn", guideView: "guideBtn",
+  diversityView: "diversityBtn", geneConsView: "geneConsBtn", redesignView: "redesignBtn", vennView: "vennBtn", metadataView: "metadataBtn",
+  primersView: "primersBtn", litView: "litBtn", standardsView: "standardsBtn", metaTableView: "metaTableBtn", stdMgrView: "stdMgrBtn", requirementsView: "reportBtn" };
+NAV_VIEW_BTN.requirementsView = "requirementsBtn";
+const NAV_TITLE = { overview: "전체 대시보드", addForm: "새 프라이머 세트 분석", paramsView: "분석 파라미터", changelogView: "변경 이력", guideView: "파이프라인 개요 / 가이드",
+  diversityView: "리니지별 유전체 다양성", geneConsView: "유전자 보존영역", redesignView: "리니지별 재설계", vennView: "커버리지 벤 다이어그램", metadataView: "메타데이터 / 지도",
+  primersView: "프라이머 입력 / 관리", litView: "문헌 프라이머", standardsView: "표준물질 대표성", metaTableView: "메타데이터 표", stdMgrView: "표준물질 입력 / 관리", requirementsView: "요구사항 기록" };
+function navTitle(d) {
+  if (!d) return "";
+  if (d.v === "detail") {
+    if (d.at === "group") return "그룹 · " + ((state.groups.find((g) => g.group_id === d.aid) || {}).label || d.aid);
+    return "세트 · " + ((state.sets.find((x) => x.set_id === d.aid) || {}).display_name || d.aid);
+  }
+  return NAV_TITLE[d.v] || "";
+}
+function navUpdate() {
+  const b = document.getElementById("navBack"), f = document.getElementById("navFwd"), c = document.getElementById("navCrumb");
+  if (!b) return;
+  b.disabled = NAV.idx <= 0; f.disabled = NAV.idx >= NAV.max;
+  c.textContent = navTitle(NAV.last);
+}
+function navRecord(id) {
+  if (NAV.lock) return;
+  const d = { v: id, aid: state.activeId || null, at: state.activeType || null };
+  const same = NAV.last && NAV.last.v === d.v && NAV.last.aid === d.aid && NAV.last.at === d.at;
+  if (same) { history.replaceState({ ...d, idx: NAV.idx }, ""); }
+  else if (NAV.last) { NAV.idx += 1; NAV.max = NAV.idx; history.pushState({ ...d, idx: NAV.idx }, ""); }
+  else { history.replaceState({ ...d, idx: NAV.idx }, ""); }
+  NAV.last = d;
+  navUpdate();
+}
+async function navRestore(st) {
+  if (st.v === "detail") { return st.at === "group" ? selectGroup(st.aid) : selectSet(st.aid); }
+  const btn = NAV_VIEW_BTN[st.v] && document.getElementById(NAV_VIEW_BTN[st.v]);
+  if (btn) btn.click();
+}
+window.addEventListener("popstate", async (e) => {
+  const st = e.state;
+  if (!st || !st.v) return;
+  NAV.lock = true;
+  NAV.idx = st.idx || 0; NAV.last = { v: st.v, aid: st.aid, at: st.at };
+  try { await navRestore(st); } catch (err) { /* page failed to open: stay on what is shown */ }
+  await new Promise((r) => setTimeout(r, 150));
+  NAV.lock = false; navUpdate();
+});
+document.addEventListener("DOMContentLoaded", () => {
+  const prev = history.state;
+  if (prev && prev.v) { NAV.idx = prev.idx || 0; NAV.max = NAV.idx; }
+  document.getElementById("navBack").addEventListener("click", () => history.back());
+  document.getElementById("navFwd").addEventListener("click", () => history.forward());
+});
 
 function narrateSetAssessment(setData) {
   // A heuristic, generic summary synthesized from the metrics already computed elsewhere
@@ -6131,7 +6190,49 @@ async function loadProfile() {
     const h1 = document.querySelector(".sidebar-header h1");
     if (h1) h1.textContent = `${PROFILE.short_name} Primer/Probe`;
   } catch { /* keep the defaults */ }
+  renderTaxonLine();
+  initPipelineSwitch();
 }
+
+// ---- ICTV taxonomy (profiles/<id>.json "taxonomy"): species under the title, the full rank list in a pop-up ----
+function ictvCrumbHtml() {
+  const t = PROFILE.taxonomy;
+  if (!t || !t.ranks) return "";
+  return `<div class="ictv-crumb" title="${escHtml(t.source || "")}">ICTV 분류: ${t.ranks.map(([rk, nm], i) => (i === t.ranks.length - 1 ? `<i><b>${escHtml(nm)}</b></i>` : `<a class="ictv-open" title="${escHtml(rk)}">${escHtml(nm)}</a>`) + (i === t.ranks.length - 1 ? ` <span>(${escHtml(rk)})</span>` : "")).join(" &rsaquo; ")}</div>`;
+}
+function renderTaxonLine() {
+  const b = document.getElementById("taxonLine"), t = PROFILE.taxonomy;
+  if (!b || !t || !t.ranks) return;
+  const species = t.ranks[t.ranks.length - 1][1], genus = (t.ranks.find((r) => r[0] === "Genus") || [])[1];
+  b.innerHTML = `ICTV · <i>${escHtml(species)}</i> <span style="opacity:.7;">(${escHtml(genus || "")})</span> &#9656;`;
+  b.hidden = false;
+  b.onclick = openTaxonomyModal;
+}
+function openTaxonomyModal() {
+  const t = PROFILE.taxonomy;
+  if (!t) return;
+  openDetailModal({
+    title: `ICTV 분류 &mdash; ${escHtml(t.virus || PROFILE.short_name)}`, subtitle: "Realm &rsaquo; &hellip; &rsaquo; Family &rsaquo; Genus &rsaquo; Species", compact: true,
+    html: `<div class="ictv-ranks">${t.ranks.map(([rk, nm], i) => `<div class="rk">${escHtml(rk)}</div><div class="nm" style="padding-left:${Math.min(i, 9) * 6}px;">${i === t.ranks.length - 1 ? `<i>${escHtml(nm)}</i>` : escHtml(nm)}</div>`).join("")}</div>
+      ${t.former_species ? `<p class="note">이전 종 이름: <i>${escHtml(t.former_species)}</i></p>` : ""}
+      <p class="note">${escHtml(t.source || "")}</p>`,
+  });
+}
+// the LASV / NiV switch in the sidebar: the dashboards listed in entry/pipelines.json, opened on the same host
+async function initPipelineSwitch() {
+  const box = document.getElementById("pipelineSwitch");
+  const link = document.getElementById("entryLink");
+  if (link) link.href = `${location.protocol}//${location.hostname}:8760/`;
+  if (!box) return;
+  let list = [];
+  try { list = await fetchJSON("/api/pipelines"); } catch (e) { /* stand-alone project */ }
+  if (list.length < 2) return;
+  box.innerHTML = list.map((p) => (p.current
+    ? `<span class="pipe-pill current" title="지금 보고 있는 대시보드">${escHtml(p.name)}</span>`
+    : `<a class="pipe-pill" href="${location.protocol}//${location.hostname}:${p.port}/" title="${escHtml(p.name)} 대시보드로 이동">${escHtml(p.name)}</a>`)).join("");
+  box.hidden = false;
+}
+document.addEventListener("click", (e) => { if (e.target.closest(".ictv-open")) openTaxonomyModal(); });
 function splitLineageKeys(segData) {
   const keys = Object.keys(segData.windows || {}).sort();
   return { real: keys.filter((k) => k !== ALL_LASV_KEY), hasAll: keys.includes(ALL_LASV_KEY) };
@@ -8478,7 +8579,8 @@ function renderOverviewHtml(data) {
   }).join("");
 
   return `
-    <h2>LASV Primer/Probe 전체 대시보드</h2>
+    <h2>${escHtml(PROFILE.short_name || "LASV")} Primer/Probe 전체 대시보드</h2>
+    ${ictvCrumbHtml()}
     <div class="subtitle">Nextstrain(lassa/s, /l) 최신 데이터셋 &middot; 판정 기준: primer mismatch&le;1, probe mismatch=0(완전일치)</div>
 
     <div class="stat-tiles">

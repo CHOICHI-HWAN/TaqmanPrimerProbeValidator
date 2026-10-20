@@ -1538,6 +1538,18 @@ def save_final_result(item_id, verdict, note):
     return data.get(item_id)
 
 
+def load_pipelines():
+    """The dashboards listed on the front-door page (entry/pipelines.json, two levels above a project folder), for the LASV / NiV switch in
+    the sidebar: [{id, name, port, current}]. Empty when this project is used on its own."""
+    reg = ROOT.parent.parent / "entry" / "pipelines.json"
+    try:
+        items = json.loads(reg.read_text(encoding="utf-8")).get("pipelines", [])
+    except (OSError, ValueError):
+        return []
+    here = f"{ROOT.parent.name}/{ROOT.name}"
+    return [{"id": p["id"], "name": p.get("short") or p["name"], "port": p["port"], "current": p.get("path") == here} for p in items]
+
+
 def load_venn(seg):
     """Everything the coverage-Venn page needs for one segment, in the active host scope: the population (accession, lineage, country)
     and, per primer set and per group, the genomes it validates (a group counts its cross-binding genomes too, like the overview)."""
@@ -2527,6 +2539,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_json(load_overview())
         if path == "/api/final-results":
             return self._send_json(load_final_results())
+        if path == "/api/pipelines":
+            return self._send_json(load_pipelines())
         m = re.match(r"^/api/venn/(\w+)$", path)
         if m:
             seg = m.group(1).lower()

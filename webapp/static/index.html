@@ -25,9 +25,11 @@
         <button id="sidebarCollapseBtn" class="theme-toggle-btn sidebar-collapse-btn" title="사이드바 접기 (Ctrl+B)">&laquo;</button>
         <button id="themeToggleBtn" class="theme-toggle-btn" title="라이트/다크 모드 전환 (Toggle light/dark mode)">&#9789;</button>
         <button id="langToggleBtn" class="theme-toggle-btn lang-toggle-btn" title="한국어 / English">EN</button>
-        <a href="http://localhost:8760" target="_blank" rel="noopener" class="back-to-entry">&larr; 전체 파이프라인 목록</a>
+        <div class="entry-row"><a id="entryLink" href="http://localhost:8760" target="_blank" rel="noopener" class="back-to-entry" title="전체 파이프라인 목록 (LASV / NiV ...)">&larr; 전체 파이프라인 목록</a><span id="fbSlot"></span></div>
         <h1>LASV Primer/Probe</h1>
         <div class="subtitle">인터랙티브 검증 대시보드</div>
+        <div id="pipelineSwitch" class="pipeline-switch" hidden></div>
+        <button type="button" id="taxonLine" class="taxon-line" hidden title="ICTV 분류 체계 전체 보기"></button>
       </div>
       <div class="insilico-note" title="이 결과는 서열 기반 컴퓨터 예측입니다. 실제 결합·증폭·진단 성능을 확정하지 않으므로 실험적 검증이 필요합니다.">
         ⓘ in silico 예측 — 실험으로 확인 필요
@@ -80,10 +82,11 @@
       </div>
       <input id="searchBox" class="search-box" type="text" placeholder="세트 검색 (이름, 벤더)...">
       <div id="setList" class="set-list"></div>
-      <div class="sidebar-footer">&copy; 2026 Chihwan Choi &middot; MIT License &middot; v0.21.0<br><button id="skinToggleBtn" class="skin-toggle" title="화면 스타일 전환 (Vaadin Lumo / 기본)">스타일: Lumo</button></div>
+      <div class="sidebar-footer">&copy; 2026 Chihwan Choi &middot; MIT License &middot; v0.22.0<br><button id="skinToggleBtn" class="skin-toggle" title="화면 스타일 전환 (Vaadin Lumo / 기본)">스타일: Lumo</button></div>
     </aside>
 
     <main class="main">
+      <div id="navBar" class="nav-bar"><button type="button" id="navBack" class="btn btn-secondary" title="이전 화면 (Alt+←)" disabled>&larr; 뒤로</button><button type="button" id="navFwd" class="btn btn-secondary" title="다음 화면 (Alt+→)" disabled>앞으로 &rarr;</button><span id="navCrumb" class="nav-crumb"></span></div>
       <div id="overview" class="overview"></div>
 
       <div id="detail" class="detail" hidden></div>

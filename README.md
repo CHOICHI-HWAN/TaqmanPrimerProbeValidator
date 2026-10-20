@@ -41,6 +41,12 @@ Detailed documentation (pipeline steps, settings, dashboard features, directory 
 
 7) **Self-testing.** `./test.sh` runs synthetic genomes with a known answer through the real mfeprimer; `./test.sh --full` also audits the real results.
 
+8) **Design and re-design.** A probe-design card per set (own TaqMan rules + Primer3, IUPAC codes, host scope, every candidate validated with the real pipeline), and a lineage-wise **re-design** page (varVAMP, PrimerHunter) that reports which designs together cover a lineage (set cover).
+
+9) **Overlap of panels.** A coverage **Venn diagram** (union, intersection, every overlap and the genomes no set catches) for any sets/groups, overall or per lineage.
+
+10) **Easy to navigate.** Group → set tree with variants folded into their parent and duplicate-sequence marks, collapsible sidebar, back/forward on every page, section jump bar in the set view, your own *adopt / hold / reject* mark per set, a LASV ⇄ NiV switch and the ICTV taxonomy (Realm … Genus, Species) of each virus.
+
 ## Schematic
 
 ![Schematic](docs/schematic/pipeline_schematic.svg)
@@ -61,13 +67,33 @@ Detailed documentation (pipeline steps, settings, dashboard features, directory 
 
 </details>
 
+<details open><summary>What is new in 0.21 (navigation · detail pop-ups · probe design · re-design and Venn)</summary>
+
+**Group → set tree, ICTV taxonomy, LASV ⇄ NiV switch, back/forward, collapsible sidebar**
+
+![Navigation and overview](docs/media/nav-overview.gif)
+
+**Detail pop-ups: copy, save as image, fit to content, minimise, maximise**
+
+![Detail pop-up](docs/media/detail-modal.gif)
+
+**Probe design card: candidates, real validation under each candidate, alignment of that probe**
+
+![Probe design](docs/media/probe-design.gif)
+
+**Lineage-wise re-design (varVAMP / PrimerHunter) and the coverage Venn diagram**
+
+![Re-design and Venn](docs/media/redesign-venn.gif)
+
+</details>
+
 *(Vendor names, primer/probe/standard sequences and standard-material names are blurred in these screenshots with `docs/demo_blur.js`.)*
 
 ## Installation
 
 ### Current version
 
-Code: **v0.21.0**   ·   Tested on Ubuntu 24.04, x86_64
+Code: **v0.22.0**   ·   Tested on Ubuntu 24.04, x86_64
 
 ### Requirements
 
@@ -226,7 +252,7 @@ There is no publication for this tool yet. Please cite the software as below, **
   author  = {Choi, Chihwan},
   title   = {TaqMan Primer/Probe Validator},
   year    = {2026},
-  version = {0.21.0},
+  version = {0.22.0},
   url     = {https://github.com/CHOICHI-HWAN/TaqmanPrimerProbeValidator}
 }
 ```

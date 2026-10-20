@@ -42,6 +42,12 @@ LASV 에디션은 두 분절(S, L)을 다루며, 유전체와 메타데이터는
 
 7) **자체 점검.** `./test.sh`는 정답을 아는 합성 게놈을 실제 mfeprimer로 돌려 핵심 기능을 확인하고, `./test.sh --full`은 실제 결과까지 감사합니다.
 
+8) **설계와 재설계.** 세트마다 Probe 설계 카드(자체 TaqMan 규칙 + Primer3, IUPAC 허용, 숙주 기준, 후보마다 실제 파이프라인 검증)와, 리니지별 **재설계** 페이지(varVAMP, PrimerHunter: 어떤 설계를 함께 쓰면 리니지를 덮는지 세트 커버로 표시).
+
+9) **패널 겹침.** 세트·그룹을 골라 전체 또는 리니지별로 합집합·교집합·영역별 겹침·어느 것도 못 잡는 유전체를 **벤 다이어그램**으로 봅니다.
+
+10) **쓰기 편한 화면.** 그룹 → 세트 트리(변이체는 부모에 접힘, 동일 서열 표시), 접히는 사이드바, 모든 페이지의 뒤로/앞으로, 세트 상세의 구역 이동 막대, 세트·그룹별 *채택/보류/탈락* 표시, LASV ⇄ NiV 전환, 바이러스별 ICTV 분류(Realm … Genus, Species) 표기.
+
 ## 개략도
 
 ![개략도](docs/schematic/pipeline_schematic.svg)
@@ -62,13 +68,33 @@ LASV 에디션은 두 분절(S, L)을 다루며, 유전체와 메타데이터는
 
 </details>
 
+<details open><summary>0.21 새 기능 (이동 · 상세 창 · Probe 설계 · 재설계와 벤 다이어그램)</summary>
+
+**그룹 → 세트 트리, ICTV 분류, LASV ⇄ NiV 전환, 뒤로/앞으로, 접히는 사이드바**
+
+![이동과 개요](docs/media/nav-overview.gif)
+
+**상세 창: 복사, 이미지로 저장, 내용에 맞춤, 최소화, 최대화**
+
+![상세 창](docs/media/detail-modal.gif)
+
+**Probe 설계 카드: 후보, 후보별 실제 검증, 그 Probe의 정렬**
+
+![Probe 설계](docs/media/probe-design.gif)
+
+**리니지별 재설계(varVAMP / PrimerHunter)와 커버리지 벤 다이어그램**
+
+![재설계와 벤](docs/media/redesign-venn.gif)
+
+</details>
+
 *(업체명, 프라이머·프로브·표준물질 서열과 표준물질 이름은 `docs/demo_blur.js`로 흐리게 처리했습니다.)*
 
 ## 설치
 
 ### 현재 버전
 
-코드: **v0.21.0**   ·   Ubuntu 24.04, x86_64에서 테스트
+코드: **v0.22.0**   ·   Ubuntu 24.04, x86_64에서 테스트
 
 ### 필요한 것
 
@@ -227,7 +253,7 @@ python3 webapp/server.py --host 0.0.0.0 --port 8765
   author  = {Choi, Chihwan},
   title   = {TaqMan Primer/Probe Validator},
   year    = {2026},
-  version = {0.21.0},
+  version = {0.22.0},
   url     = {https://github.com/CHOICHI-HWAN/TaqmanPrimerProbeValidator}
 }
 ```

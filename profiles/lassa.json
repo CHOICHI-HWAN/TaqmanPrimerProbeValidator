@@ -3,6 +3,14 @@
   "id": "lassa",
   "name": "Lassa mammarenavirus",
   "short_name": "LASV",
+  "taxonomy": {
+    "source": "ICTV Master Species List (2024-2025 releases). Names and ranks change between releases -- check https://ictv.global/taxonomy",
+    "virus": "Lassa virus (LASV)",
+    "ranks": [["Realm", "Riboviria"], ["Kingdom", "Orthornavirae"], ["Phylum", "Negarnaviricota"], ["Subphylum", "Polyploviricotina"],
+              ["Class", "Bunyaviricetes"], ["Order", "Hareavirales"], ["Family", "Arenaviridae"], ["Genus", "Mammarenavirus"],
+              ["Species", "Mammarenavirus lassaense"]],
+    "former_species": "Lassa mammarenavirus"
+  },
 
   "source": {
     "type": "nextstrain",
