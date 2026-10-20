@@ -101,31 +101,38 @@ export function explainError(e) {
 if (typeof document !== "undefined") {
   const btn = document.createElement("button");
   btn.id = "fbPublishBtn";
-  btn.textContent = "☁ Firebase 업로드";
+  const BTN_TITLE = "Firebase 업로드 — 결과만 읽기 전용·로그인 보호 사이트로 올립니다";
+  btn.textContent = "☁";
+  btn.title = BTN_TITLE;
   btn.hidden = true;
-  btn.style.cssText = "position:fixed;top:10px;right:16px;z-index:5000;padding:7px 14px;border-radius:8px;border:1px solid #94a3b8;background:#fff;color:#0f172a;cursor:pointer;font-size:13px;box-shadow:0 1px 4px rgba(0,0,0,.2)";
+  // a small icon next to "전체 파이프라인 목록" in the sidebar header (it used to float over the top right of every page)
+  btn.className = "fb-icon-btn";
   const msg = document.createElement("div");                       // errors stay on screen (alert() alone is easy to miss)
   msg.id = "fbPublishMsg";
   msg.hidden = true;
-  msg.style.cssText = "position:fixed;top:46px;right:16px;z-index:5000;max-width:380px;padding:8px 12px;border-radius:8px;font-size:12.5px;line-height:1.45;box-shadow:0 1px 6px rgba(0,0,0,.25);background:#fff;color:#0f172a;border:1px solid #94a3b8;cursor:pointer";
+  msg.style.cssText = "position:fixed;top:50px;left:16px;z-index:5000;max-width:380px;padding:8px 12px;border-radius:8px;font-size:12.5px;line-height:1.45;box-shadow:0 1px 6px rgba(0,0,0,.25);background:#fff;color:#0f172a;border:1px solid #94a3b8;cursor:pointer";
   msg.title = "클릭하면 닫힙니다";
   msg.onclick = () => { msg.hidden = true; };
-  document.body.appendChild(btn);
+  const slot = document.getElementById("fbSlot");
+  (slot || document.body).appendChild(btn);
   document.body.appendChild(msg);
   // step log: shows how far the button got (config -> libraries -> auth warm-up -> click), so a failure can be read off the screen
   const steps = document.createElement("div");
   steps.id = "fbPublishSteps";
-  steps.style.cssText = "position:fixed;top:44px;right:16px;z-index:4999;font:11px/1.35 ui-monospace,monospace;color:#64748b;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;max-width:380px;text-align:right";
+  steps.style.cssText = "position:fixed;top:48px;left:16px;z-index:4999;font:11px/1.35 ui-monospace,monospace;color:#64748b;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;max-width:380px;text-align:left";
   steps.hidden = true;
   document.body.appendChild(steps);
   const stepLog = [];
-  const step = (t) => { stepLog.push(t); steps.textContent = stepLog.slice(-4).join(" › "); steps.hidden = false; msg.style.top = "66px"; };
+  const step = (t) => {                                          // the log stays hidden unless something went wrong
+    stepLog.push(t); steps.textContent = stepLog.slice(-4).join(" › ");
+    if (/오류|실패|막/.test(t)) { steps.hidden = false; msg.style.top = "70px"; }
+  };
   window.addEventListener("error", (ev) => { if (String(ev.filename || "").includes("publish.js")) step("JS 오류: " + ev.message); });
   window.addEventListener("unhandledrejection", (ev) => { const m = String((ev.reason && (ev.reason.code || ev.reason.message)) || ev.reason); step("오류: " + m); });
   btn.addEventListener("click", () => step("클릭됨"), true);          // registered first: proves the click reaches the button
   step("스크립트 로드됨");
 
-  const setLabel = (t) => { btn.textContent = t; };
+  const setLabel = (t) => { btn.title = t && !/Firebase 업로드$/.test(t) ? t : BTN_TITLE; btn.classList.toggle("busy", !!t && !/Firebase 업로드$/.test(t)); };
   const say = (t, bad) => { msg.textContent = t; msg.style.borderColor = bad ? "#e5484d" : "#94a3b8"; msg.hidden = !t; };
   let sdk = null, busy = false;
 

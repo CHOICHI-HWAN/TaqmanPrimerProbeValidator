@@ -371,25 +371,195 @@ function uiDialog({ title, message, html, input, defaultValue, placeholder, butt
 
 // Large read-only window for a drill-down (a genome's binding detail, ...) -- Esc, the X button or a
 // click on the backdrop closes it. Replaces the old "expand a row inline below the table" pattern.
-function openDetailModal({ title, subtitle, html }) {
+// Everything that is not in the page's own colour/text styles is dropped: only the properties that decide how an element LOOKS are copied
+// into the clone that is rasterised (keeps the SVG small; layout is recomputed by the browser from the same widths).
+const DM_STYLE_PROPS = ["color", "background-color", "background-image", "border-top", "border-right", "border-bottom", "border-left", "border-radius",
+  "box-shadow", "font-family", "font-size", "font-weight", "font-style", "line-height", "letter-spacing", "text-align", "text-decoration",
+  "text-transform", "white-space", "word-break", "overflow-wrap", "vertical-align", "padding-top", "padding-right", "padding-bottom", "padding-left",
+  "margin-top", "margin-right", "margin-bottom", "margin-left", "display", "flex-direction", "flex-wrap", "flex-grow", "flex-shrink", "flex-basis",
+  "align-items", "justify-content", "gap", "grid-template-columns", "grid-template-rows", "position", "top", "left", "right", "bottom", "opacity",
+  "box-sizing", "table-layout", "border-collapse", "border-spacing", "min-width", "max-width", "list-style-type", "text-overflow", "zoom", "fill", "stroke", "stroke-width"];
+
+async function domToPngBlob(root, maxScale = 2) {
+  const all = [root, ...root.querySelectorAll("*")];
+  if (all.length > 9000) throw new Error("내용이 너무 커서(요소 9000개 초과) 이미지로 만들 수 없습니다. 텍스트 복사를 쓰세요.");
+  const w = Math.ceil(root.offsetWidth), h = Math.ceil(root.scrollHeight);
+  const clone = root.cloneNode(true);
+  const dst = [clone, ...clone.querySelectorAll("*")];
+  all.forEach((src, i) => {
+    const d = dst[i], cs = getComputedStyle(src);
+    let css = "";
+    for (const prop of DM_STYLE_PROPS) css += `${prop}:${cs.getPropertyValue(prop)};`;
+    // a scrolling area is drawn at its full size, nothing clipped
+    if (/(auto|scroll|hidden)/.test(cs.overflowY + cs.overflowX) && (src.scrollHeight > src.clientHeight + 1 || src.scrollWidth > src.clientWidth + 1)) {
+      css += `overflow:visible;max-height:none;height:${src.scrollHeight}px;width:${Math.max(src.scrollWidth, src.clientWidth)}px;`;
+    }
+    d.setAttribute("style", css);
+    if (src.tagName === "INPUT") d.setAttribute("value", src.value);
+  });
+  clone.querySelectorAll(".dm-tools-only, .detail-modal-tools").forEach((x) => x.remove());
+  clone.style.cssText += `;width:${w}px;max-height:none;height:auto;overflow:visible;`;
+  const bg = getComputedStyle(document.body).backgroundColor || "#fff";
+  const xml = new XMLSerializer().serializeToString(clone);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><foreignObject x="0" y="0" width="100%" height="100%">${xml}</foreignObject></svg>`;
+  const img = new Image();
+  await new Promise((res, rej) => { img.onload = res; img.onerror = () => rej(new Error("이미지를 만들지 못했습니다.")); img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg); });
+  const scale = Math.min(maxScale, 16000 / w, 16000 / h, Math.sqrt(80e6 / (w * h)));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.floor(w * scale)); canvas.height = Math.max(1, Math.floor(h * scale));
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.scale(scale, scale); ctx.drawImage(img, 0, 0);
+  return new Promise((res, rej) => canvas.toBlob((blob) => (blob ? res(blob) : rej(new Error("이미지가 너무 큽니다."))), "image/png"));
+}
+
+function downloadBlob(blob, name) {
+  const url = URL.createObjectURL(blob), a = document.createElement("a");
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+// compact: only minimise / maximise / close (for views that bring their own export buttons, e.g. the MSA modal)
+// 세트 상세 화면을 읽는 순서대로 다시 배열하고 위쪽에 구역 이동 막대를 붙입니다: 요약 → 결합 근거(게놈별 표 + MSA) → 표준물질 → 다양성·계통 → 실험·메모 → Probe 설계.
+// 카드는 옮기기만 하므로 이미 연결된 기능(MSA↔표 연동 등)은 그대로입니다.
+function organizeSetDetail(detail) {
+  if (detail.querySelector(".detail-tabs") || !detail.querySelector(".detail-header")) return;
+  const kids = [...detail.children];
+  const heading = (k) => (k.querySelector(":scope > h3, :scope > .msa-card-header h3, :scope h3") || {}).textContent || "";
+  const has = (k, re) => re.test(heading(k));
+  const rules = [
+    ["summary", "요약", (k) => k.classList.contains("assessment-card") || k.classList.contains("card-grid")],
+    ["evidence", "결합 근거", (k) => has(k, /게놈별 F \/ Probe \/ R 미스매치/) || k.classList.contains("msa-card")],
+    ["standard", "표준물질", (k) => has(k, /표준물질\(KDCA\) 상세 결합/)],
+    ["context", "다양성·계통", (k) => has(k, /pixy/) || k.classList.contains("tree-card")],
+    ["wet", "실험·메모", (k) => has(k, /실험\(Wet-lab\)/) || has(k, /메모 \/ 노트/)],
+    ["design", "Probe 설계", (k) => k.classList.contains("probe-design-card")],
+  ];
+  const buckets = rules.map(() => []);
+  for (const k of kids) {
+    for (let i = 0; i < rules.length; i++) if (rules[i][2](k)) { buckets[i].push(k); break; }
+  }
+  const evidence = buckets[1];
+  evidence.sort((a, b) => (a.classList.contains("msa-card") ? 1 : 0) - (b.classList.contains("msa-card") ? 1 : 0));
+  const first = kids.find((k) => buckets.some((b) => b.includes(k)));
+  if (!first) return;
+  const wrap = el("div", "detail-sections");
+  const nav = el("div", "detail-tabs");
+  nav.innerHTML = rules.map((r, i) => (buckets[i].length ? `<button type="button" class="detail-tab" data-sect="${r[0]}">${r[1]}</button>` : "")).join("");
+  wrap.appendChild(nav);
+  rules.forEach((r, i) => {
+    if (!buckets[i].length) return;
+    const isDesign = r[0] === "design";
+    const sect = el(isDesign ? "details" : "section", "detail-sect");
+    sect.id = "sect-" + r[0];
+    if (isDesign) {
+      sect.innerHTML = `<summary class="sect-title">${r[1]} <span class="note">(펼쳐서 사용 — 새 Probe 후보 설계·검증)</span></summary>`;
+      try { sect.open = localStorage.getItem("lasv_sect_design_open") === "1"; } catch (e) { /* ignore */ }
+      sect.addEventListener("toggle", () => { try { localStorage.setItem("lasv_sect_design_open", sect.open ? "1" : "0"); } catch (e) { /* ignore */ } });
+    } else {
+      sect.innerHTML = `<h2 class="sect-title">${r[1]}</h2>`;
+    }
+    buckets[i].forEach((k) => sect.appendChild(k));
+    wrap.appendChild(sect);
+  });
+  const anchor = kids.find((k) => k.parentNode === detail && !buckets.some((bk) => bk.includes(k)) && kids.indexOf(k) > kids.indexOf(first));
+  detail.insertBefore(wrap, anchor || null);
+  nav.addEventListener("click", (e) => {
+    const b = e.target.closest(".detail-tab");
+    if (!b) return;
+    const t = detail.querySelector("#sect-" + b.dataset.sect);
+    if (t && t.tagName === "DETAILS") t.open = true;
+    if (t) t.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  const main = document.querySelector(".main");
+  const spy = () => {
+    if (!document.body.contains(nav)) { main.removeEventListener("scroll", spy); return; }
+    const top = nav.getBoundingClientRect().bottom + 8;
+    let cur = null;
+    wrap.querySelectorAll(".detail-sect").forEach((x) => { if (x.getBoundingClientRect().top <= top + 40) cur = x.id.replace("sect-", ""); });
+    nav.querySelectorAll(".detail-tab").forEach((b) => b.classList.toggle("on", b.dataset.sect === cur));
+  };
+  main.addEventListener("scroll", spy, { passive: true });
+  spy();
+}
+
+(function wireFinalResultBoxes() {                         // whenever a detail page is rendered, fill its final-result box
+  new MutationObserver(() => {
+    const box = document.querySelector("#detail .final-result-box:empty");
+    if (box) loadFinalResults().then(() => initFinalResult(box.parentElement));
+    const d = document.getElementById("detail");
+    if (d.querySelector(".detail-header") && d.querySelector(".msa-card") && !d.querySelector(".detail-tabs")) organizeSetDetail(d);
+  }).observe(document.getElementById("detail"), { childList: true });
+})();
+
+function openDetailModal({ title, subtitle, html, compact }) {
   const prevFocus = document.activeElement;
   const overlay = el("div", "modal-overlay detail-modal-overlay");
   overlay.innerHTML = `<div class="modal-box detail-modal" role="dialog" aria-modal="true">
-    <div class="modal-head"><div><div class="modal-title">${title}</div>${subtitle ? `<div class="modal-sub">${subtitle}</div>` : ""}</div>
-      <button type="button" class="btn btn-secondary detail-modal-close" title="닫기 (Esc)">닫기</button></div>
+    <div class="modal-head"><div style="min-width:0;"><div class="modal-title">${title}</div>${subtitle ? `<div class="modal-sub">${subtitle}</div>` : ""}</div>
+      <div class="detail-modal-tools">
+        ${compact ? "" : `<button type="button" class="btn btn-secondary dm-copy dm-hide-min" title="창의 내용을 텍스트로 복사합니다">&#128203; 복사</button>
+        <button type="button" class="btn btn-secondary dm-img dm-hide-min" title="창 전체(스크롤 밖 부분 포함)를 PNG 이미지로 저장합니다">&#128247; 화면 저장</button>
+        <button type="button" class="btn btn-secondary dm-copyimg dm-hide-min" title="창 전체를 이미지로 클립보드에 복사합니다 (HTTPS/localhost에서만, 아니면 저장)">&#128444; 이미지 복사</button>
+        <button type="button" class="btn btn-secondary dm-fit dm-hide-min on" title="내용이 창보다 넓으면 창을 넓히고, 그래도 넘치면 축소해서 맞춥니다 (끄면 가로 스크롤)">&#8660; 맞춤</button>`}
+        <button type="button" class="btn btn-secondary dm-min" title="최소화 (왼쪽 아래로 접기)">&#9473;</button>
+        <button type="button" class="btn btn-secondary dm-max dm-hide-min" title="최대화 / 원래 크기">&#9974;</button>
+        <button type="button" class="btn btn-secondary detail-modal-close" title="닫기 (Esc)">닫기</button></div></div>
     <div class="detail-modal-body">${html}</div></div>`;
   modalHost().appendChild(overlay);
+  const box = overlay.querySelector(".detail-modal"), body = overlay.querySelector(".detail-modal-body");
+  let fitOn = !compact;
+  const fit = () => {                                      // the window follows its content: wider if needed, then scaled down
+    if (overlay.classList.contains("minimized")) return;
+    body.style.zoom = ""; box.style.width = "";
+    if (!fitOn) return;
+    const maxW = window.innerWidth - 56;
+    if (!overlay.classList.contains("maximized")) {
+      const need = body.scrollWidth + 40;
+      if (need > box.getBoundingClientRect().width) box.style.width = `${Math.min(need, maxW)}px`;
+    }
+    if (body.scrollWidth > body.clientWidth + 2) body.style.zoom = String(Math.max(0.5, body.clientWidth / body.scrollWidth).toFixed(3));
+  };
   const close = () => {
     document.removeEventListener("keydown", onKey, true);
+    window.removeEventListener("resize", fit);
     overlay.remove();
     if (prevFocus && prevFocus.focus) { try { prevFocus.focus(); } catch { /* element gone */ } }
   };
   const onKey = (ev) => { if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); close(); } };
   document.addEventListener("keydown", onKey, true);
+  window.addEventListener("resize", fit);
   overlay.addEventListener("mousedown", (ev) => { if (ev.target === overlay) close(); });
   overlay.querySelector(".detail-modal-close").addEventListener("click", close);
   overlay.querySelector(".detail-modal-close").focus();
-  return { close, overlay };
+  const flash = (btn, text) => { const o = btn.innerHTML; btn.textContent = text; setTimeout(() => { btn.innerHTML = o; }, 1400); };
+  const tool = (cls, fn) => { const b = overlay.querySelector(cls); if (b) b.addEventListener("click", (e) => { e.stopPropagation(); fn(b); }); };
+  tool(".dm-copy", (b) => copyTextToClipboard(body.innerText).then(() => flash(b, "✓ 복사됨")).catch(() => uiAlert("복사하지 못했습니다.")));
+  const fname = () => `${(overlay.querySelector(".modal-title").textContent || "detail").trim().replace(/[^\w가-힣.-]+/g, "_").slice(0, 60)}.png`;
+  tool(".dm-img", async (b) => { flash(b, "저장 중..."); try { downloadBlob(await domToPngBlob(box), fname()); } catch (err) { uiAlert(err.message); } });
+  tool(".dm-copyimg", async (b) => {
+    try {
+      const blob = await domToPngBlob(box);
+      if (navigator.clipboard && window.ClipboardItem && window.isSecureContext) { await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]); flash(b, "✓ 복사됨"); }
+      else { downloadBlob(blob, fname()); uiAlert("이 주소(http)에서는 브라우저가 이미지 복사를 허용하지 않아 PNG 파일로 저장했습니다. (localhost 또는 HTTPS에서는 바로 복사됩니다.)"); }
+    } catch (err) { uiAlert(err.message); }
+  });
+  tool(".dm-fit", (b) => { fitOn = !fitOn; b.classList.toggle("on", fitOn); fit(); });
+  tool(".dm-max", () => { overlay.classList.toggle("maximized"); fit(); });
+  const minBtn = overlay.querySelector(".dm-min");
+  const setMin = (on) => {
+    overlay.classList.toggle("minimized", on);
+    minBtn.innerHTML = on ? "&#9633;" : "&#9473;"; minBtn.title = on ? "복원" : "최소화 (왼쪽 아래로 접기)";
+    if (on) {                                              // dock next to the other minimised windows
+      const idx = [...document.querySelectorAll(".detail-modal-overlay.minimized")].indexOf(overlay);
+      overlay.style.left = `${12 + Math.max(0, idx) * 352}px`;
+    } else overlay.style.left = "";
+    fit();
+  };
+  minBtn.addEventListener("click", (e) => { e.stopPropagation(); setMin(!overlay.classList.contains("minimized")); });
+  box.addEventListener("click", (e) => { if (overlay.classList.contains("minimized") && !e.target.closest("button")) setMin(false); });
+  requestAnimationFrame(fit);
+  return { close, overlay, fit };
 }
 
 function uiAlert(message, opts = {}) {
@@ -420,142 +590,204 @@ function escHtml(s) {
 
 // ---------------- sidebar ----------------
 
+// ---- sidebar tree: group > its sets > (variants as a badge that unfolds) ---------------------------------------------------------
+// A set is shown under ONE group -- the smallest group that contains it, so an "ALL" group does not repeat every set -- and sets that
+// belong to no group are listed by vendor. A variant ("<parent name>-<n>", see set_parents) is folded into its parent's row.
+state.treeClosed = new Set();            // keys "g:<group id>" of groups the user folded
+state.treeOpenVariants = new Set();      // keys "v:<set id>" of parents whose variants are unfolded
+try {
+  state.treeClosed = new Set(JSON.parse(localStorage.getItem("lasv_tree_closed") || "[]"));
+  state.treeOpenVariants = new Set(JSON.parse(localStorage.getItem("lasv_tree_open_variants") || "[]"));
+} catch (e) { /* private mode */ }
+function saveTreeState() {
+  try {
+    localStorage.setItem("lasv_tree_closed", JSON.stringify([...state.treeClosed]));
+    localStorage.setItem("lasv_tree_open_variants", JSON.stringify([...state.treeOpenVariants]));
+  } catch (e) { /* ignore */ }
+}
+function vendorLabel(source) {
+  if (!source) return "출처 없음";
+  return /^문헌/.test(source) ? "문헌" : source;
+}
+function primaryGroupOf(groups) {        // set id -> the smallest group containing it (ties: lowest id)
+  const map = new Map();
+  [...groups].sort((x, y) => (x.members || []).length - (y.members || []).length || x.group_id.localeCompare(y.group_id)).forEach((g) => {
+    for (const id of g.members || []) if (!map.has(id)) map.set(id, g.group_id);
+  });
+  return map;
+}
+// the order the overview uses too: [{type:"group", g, sets:[{s, variants}]}, {type:"vendor", name, sets:[...]}] per segment
+function buildSetTree(seg, q) {
+  const needle = (q || "").toLowerCase();
+  const match = (s) => !needle || (s.display_name || s.set_id).toLowerCase().includes(needle) || s.set_id.toLowerCase().includes(needle) || (s.source || "").toLowerCase().includes(needle);
+  const all = state.sets.filter((s) => s.segment === seg);
+  const ids = new Set(all.map((s) => s.set_id));
+  const variantsOf = new Map();
+  for (const s of all) if (s.parent_id && ids.has(s.parent_id)) (variantsOf.get(s.parent_id) || variantsOf.set(s.parent_id, []).get(s.parent_id)).push(s);
+  const byName = (x, y) => (x.display_name || x.set_id).localeCompare(y.display_name || y.set_id, undefined, { numeric: true });
+  const order = state.uiState.set_order;
+  const tops = all.filter((s) => !(s.parent_id && ids.has(s.parent_id)));
+  const entry = (s) => {
+    const vars = (variantsOf.get(s.set_id) || []).slice().sort(byName);
+    const shownVars = vars.filter(match);
+    if (!match(s) && !shownVars.length) return null;
+    return { s, variants: vars, shownVariants: needle ? shownVars : vars };
+  };
+  const groups = state.groups.filter((g) => g.segment === seg);
+  const prim = primaryGroupOf(groups);
+  const sortSets = (arr) => applyCustomOrder(arr.slice().sort(byName), order, (s) => s.set_id);
+  const out = [];
+  const orderedGroups = applyCustomOrder(groups.slice().sort((x, y) => x.label.localeCompare(y.label)), state.uiState.group_order, (g) => g.group_id);
+  for (const g of orderedGroups) {
+    const kids = sortSets(tops.filter((s) => prim.get(s.set_id) === g.group_id)).map(entry).filter(Boolean);
+    const others = groups.filter((x) => x.group_id !== g.group_id && (g.members || []).some((m) => prim.get(m) === x.group_id && x.group_id !== g.group_id));
+    const childGroups = [...new Set((g.members || []).map((m) => prim.get(m)).filter((gid) => gid && gid !== g.group_id))].map((gid) => (groups.find((x) => x.group_id === gid) || {}).label).filter(Boolean);
+    if (needle && !g.label.toLowerCase().includes(needle) && !kids.length) continue;
+    out.push({ type: "group", g, kids, childGroups });
+  }
+  const free = tops.filter((s) => !prim.has(s.set_id));
+  const buckets = {};
+  for (const s of free) (buckets[vendorLabel(s.source)] = buckets[vendorLabel(s.source)] || []).push(s);
+  for (const name of Object.keys(buckets).sort((x, y) => x.localeCompare(y))) {
+    const sets = sortSets(buckets[name]).map(entry).filter(Boolean);
+    if (sets.length) out.push({ type: "vendor", name, sets });
+  }
+  return out;
+}
+
 function renderSidebar() {
   const q = ($("#searchBox").value || "").toLowerCase();
   const list = $("#setList");
   list.innerHTML = "";
-  const dragging = { id: null, kind: null };
+  const dragging = { id: null, kind: null, container: null };
+  const searching = !!q;
 
-  // segment -> source -> [sets]
-  const bySeg = Object.fromEntries(segKeys().map((k) => [k.toUpperCase(), {}]));
-  for (const s of state.sets) {
-    const dn = (s.display_name || s.set_id).toLowerCase();
-    if (q && !(dn.includes(q) || s.set_id.toLowerCase().includes(q) || (s.source || "").toLowerCase().includes(q))) continue;
-    const segBucket = bySeg[s.segment] || (bySeg[s.segment] = {});
-    (segBucket[s.source] || (segBucket[s.source] = [])).push(s);
-  }
-  for (const seg of Object.keys(bySeg)) {
-    for (const source of Object.keys(bySeg[seg])) {
-      bySeg[seg][source].sort((a, b) => (a.display_name || a.set_id).localeCompare(b.display_name || b.set_id));
-      bySeg[seg][source] = applyCustomOrder(bySeg[seg][source], state.uiState.set_order, (s) => s.set_id);
-    }
-  }
-  const groupsBySeg = Object.fromEntries(segKeys().map((k) => [k.toUpperCase(), []]));
-  for (const g of state.groups) {
-    if (q && !(g.label.toLowerCase().includes(q))) continue;
-    (groupsBySeg[g.segment] || (groupsBySeg[g.segment] = [])).push(g);
-  }
-  for (const seg of Object.keys(groupsBySeg)) {
-    groupsBySeg[seg].sort((a, b) => a.label.localeCompare(b.label));
-    groupsBySeg[seg] = applyCustomOrder(groupsBySeg[seg], state.uiState.group_order, (g) => g.group_id);
-  }
-
-  // Persist the drag result: flatten this render's current bucket order (search-filtered
-  // views only reorder within what's visible, so an active search never drops the rest of
-  // the list from the saved order) and re-render so the drop is reflected immediately.
-  const commitOrder = (kind) => {
-    const flat = kind === "set"
-      ? Object.keys(bySeg).flatMap((seg) => Object.keys(bySeg[seg]).sort().flatMap((src) => bySeg[seg][src].map((s) => s.set_id)))
-      : Object.keys(groupsBySeg).flatMap((seg) => groupsBySeg[seg].map((g) => g.group_id));
-    state.uiState[kind === "set" ? "set_order" : "group_order"] = flat;
-    saveOrder(kind, flat);
+  // persist a drag: the dropped item takes the slot of the one it replaced, every other id keeps its place in the saved order
+  const commitOrder = (kind, containerIds, newIds) => {
+    const key = kind === "set" ? "set_order" : "group_order";
+    const base = (state.uiState[key] || []).slice();
+    for (const id of containerIds) if (!base.includes(id)) base.push(id);
+    const inContainer = new Set(containerIds);
+    const slots = base.map((id, i) => (inContainer.has(id) ? i : -1)).filter((i) => i >= 0);
+    newIds.forEach((id, k) => { base[slots[k]] = id; });
+    state.uiState[key] = base;
+    saveOrder(kind, base);
     renderSidebar();
   };
-
-  const makeDraggable = (el2, id, kind, bucket) => {
-    const bucketKey = `${bucket.seg}|${bucket.source || ""}`;
+  const makeDraggable = (el2, id, kind, containerKey, idsInOrder) => {
     el2.draggable = true;
     el2.addEventListener("dragstart", (e) => {
-      dragging.id = id; dragging.kind = kind; dragging.bucketKey = bucketKey;
+      e.stopPropagation();
+      dragging.id = id; dragging.kind = kind; dragging.container = containerKey;
       e.dataTransfer.effectAllowed = "move";
     });
     el2.addEventListener("dragover", (e) => {
-      if (dragging.kind !== kind || dragging.bucketKey !== bucketKey || dragging.id === id) return;
+      if (dragging.kind !== kind || dragging.container !== containerKey || dragging.id === id) return;
       e.preventDefault();
       el2.classList.add("drag-over");
     });
     el2.addEventListener("dragleave", () => el2.classList.remove("drag-over"));
     el2.addEventListener("drop", (e) => {
-      e.preventDefault();
+      e.preventDefault(); e.stopPropagation();
       el2.classList.remove("drag-over");
-      if (dragging.kind !== kind || dragging.bucketKey !== bucketKey || dragging.id === id) return;
-      const arr = kind === "set" ? bySeg[bucket.seg][bucket.source] : groupsBySeg[bucket.seg];
-      const idKey = kind === "set" ? "set_id" : "group_id";
-      const from = arr.findIndex((x) => x[idKey] === dragging.id);
-      const to = arr.findIndex((x) => x[idKey] === id);
+      if (dragging.kind !== kind || dragging.container !== containerKey || dragging.id === id) return;
+      const ids = idsInOrder.slice();
+      const from = ids.indexOf(dragging.id), to = ids.indexOf(id);
       if (from === -1 || to === -1) return;
-      const [moved] = arr.splice(from, 1);
-      arr.splice(to, 0, moved);
-      commitOrder(kind);
+      ids.splice(to, 0, ids.splice(from, 1)[0]);
+      commitOrder(kind, idsInOrder, ids);
     });
   };
 
-  const renderSetItem = (s, bucket) => {
-    const item = el("div", "set-item" + (state.activeType === "set" && s.set_id === state.activeId ? " active" : ""));
+  const renderSetItem = (en, level, containerKey, idsInOrder, parentName) => {
+    const s = en.s;
+    const item = el("div", "set-item" + (level === 1 ? " child" : level === 2 ? " variant" : "") + (state.activeType === "set" && s.set_id === state.activeId ? " active" : ""));
     const pct = s.summary?.validated_pct ?? 0;
     const oxHtml = s.standard?.ok ? `<span class="ox ox-o">O</span>` : `<span class="ox ox-x">X</span>`;
     const checked = state.selectedForGroup.has(s.set_id);
+    const nVar = en.variants ? en.variants.length : 0;
+    const open = searching || state.treeOpenVariants.has("v:" + s.set_id);
+    const dup = s.duplicate_of
+      ? `<span class="dup-badge" title="F/R/Probe 서열이 ${escHtml(s.duplicate_of)}와 같습니다 (이름만 다른 중복 등록)">= ${escHtml(s.duplicate_of)}</span>`
+      : (s.duplicate_ids && s.duplicate_ids.length ? `<span class="dup-badge" title="같은 서열의 다른 이름: ${escHtml(s.duplicate_ids.join(", "))}">동일 서열 +${s.duplicate_ids.length}</span>` : "");
+    const varBadge = nVar ? `<span class="variant-badge" data-toggle="${escHtml(s.set_id)}" title="이 세트에서 변형한 세트 ${nVar}개 — 눌러서 펼치기/접기">${open ? "▾" : "▸"} +${nVar} 변이</span>` : "";
+    const nm = s.display_name || s.set_id;
+    const shortName = level === 2 && parentName && nm.startsWith(parentName) ? "↳ " + nm.slice(parentName.length) + ` <span class="note">${escHtml(nm)}</span>` : escHtml(nm);
     item.innerHTML = `
       <div class="row1">
-        <span class="name">${state.groupMode ? `<input type="checkbox" class="set-item-checkbox" data-set-id="${s.set_id}" ${checked ? "checked" : ""}>` : ""}&#8942; ${escHtml(s.display_name || s.set_id)}${s.note ? ' <span class="note-dot" title="노트 있음">&#128221;</span>' : ""}</span>
+        <span class="name">${state.groupMode ? `<input type="checkbox" class="set-item-checkbox" data-set-id="${s.set_id}" ${checked ? "checked" : ""}>` : ""}&#8942; ${shortName}</span>
         ${state.groupMode ? "" : `<button class="rename-btn" title="이름 변경" data-set-id="${s.set_id}">&#9998;</button>`}
         ${segPill(s.segment)}
       </div>
-      <div class="stats">validated ${fmtPct(pct)} &middot; ${oxHtml}${s.fluorophore ? ` &middot; <span class="fluor-tag">${escHtml(s.fluorophore)}</span>` : ""}</div>
+      <div class="stats">validated ${fmtPct(pct)} &middot; ${oxHtml}${s.fluorophore ? ` &middot; <span class="fluor-tag">${escHtml(s.fluorophore)}</span>` : ""} ${varBadge} ${dup}</div>
       <div class="bar"><span style="width:${Math.max(0, Math.min(100, pct))}%"></span></div>
     `;
     if (state.groupMode) {
-      item.querySelector(".set-item-checkbox").addEventListener("click", (e) => {
-        e.stopPropagation();
-        toggleGroupSelection(s.set_id, s.segment);
-      });
+      item.querySelector(".set-item-checkbox").addEventListener("click", (e) => { e.stopPropagation(); toggleGroupSelection(s.set_id, s.segment); });
       item.addEventListener("click", () => toggleGroupSelection(s.set_id, s.segment));
     } else {
       item.addEventListener("click", () => selectSet(s.set_id));
-      item.querySelector(".rename-btn").addEventListener("click", (e) => {
-        e.stopPropagation();
-        renameSet(s.set_id, s.display_name || s.set_id);
-      });
+      item.querySelector(".rename-btn").addEventListener("click", (e) => { e.stopPropagation(); renameSet(s.set_id, nm); });
     }
-    makeDraggable(item, s.set_id, "set", bucket);
-    return item;
+    const vb = item.querySelector(".variant-badge");
+    if (vb) vb.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const k = "v:" + s.set_id;
+      if (state.treeOpenVariants.has(k)) state.treeOpenVariants.delete(k); else state.treeOpenVariants.add(k);
+      saveTreeState(); renderSidebar();
+    });
+    if (level < 2) makeDraggable(item, s.set_id, "set", containerKey, idsInOrder);
+    const frag = el("div", null);
+    frag.appendChild(item);
+    if (nVar && open) {
+      const vwrap = el("div", "variant-list");
+      for (const v of en.shownVariants) vwrap.appendChild(renderSetItem({ s: v, variants: [], shownVariants: [] }, 2, "", [], nm));
+      frag.appendChild(vwrap);
+    }
+    return frag;
   };
 
-  for (const seg of Object.keys(bySeg)) {
-    const sources = bySeg[seg];
-    if (!Object.keys(sources).length && !groupsBySeg[seg].length) continue;
-    list.appendChild(el("div", null, hasSegs() ? `<div style="font-size:11px;color:var(--muted);font-weight:700;margin:8px 4px 2px;">SEGMENT ${seg}</div>` : ""));
-
-    for (const g of groupsBySeg[seg]) {
-      const item = el("div", "group-item" + (state.activeType === "group" && g.group_id === state.activeId ? " active" : ""));
-      item.innerHTML = `
-        <div class="row1">
-          <span class="name">&#8942; &#9633; ${escHtml(g.label)} <span style="color:var(--muted);font-weight:400;">(${g.member_count}개 세트 ALL)</span></span>
-          <button class="rename-btn" title="그룹 이름 변경" data-group-id="${g.group_id}">&#9998;</button>
-          ${segPill(g.segment)}
-        </div>
-        <div class="stats">합집합 ${fmtPct(g.summary.validated_pct)} (${g.summary.validated}/${g.summary.total_genomes}) · 교차 포함 <b>${fmtPct(g.summary.validated_with_cross_pct ?? g.summary.validated_pct)}</b> (${g.summary.validated_with_cross ?? g.summary.validated})</div>
-        <div class="bar" title="진한 막대 = 교차 결합 포함, 안쪽 막대 = 세트별 합집합"><span style="width:${Math.max(0, Math.min(100, g.summary.validated_with_cross_pct ?? g.summary.validated_pct))}%;opacity:.45;"></span><span style="width:${Math.max(0, Math.min(100, g.summary.validated_pct))}%;position:absolute;left:0;top:0;"></span></div>
-      `;
-      item.addEventListener("click", () => selectGroup(g.group_id));
-      item.querySelector(".rename-btn").addEventListener("click", (e) => {
-        e.stopPropagation();
-        renameGroup(g.group_id, g.label);
-      });
-      makeDraggable(item, g.group_id, "group", { seg });
-      list.appendChild(item);
-    }
-
-    const sourceNames = Object.keys(sources).sort((a, b) => a.localeCompare(b));
-    for (const source of sourceNames) {
-      const members = sources[source];
-      if (members.length > 1) {
-        list.appendChild(el("div", null,
-          `<div style="font-size:10.5px;color:var(--muted);margin:6px 4px 2px 10px;">${source} (${members.length})</div>`));
+  for (const seg of ["S", "L", ...[...new Set(state.sets.map((x) => x.segment))].filter((x) => x !== "S" && x !== "L")]) {
+    const tree = buildSetTree(seg, q);
+    if (!tree.length) continue;
+    if (hasSegs()) list.appendChild(el("div", null, `<div style="font-size:11px;color:var(--muted);font-weight:700;margin:8px 4px 2px;">SEGMENT ${seg}</div>`));
+    const groupIds = tree.filter((t) => t.type === "group").map((t) => t.g.group_id);
+    for (const node of tree) {
+      if (node.type === "group") {
+        const g = node.g, key = "g:" + g.group_id, closed = !searching && state.treeClosed.has(key);
+        const item = el("div", "group-item" + (state.activeType === "group" && g.group_id === state.activeId ? " active" : ""));
+        item.innerHTML = `
+          <div class="row1">
+            <span class="name"><span class="tree-chevron" title="접기/펼치기">${closed ? "▸" : "▾"}</span> &#9633; ${escHtml(g.label)} <span style="color:var(--muted);font-weight:400;">(${g.member_count}개 세트 ALL)</span></span>
+            <button class="rename-btn" title="그룹 이름 변경" data-group-id="${g.group_id}">&#9998;</button>
+            ${segPill(g.segment)}
+          </div>
+          <div class="stats">합집합 ${fmtPct(g.summary.validated_pct)} (${g.summary.validated}/${g.summary.total_genomes}) · 교차 포함 <b>${fmtPct(g.summary.validated_with_cross_pct ?? g.summary.validated_pct)}</b></div>
+          <div class="bar" title="진한 막대 = 교차 결합 포함, 안쪽 막대 = 세트별 합집합"><span style="width:${Math.max(0, Math.min(100, g.summary.validated_with_cross_pct ?? g.summary.validated_pct))}%"></span></div>
+          ${node.childGroups.length ? `<div class="note" style="margin-top:3px;">세트는 아래 그룹에 있습니다: ${node.childGroups.map(escHtml).join(" · ")}</div>` : ""}
+        `;
+        item.addEventListener("click", () => selectGroup(g.group_id));
+        item.querySelector(".tree-chevron").addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (state.treeClosed.has(key)) state.treeClosed.delete(key); else state.treeClosed.add(key);
+          saveTreeState(); renderSidebar();
+        });
+        item.querySelector(".rename-btn").addEventListener("click", (e) => { e.stopPropagation(); renameGroup(g.group_id, g.label); });
+        makeDraggable(item, g.group_id, "group", "groups|" + seg, groupIds);
+        list.appendChild(item);
+        if (!closed && node.kids.length) {
+          const wrap = el("div", "tree-children");
+          const ids = node.kids.map((k) => k.s.set_id);
+          for (const k of node.kids) wrap.appendChild(renderSetItem(k, 1, "g|" + g.group_id, ids));
+          list.appendChild(wrap);
+        }
+      } else {
+        list.appendChild(el("div", null, `<div class="tree-vendor">그룹 없음 · ${escHtml(node.name)} (${node.sets.length})</div>`));
+        const wrap = el("div", "source-group");
+        const ids = node.sets.map((k) => k.s.set_id);
+        for (const k of node.sets) wrap.appendChild(renderSetItem(k, 0, "v|" + seg + "|" + node.name, ids));
+        list.appendChild(wrap);
       }
-      const wrap = el("div", members.length > 1 ? "source-group" : null);
-      for (const s of members) wrap.appendChild(renderSetItem(s, { seg, source }));
-      list.appendChild(wrap);
     }
   }
 }
@@ -1190,6 +1422,373 @@ function msaClearColSelection(msaCard) {
   if (readout) readout.hidden = true;
 }
 
+// Probe auto-design (scripts/probe_designer.py): GET shows the last saved run, POST runs it again (about a second).
+function renderProbeDesign(r, ctx = { vals: new Map(), running: null, setData: {} }) {
+  if (!r || !r.generated) return "<p class='note'>아직 실행하지 않았습니다. 오른쪽 위 \"Probe 설계 실행\"을 누르면 이 세트의 정렬 consensus에서 후보를 만들고 전체 population으로 다시 검증합니다.</p>";
+  const reg = r.registered || {};
+  const n = r.msa_n || 0, pct = (v) => (n ? ` (${(100 * v / n).toFixed(1)}%)` : "");
+  const rows = (r.candidates || []).map((c) => {
+    const better = reg.msa_cov0 != null && c.msa_cov0 > reg.msa_cov0;
+    const val = ctx.vals.get(c.seq), running = ctx.running && ctx.running.seq === c.seq;
+    const valRow = (val || running) ? `<tr class="probe-val-row"><td colspan="13" style="padding:0 0 10px 24px;">${running ? `<p class="note">⏳ 검증 중: ${escHtml(ctx.running.text || "")}</p>` : ""}${val ? probeValidationHtml(val, ctx.setData, true) : ""}</td></tr>` : "";
+    return `<tr><td>${c.rank}</td>
+      <td class="mono">${escHtml(c.seq)} <button type="button" class="btn btn-secondary probe-copy" data-seq="${escHtml(c.seq)}" title="서열 복사" style="padding:0 6px;">&#128203;</button></td>
+      <td>${({ own: "자체 규칙", primer3: "Primer3", "own+primer3": "자체+Primer3" })[c.source] || c.source}${c.p3_penalty != null ? `<div class="note">penalty ${c.p3_penalty} · hairpin ${c.p3_hairpin}&deg;C</div>` : ""}</td><td>${c.strand === "+" ? "정방향 (5′→3′, 센스)" : "역방향 (상보가닥)"}</td><td>${c.length}</td><td>${c.n_iupac ?? 0}</td><td>${c.tm}${c.tm_p3 != null ? ` <span class="note">(${c.tm_p3})</span>` : ""}</td><td>${c.gc}%</td>
+      <td>${c.col_start}-${c.col_end}</td>
+      <td>${c.msa_cov0}${pct(c.msa_cov0)} ${better ? '<span class="pill pill-ok">등록 Probe보다 높음</span>' : ""}</td><td>${c.msa_cov1}${pct(c.msa_cov1)}</td>
+      <td>${c.mfe_hits != null ? `${c.mfe_hits} / ${c.population} (${c.mfe_cov_pct}%)` : "&mdash;"}</td>
+      <td><button type="button" class="btn btn-secondary probe-validate" data-seq="${escHtml(c.seq)}" ${running ? "disabled" : ""} title="이 Probe와 이 세트의 F/R로 실제 검증 과정(population·표준물질·dimer/hairpin)을 실행합니다. 결과는 이 카드에만 표시됩니다.">&#9654; 검증</button></td></tr>${valRow}`;
+  }).join("");
+  return `<p class="note">F/R 사이 정렬 열 ${r.col_window[0]}-${r.col_window[1]} 에서 ${r.n_pass_rules.toLocaleString()}개 창이 규칙을 통과했습니다
+    (길이 ${r.len_range[0]}-${r.len_range[1]}nt · IUPAC 최대 ${r.max_iupac ?? 0}개 · GC ${r.gc_range[0]}-${r.gc_range[1]}% · Tm ${r.tm_range[0]}-${r.tm_range[1]}&deg;C = 더 높은 프라이머(${r.primer_tm}&deg;C)보다 ${r.tm_above ? `${r.tm_above[0]}-${r.tm_above[1]}` : "3-10"}&deg;C 높게 · 5′ G 제외 · 4개 이상 연속 같은 염기 제외).
+    ${escHtml(r.generated)} 실행. ${pdScopeBadge(r.host_scope)} <span class="note">(집계 대상 ${r.population_n ?? "전체"}개)</span></p>
+    <p class="note"><b>등록된 Probe</b> <span class="mono">${escHtml(reg.seq || "")}</span> · Tm ${reg.tm != null ? reg.tm : "&mdash;"}&deg;C · 정렬에서 완전 일치 ${reg.msa_cov0}${pct(reg.msa_cov0)}</p>
+    ${rows ? `<div style="overflow:auto;"><table class="mini-reference-table"><tr><th>#</th><th>서열 (5′→3′)</th><th>출처</th><th>가닥</th><th>길이</th><th>IUPAC</th><th>Tm&deg;C <span class="note">(Primer3 Tm)</span></th><th>GC</th><th>정렬 열</th>
+      <th>정렬 완전 일치(0 mm)</th><th>1 mm 이하</th><th>MFEprimer population (${r.probe_mismatch} mm)</th><th>실제 검증</th></tr>${rows}</table></div>
+      <p class="note">Tm은 출처마다 자기 계산식 값이고(자체 규칙: nearest-neighbour, Primer3: Primer3 계산) 괄호는 같은 조건(250 nM, 50 mM Na⁺)의 Primer3 Tm이라 MFEprimer의 Tm과 몇 도 다를 수 있습니다. Primer3 후보는 Primer3의 internal oligo 설계(Tm·GC·poly-X·hairpin·penalty)로 뽑고 5′ G인 가닥은 뺐으며, IUPAC는 뒤에서 같은 방식으로 넣었습니다. 합성 전에 hairpin/dimer와 형광체 위치(5′ 형광체, 3′ 소광체)를 따로 확인하세요. 이 결과는 in silico 후보입니다.</p>`
+      : "<p class='note'>규칙을 통과한 후보가 없습니다 (Tm/GC 조건이 이 영역에는 너무 엄격할 수 있습니다).</p>"}`;
+}
+
+function probeValidationHtml(v, setData, open) {
+  const reg = setData.summary || {};
+  const pctf = (x) => (x == null || x === "" ? "&mdash;" : `${Number(x).toFixed(1)}%`);
+    const sm = v.summary || {};
+    const delta = (a, b) => (a == null || b == null ? "" : ` <span class="note">(등록 Probe 세트 ${pctf(b)})</span>`);
+    const std = v.standard || {};
+    const dh = v.dimer_hairpin || {};
+    const flagged = [...Object.values(dh.dimer || {}), ...Object.values(dh.hairpin || {})].reduce((n, x) => n + ((x && x.flagged) || 0), 0);
+    const lin = (v.lineages || []).map((l) => `<tr><td>${escHtml(l.lineage)}</td><td>${l.validated} / ${l.total}</td><td>${l.total ? (100 * l.validated / l.total).toFixed(1) : "0.0"}%</td></tr>`).join("");
+    return `<details class="probe-validation" ${open ? "open" : ""} style="margin-top:12px;border:1px solid var(--border);border-radius:var(--r-md);padding:8px 12px;">
+      <summary><b class="mono">${escHtml(v.seq)}</b> <span class="note">· ${escHtml(v.generated)} 검증 결과</span> ${pdScopeBadge(v.host_scope)} <button type="button" class="btn btn-secondary probe-msa-btn" data-seq="${escHtml(v.seq)}" style="padding:0 8px;" title="이 Probe로 만든 전체 게놈 정렬(MSA)을 창으로 봅니다">&#129516; MSA 보기</button></summary>
+      <div style="display:flex;gap:18px;flex-wrap:wrap;margin:8px 0;">
+        <div><div class="note">최종 Validated</div><b>${sm.validated ?? "&mdash;"} / ${sm.total_genomes ?? "&mdash;"} (${pctf(sm.validated_pct)})</b>${delta(sm.validated_pct, reg.validated_pct)}</div>
+        <div><div class="note">Probe 완전 일치</div><b>${pctf(sm.probe_coverage_mm0_pct)}</b>${delta(sm.probe_coverage_mm0_pct, reg.probe_coverage_mm0_pct)}</div>
+        <div><div class="note">Primer 커버리지 (mm ${v.primer_mismatch_pass})</div><b>${pctf(sm["primer_coverage_mm" + v.primer_mismatch_pass + "_pct"])}</b></div>
+        <div><div class="note">Probe dropout</div><b>${sm.probe_dropout ?? "&mdash;"}</b>${reg.probe_dropout != null ? ` <span class="note">(등록 ${reg.probe_dropout})</span>` : ""}</div>
+        <div><div class="note">표준물질(KDCA)</div><b>${std.ok ? "✅ 매치" : (std.matched && std.matched.length ? "△ 일부" : "✗ 불일치")}</b></div>
+        <div><div class="note">dimer/hairpin 경고</div><b>${flagged}</b></div>
+      </div>
+      <table class="mini-reference-table"><tr><th>${escHtml((PROFILE.lineage && PROFILE.lineage.label) || "Lineage")}</th><th>검증 통과 / 전체</th><th>%</th></tr>${lin}</table>
+      <p class="note">실제 파이프라인과 같은 검색·판정으로 계산했습니다 (F/R mismatch&le;${v.primer_mismatch_pass} + 3′ 끝 일치, Probe mismatch&le;${v.probe_mismatch}). 이 결과는 이 카드에만 저장되며 개요·요약·보고서에는 들어가지 않습니다.</p>
+    </details>`;
+}
+
+function renderProbeValidations(items, setData) {
+  if (!items.length) return "";
+  const blocks = items.map((v, vi) => probeValidationHtml(v, setData, vi === 0)).join("");
+  return `<h4 style="margin:16px 0 0;">이전 검증 기록 <span class="note">(현재 후보 목록에 없는 Probe · 이 카드 전용)</span></h4>${blocks}`;
+}
+
+const PD_SCOPE_LABEL = { human: "사람 유래", animal: "동물 유래", unknown: "숙주 미상", all: "전체" };
+function pdScopeBadge(scope) {
+  if (!scope) return "";
+  const stale = state.hostScope && state.hostScope !== scope;
+  return `<span class="pill ${stale ? "pill-warn" : "pill-ok"}" title="이 결과를 계산할 때 쓴 숙주 기준입니다${stale ? ` — 지금 화면의 기준(${PD_SCOPE_LABEL[state.hostScope] || state.hostScope})과 다르니 다시 실행하세요` : ""}">숙주 기준: ${PD_SCOPE_LABEL[scope] || scope}</span>`;
+}
+
+function renderProbeBest(b) {
+  if (!b || !b.generated) return "";
+  const pctf = (v) => (v == null ? "&mdash;" : `${Number(v).toFixed(1)}%`);
+  const rows = (b.ranking || []).map((r, i) => `<tr${i === 0 ? ' style="background:rgba(84,162,74,.14);font-weight:600;"' : ""}>
+    <td>${i + 1}</td><td class="mono">${escHtml(r.seq)} <button type="button" class="btn btn-secondary probe-copy" data-seq="${escHtml(r.seq)}" style="padding:0 6px;" title="서열 복사">&#128203;</button></td>
+    <td>${({ own: "자체", primer3: "Primer3", "own+primer3": "자체+P3" })[r.source] || ""}</td><td>${r.n_iupac}</td><td>${r.tm ?? "&mdash;"}</td><td>${r.validated ?? "&mdash;"} (${pctf(r.validated_pct)})</td><td>${pctf(r.probe_pct)}</td><td>${r.dropout ?? "&mdash;"}</td>
+    <td>${r.std_ok ? "✅" : "✗"}</td></tr>`).join("");
+  const top = (b.ranking || [])[0];
+  return `<h4 style="margin:16px 0 0;">&#127942; 최적 Probe 탐색 결과 <span class="note">${escHtml(b.generated)} · 후보 ${b.n_tested}개를 모두 실제 검증</span> ${pdScopeBadge(b.host_scope)}</h4>
+    ${top ? `<p style="margin:6px 0;">가장 좋은 Probe: <b class="mono">${escHtml(top.seq)}</b> — Validated ${top.validated} (${pctf(top.validated_pct)}), Probe 완전 일치 ${pctf(top.probe_pct)}, dropout ${top.dropout}</p>` : ""}
+    <div style="overflow:auto;"><table class="mini-reference-table"><tr><th>순위</th><th>서열 (5′→3′)</th><th>출처</th><th>IUPAC</th><th>Tm&deg;C</th><th>최종 Validated</th><th>Probe 완전 일치</th><th>dropout</th><th>표준물질</th></tr>${rows}</table></div>
+    <p class="note">순위 기준: 최종 Validated 수 &rarr; 표준물질 매치 &rarr; Probe 완전 일치 &rarr; dropout이 적은 순 &rarr; IUPAC 적은 순. 후보마다 자세한 검증 결과는 위 후보 표의 각 행 아래에 있습니다. 최종 Validated는 F/R이 정하는 상한이 있어서, Probe만으로는 차이가 작을 수 있습니다. 이 결과도 이 카드에만 저장됩니다.</p>`;
+}
+
+// The alignment of one designed probe (F/R of the set + that probe), in a modal -- the same view as the set's MSA card.
+async function openProbeMsaModal(setData, seq, urlOverride, titleLabel) {
+  let d;
+  try {
+    d = await fetchJSON(urlOverride || `/api/sets/${encodeURIComponent(setData.set_id)}/probe-design/msa?host=${encodeURIComponent(state.hostScope || "")}&seq=${encodeURIComponent(seq)}`);
+  } catch (e) { uiAlert("MSA를 불러오지 못했습니다. 이 Probe의 검증 결과가 있는지 확인하세요."); return; }
+  const pseudo = { ...d, set_id: `${setData.set_id} + ${seq}` };
+  const saved = { s: state.msaSearch, m: state.msaFilterMode, c: state.msaColFilters, a: state._msaAttrOf, b: state._msaBase };
+  state.msaSearch = ""; state.msaFilterMode = "all"; state.msaColFilters = {};
+  const { overlay } = openDetailModal({
+    title: titleLabel || `전체 게놈 정렬 (MSA) &mdash; 설계 Probe <span class="mono">${escHtml(seq)}</span>`,
+    subtitle: titleLabel ? "varVAMP가 설계한 F/Probe/R · 숙주 기준을 따릅니다 · 컬럼은 ⌥/Alt+드래그로 선택" : `F/R은 ${escHtml(setData.display_name || setData.set_id)} 그대로, Probe만 설계한 서열입니다 · 숙주 기준을 따릅니다 · 컬럼은 ⌥/Alt+드래그로 선택`,
+    html: '<div class="card msa-card" id="probeMsaCard" style="margin:0;"></div>',
+    compact: true,
+  });
+  const box = overlay.querySelector(".modal-box");
+  box.style.width = "min(97vw, 1500px)"; box.style.maxWidth = "97vw";
+  const card = overlay.querySelector("#probeMsaCard");
+  const HEADER = `<div class="msa-card-header"><span class="note">${d.msa && d.msa.rows ? d.msa.rows.length : 0}개 게놈</span>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+      <button type="button" class="btn btn-secondary pm-snap">&#128247; 이미지 저장</button>
+      <button type="button" class="btn btn-secondary pm-copyimg">&#128203; 이미지 복사</button>
+      <button type="button" class="btn btn-secondary pm-copytxt">&#128203; 텍스트 복사</button>
+      <button type="button" class="btn btn-secondary pm-fs">&#9974; 전체화면</button></div></div>`;
+  const draw = () => {
+    const focusSearch = document.activeElement && document.activeElement.id === "msaSearch" && card.contains(document.activeElement);
+    const caret = focusSearch ? document.activeElement.selectionStart : null;
+    card.innerHTML = HEADER + renderMSA(pseudo);
+    const pi = card.querySelector("#msaDiversityRow");              // the pi track belongs to the registered set only
+    if (pi) pi.remove();
+    const ruler = card.querySelector(".msa-ruler");
+    if (ruler) ruler.style.top = "0";
+    const q = (sel) => card.querySelector(sel);
+    q("#msaSearch")?.addEventListener("input", (e) => { state.msaSearch = e.target.value; draw(); });
+    card.querySelectorAll(".mt-funnel[data-msa-col]").forEach((b) =>
+      b.addEventListener("click", (e) => { e.stopPropagation(); msaOpenColMenu(b, b.dataset.msaCol, draw); }));
+    q("#msaClearColFilters")?.addEventListener("click", () => { state.msaColFilters = {}; draw(); });
+    q("#msaMetaCols")?.addEventListener("change", (e) => { state.msaMetaCols = e.target.checked; draw(); });
+    q("#msaFilterMode")?.addEventListener("change", (e) => { state.msaFilterMode = e.target.value; draw(); });
+    q(".pm-snap")?.addEventListener("click", () => msaSnapshot(card, pseudo, "save"));
+    q(".pm-copyimg")?.addEventListener("click", () => msaSnapshot(card, pseudo, "copy"));
+    q(".pm-copytxt")?.addEventListener("click", () => msaCopyText(card, pseudo));
+    q(".pm-fs")?.addEventListener("click", () => toggleFullscreen(card));
+    const copyBtn = q("#msaColSelectCopyBtn"), clearBtn = q("#msaColSelectClearBtn");
+    if (copyBtn) copyBtn.addEventListener("click", () => msaCopyColSelection(card));
+    if (clearBtn) clearBtn.addEventListener("click", () => msaClearColSelection(card));
+    if (focusSearch) { const el2 = q("#msaSearch"); el2.focus(); el2.setSelectionRange(caret, caret); }
+  };
+  draw();
+  wireColumnSelection(card);
+  const mo = new MutationObserver(() => {                       // closed: give the set page its own filter state back
+    if (document.body.contains(overlay)) return;
+    state.msaSearch = saved.s; state.msaFilterMode = saved.m; state.msaColFilters = saved.c; state._msaAttrOf = saved.a; state._msaBase = saved.b;
+    mo.disconnect();
+  });
+  mo.observe(document.body, { childList: true, subtree: true });
+}
+
+async function initProbeDesign(detail, setData) {
+  const body = detail.querySelector("#probeDesignBody"), btn = detail.querySelector("#probeDesignRunBtn");
+  if (!body || !btn) return;
+  const id = encodeURIComponent(setData.set_id);
+  const valBox = detail.querySelector("#probeDesignValidations");
+  let design = null, vals = [], running = null;       // the last design, the saved validations, the validation in progress
+  const rerender = () => {
+    if (!document.body.contains(body)) return;
+    body.innerHTML = renderProbeDesign(design, { vals: new Map(vals.map((v) => [v.seq, v])), running, setData });
+    const inTable = new Set(((design && design.candidates) || []).map((c) => c.seq));
+    valBox.innerHTML = renderProbeValidations(vals.filter((v) => !inTable.has(v.seq)), setData);
+  };
+  const show = (r) => { design = r; rerender(); };
+  const loadValidations = async () => {
+    try { vals = await fetchJSON(`/api/sets/${id}/probe-design/validations`); } catch (e) { /* none yet */ }
+    rerender();
+  };
+  try { design = await fetchJSON(`/api/sets/${id}/probe-design`); } catch (e) { body.innerHTML = "<p class='note'>결과를 불러오지 못했습니다.</p>"; }
+  await loadValidations();
+  const bestBox = detail.querySelector("#probeDesignBest");
+  const loadBest = async (status) => {
+    let b = null;
+    try { b = await fetchJSON(`/api/sets/${id}/probe-design/best`); } catch (e) { /* none yet */ }
+    if (document.body.contains(bestBox)) bestBox.innerHTML = (status ? `<p class="note">${status}</p>` : "") + renderProbeBest(b);
+  };
+  loadBest();
+  detail.querySelector("#probeBestBtn").addEventListener("click", async (e) => {
+    const bb = e.currentTarget;
+    const n = Number(detail.querySelector("#probeDesignTop").value) || 20;
+    if (!(await uiConfirm(`후보 ${n}개를 모두 실제 검증 과정에 태웁니다. 약 ${Math.ceil(n * 7 / 60)}분 걸리며 그동안 서버가 계산에 쓰입니다. 계속할까요?`, { title: "최적 Probe 자동 탐색", okLabel: "시작" }))) return;
+    bb.disabled = true;
+    try {
+      const { job_id, error } = await fetchJSON(`/api/sets/${id}/probe-design/best`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ top: n, max_iupac: Number(detail.querySelector("#probeDesignIupac").value), method: detail.querySelector("#probeDesignMethod").value, host: state.hostScope,
+          tm_above_min: Number(detail.querySelector("#probeDesignTmMin").value), tm_above_max: Number(detail.querySelector("#probeDesignTmMax").value),
+          probe_mismatch: Number(detail.querySelector("#probeDesignMm").value) || 0 }) });
+      if (error) throw new Error(error);
+      for (;;) {
+        const j = await fetchJSON(`/api/jobs/${job_id}`);
+        if (!document.body.contains(bestBox)) return;
+        if (j.status === "running") { bestBox.querySelector(".probe-best-status")?.remove();
+          bestBox.insertAdjacentHTML("afterbegin", `<p class="note probe-best-status">⏳ ${escHtml(j.progress || "")} (${j.elapsed_sec ?? 0}초)</p>`); await new Promise((r) => setTimeout(r, 2000)); continue; }
+        if (j.status === "error") uiAlert("최적 탐색에 실패했습니다: " + (j.error || ""));
+        break;
+      }
+      await Promise.all([loadBest(), loadValidations()]);
+    } catch (err) { uiAlert("최적 탐색을 시작하지 못했습니다: " + err.message); }
+    bb.disabled = false;
+  });
+  detail.querySelector("#probeDesignCard").addEventListener("click", async (e) => {
+    const mb = e.target.closest(".probe-msa-btn");
+    if (mb) { e.preventDefault(); openProbeMsaModal(setData, mb.dataset.seq); return; }
+    const vb = e.target.closest(".probe-validate");
+    if (vb) {
+      if (running) { uiAlert("이미 다른 Probe를 검증 중입니다. 끝난 뒤 다시 눌러 주세요."); return; }
+      running = { seq: vb.dataset.seq, text: "시작..." }; rerender();
+      try {
+        const { job_id, error } = await fetchJSON(`/api/sets/${id}/probe-design/validate`, {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ seq: vb.dataset.seq, host: state.hostScope }) });
+        if (error) throw new Error(error);
+        for (;;) {
+          const j = await fetchJSON(`/api/jobs/${job_id}`);
+          if (!document.body.contains(valBox)) return;
+          if (j.status === "running") { running.text = j.progress || ""; rerender(); await new Promise((r) => setTimeout(r, 1500)); continue; }
+          if (j.status === "error") uiAlert("검증에 실패했습니다: " + (j.error || ""));
+          break;
+        }
+      } catch (err) { uiAlert("검증을 시작하지 못했습니다: " + err.message); }
+      running = null;
+      await loadValidations();
+      return;
+    }
+    const c = e.target.closest(".probe-copy");
+    if (c) copyTextToClipboard(c.dataset.seq).then(() => { c.textContent = "✓"; setTimeout(() => { c.innerHTML = "&#128203;"; }, 1000); }).catch(() => uiAlert("복사하지 못했습니다."));
+  });
+  btn.addEventListener("click", async () => {
+    btn.disabled = true; const orig = btn.innerHTML; btn.textContent = "설계·검증 중...";
+    try {
+      const r = await fetchJSON(`/api/sets/${id}/probe-design`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ top: Number(detail.querySelector("#probeDesignTop").value) || 10, max_iupac: Number(detail.querySelector("#probeDesignIupac").value), method: detail.querySelector("#probeDesignMethod").value, host: state.hostScope, tm_above_min: Number(detail.querySelector("#probeDesignTmMin").value), tm_above_max: Number(detail.querySelector("#probeDesignTmMax").value), probe_mismatch: Number(detail.querySelector("#probeDesignMm").value) || 0 }),
+      });
+      if (r.error) uiAlert(r.error); else show(r);
+    } catch (e) { uiAlert("Probe 설계에 실패했습니다: " + e.message); }
+    btn.disabled = false; btn.innerHTML = orig;
+  });
+}
+
+// navigator.clipboard only exists on HTTPS/localhost; the dashboard is usually opened over plain http on the LAN
+// (http://10.x.x.x:8765), so text copy falls back to a hidden textarea + execCommand("copy").
+function copyTextToClipboard(text) {
+  const legacy = () => new Promise((resolve, reject) => {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.cssText = "position:fixed;left:-9999px;top:0;opacity:0;";
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+    ta.remove();
+    ok ? resolve() : reject(new Error("copy failed"));
+  });
+  // the async API can refuse (page not focused, permission): fall back to the old way before giving up
+  if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text).catch(legacy);
+  return legacy();
+}
+
+// the column window to export: the dragged selection if there is one, otherwise the whole alignment
+function msaExportWindow(msaCard, setData) {
+  const n = setData.msa.columns;
+  const readout = msaCard.querySelector("#msaColSelectReadout");
+  if (readout && !readout.hidden && readout.dataset.start !== undefined) {
+    const lo = Math.max(0, Number(readout.dataset.start)), hi = Math.min(n - 1, Number(readout.dataset.end));
+    if (!isNaN(lo) && !isNaN(hi) && hi >= lo) return { lo, hi, selected: true };
+  }
+  return { lo: 0, hi: n - 1, selected: false };
+}
+
+// every row that is currently listed (search/filters applied, NOT limited to the 800 drawn), as {label, seq, kind}
+function msaExportRows(msaCard, setData) {
+  const msa = setData.msa;
+  const textOf = (sel) => { const el = msaCard.querySelector(sel); return el ? el.textContent : ""; };
+  const out = [
+    { kind: "ruler", label: "ref position", seq: textOf(".msa-ruler .msa-seq") },
+    { kind: "combined", label: "PRIMER/PROBE", seq: textOf(".msa-combined-row .msa-seq") },
+    { kind: "consensus", label: "CONSENSUS", seq: msa.consensus },
+  ];
+  for (const r of ((state._msaRowsBySet && state._msaRowsBySet.get(setData)) || msa.rows)) {
+    out.push({
+      kind: "genome",
+      label: `${r.genome_id} | ${r.lineage || "NA"} | ${r.country || "?"}  F${mmText(r.f_mismatch)} P${mmText(r.p_mismatch)} R${mmText(r.r_mismatch)}`,
+      seq: r.dots, tsvLabel: `${r.genome_id} | ${r.lineage || "NA"} | ${r.country || "?"}`,
+    });
+  }
+  return out;
+}
+
+function msaCopyText(msaCard, setData) {
+  const msa = setData.msa;
+  const { lo, hi, selected } = msaExportWindow(msaCard, setData);
+  const undot = (d) => d.split("").map((c, i) => (c === "." ? msa.consensus[i] : c)).join("");
+  const lines = msaExportRows(msaCard, setData).map((r) => {
+    const seq = r.kind === "genome" ? undot(r.seq) : r.seq;
+    return `${r.tsvLabel || r.label}\t${seq.slice(lo, hi + 1)}`;
+  });
+  copyTextToClipboard(lines.join("\n") + "\n")
+    .then(() => uiAlert(`정렬 텍스트를 복사했습니다 (${lines.length - 3}개 게놈, 컬럼 ${lo + 1}-${hi + 1}${selected ? ", 선택 구간" : ", 전체"}).`))
+    .catch(() => uiAlert("클립보드 복사에 실패했습니다. 브라우저가 복사를 막았을 수 있습니다."));
+}
+
+// Draws the alignment on a canvas (no external library): the three header rows + every listed genome.
+// "." (same as consensus) stays faint, a letter (mismatch) is red, "-" is grey; F/Probe/R windows are shaded like on screen.
+function msaRenderCanvas(msaCard, setData) {
+  const msa = setData.msa;
+  const { lo, hi } = msaExportWindow(msaCard, setData);
+  const rows = msaExportRows(msaCard, setData);
+  const cs = getComputedStyle(document.documentElement);
+  const css = (v, d) => (cs.getPropertyValue(v).trim() || d);
+  const bg = css("--bg", "#ffffff"), fg = css("--fg", "#1a1d23"), muted = css("--muted", "#6b7280"), border = css("--border", "#e5e7eb");
+  const FS = 12, LH = 16, PAD = 8, LABEL_W = 330;
+  const font = `${FS}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
+  const probe = document.createElement("canvas").getContext("2d");
+  probe.font = font;
+  const cw = probe.measureText("M").width;
+  const ncol = hi - lo + 1;
+  const W = Math.ceil(PAD * 2 + LABEL_W + ncol * cw), H = PAD * 2 + rows.length * LH;
+  // browsers cap canvas size (~32k px per side, ~270M px total): shrink the drawing if the alignment is huge
+  const scale = Math.min(1, 30000 / W, 30000 / H, Math.sqrt(120e6 / (W * H)));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.floor(W * scale));
+  canvas.height = Math.max(1, Math.floor(H * scale));
+  const ctx = canvas.getContext("2d");
+  ctx.scale(scale, scale);
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+  ctx.font = font; ctx.textBaseline = "middle";
+  const wins = [[msa.f_col, "rgba(76,120,168,.32)"], [msa.p_col, "rgba(242,166,90,.42)"], [msa.r_col, "rgba(84,162,74,.32)"]];
+  const x0 = PAD + LABEL_W;
+  rows.forEach((r, ri) => {
+    const y = PAD + ri * LH;
+    if (r.kind !== "ruler") for (const [w, color] of wins) {
+      if (!w) continue;
+      const a = Math.max(w[0], lo), b = Math.min(w[1], hi);
+      if (b >= a) { ctx.fillStyle = color; ctx.fillRect(x0 + (a - lo) * cw, y, (b - a + 1) * cw, LH); }
+    }
+    ctx.fillStyle = r.kind === "genome" ? fg : muted;
+    ctx.font = (r.kind === "genome" ? "" : "bold ") + font;
+    let label = r.label;
+    while (label.length > 4 && ctx.measureText(label).width > LABEL_W - 8) label = label.slice(0, -2);
+    if (label !== r.label) label += "…";
+    ctx.fillText(label, PAD, y + LH / 2);
+    ctx.font = font;
+    const seq = r.seq.slice(lo, hi + 1);
+    for (let i = 0; i < seq.length; i++) {
+      const c = seq[i];
+      if (c === " ") continue;
+      if (r.kind === "genome") ctx.fillStyle = c === "." ? border : c === "-" ? muted : "#E45756";
+      else ctx.fillStyle = fg;
+      ctx.fillText(c, x0 + i * cw, y + LH / 2);
+    }
+  });
+  ctx.strokeStyle = border; ctx.beginPath(); ctx.moveTo(PAD + LABEL_W - 4, PAD); ctx.lineTo(PAD + LABEL_W - 4, H - PAD); ctx.stroke();
+  return canvas;
+}
+
+function msaSnapshot(msaCard, setData, mode) {
+  if (!setData.msa || !setData.msa.columns) return;
+  const canvas = msaRenderCanvas(msaCard, setData);
+  const name = `${setData.set_id}_alignment.png`;
+  const download = (blob) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  };
+  canvas.toBlob((blob) => {
+    if (!blob) { uiAlert("이미지를 만들지 못했습니다. 정렬이 너무 큽니다 — 컬럼을 드래그로 선택해 구간만 저장해 보세요."); return; }
+    if (mode === "copy") {
+      if (navigator.clipboard && window.ClipboardItem && window.isSecureContext) {
+        navigator.clipboard.write([new ClipboardItem({ "image/png": blob })])
+          .then(() => uiAlert("정렬 이미지를 클립보드에 복사했습니다."))
+          .catch(() => { download(blob); uiAlert("클립보드 복사가 막혀 PNG 파일로 저장했습니다."); });
+      } else {
+        download(blob);
+        uiAlert("이 주소(http)에서는 브라우저가 이미지 복사를 허용하지 않아 PNG 파일로 저장했습니다. (localhost 또는 HTTPS에서는 바로 복사됩니다.)");
+      }
+    } else download(blob);
+  }, "image/png");
+}
+
 function msaCopyColSelection(msaCard) {
   const readout = msaCard.querySelector("#msaColSelectReadout");
   if (!readout || readout.hidden) return;
@@ -1203,7 +1802,7 @@ function msaCopyColSelection(msaCard) {
     lines.push(`${label}\t${text.slice(lo, hi + 1)}`);
   });
   const text = lines.join("\n");
-  navigator.clipboard?.writeText(text).then(() => {
+  copyTextToClipboard(text).then(() => {
     const btn = msaCard.querySelector("#msaColSelectCopyBtn");
     if (btn) {
       const orig = btn.textContent;
@@ -1513,6 +2112,7 @@ function renderMSA(setData) {
   state._msaAttrOf = attrOf; state._msaBase = rows;
   const colFilters = state.msaColFilters || {};
   rows = rows.filter((r) => Object.entries(colFilters).every(([k, set]) => set.has(attrOf(r)[k])));
+  (state._msaRowsBySet = state._msaRowsBySet || new WeakMap()).set(setData, rows);   // all rows after search/filters -- the snapshot/copy buttons use these, not just the 800 drawn
   const shown = rows.slice(0, 800);
 
   const ampStartForRuler = setData.gene && setData.gene.amplicon_start !== "" && setData.gene.amplicon_start != null ? Number(setData.gene.amplicon_start) : NaN;
@@ -1666,10 +2266,66 @@ function renderLineageBreakdownCompact(setData) {
   }).join("");
 }
 
-const MAIN_VIEW_IDS = ["overview", "detail", "addForm", "paramsView", "changelogView", "guideView", "diversityView", "geneConsView", "metadataView", "primersView", "litView", "standardsView", "metaTableView", "stdMgrView", "requirementsView"];
+const MAIN_VIEW_IDS = ["overview", "detail", "addForm", "paramsView", "changelogView", "guideView", "diversityView", "geneConsView", "redesignView", "vennView", "metadataView", "primersView", "litView", "standardsView", "metaTableView", "stdMgrView", "requirementsView"];
 function showMainView(id) {
   for (const v of MAIN_VIEW_IDS) $(`#${v}`).hidden = (v !== id);
+  navRecord(id);
 }
+
+// ---- back / forward: every page change is a browser-history entry (Alt+arrows and the browser buttons work) and the bar on top of the page
+// goes back / forward the same way. A page is {view id, active set/group id}; going back re-opens it through its own menu button.
+const NAV = { idx: 0, max: 0, lock: false, last: null };
+const NAV_VIEW_BTN = { overview: "overviewBtn", addForm: "addSetBtn", paramsView: "paramsBtn", changelogView: "changelogBtn", guideView: "guideBtn",
+  diversityView: "diversityBtn", geneConsView: "geneConsBtn", redesignView: "redesignBtn", vennView: "vennBtn", metadataView: "metadataBtn",
+  primersView: "primersBtn", litView: "litBtn", standardsView: "standardsBtn", metaTableView: "metaTableBtn", stdMgrView: "stdMgrBtn", requirementsView: "reportBtn" };
+NAV_VIEW_BTN.requirementsView = "requirementsBtn";
+const NAV_TITLE = { overview: "전체 대시보드", addForm: "새 프라이머 세트 분석", paramsView: "분석 파라미터", changelogView: "변경 이력", guideView: "파이프라인 개요 / 가이드",
+  diversityView: "리니지별 유전체 다양성", geneConsView: "유전자 보존영역", redesignView: "리니지별 재설계", vennView: "커버리지 벤 다이어그램", metadataView: "메타데이터 / 지도",
+  primersView: "프라이머 입력 / 관리", litView: "문헌 프라이머", standardsView: "표준물질 대표성", metaTableView: "메타데이터 표", stdMgrView: "표준물질 입력 / 관리", requirementsView: "요구사항 기록" };
+function navTitle(d) {
+  if (!d) return "";
+  if (d.v === "detail") {
+    if (d.at === "group") return "그룹 · " + ((state.groups.find((g) => g.group_id === d.aid) || {}).label || d.aid);
+    return "세트 · " + ((state.sets.find((x) => x.set_id === d.aid) || {}).display_name || d.aid);
+  }
+  return NAV_TITLE[d.v] || "";
+}
+function navUpdate() {
+  const b = document.getElementById("navBack"), f = document.getElementById("navFwd"), c = document.getElementById("navCrumb");
+  if (!b) return;
+  b.disabled = NAV.idx <= 0; f.disabled = NAV.idx >= NAV.max;
+  c.textContent = navTitle(NAV.last);
+}
+function navRecord(id) {
+  if (NAV.lock) return;
+  const d = { v: id, aid: state.activeId || null, at: state.activeType || null };
+  const same = NAV.last && NAV.last.v === d.v && NAV.last.aid === d.aid && NAV.last.at === d.at;
+  if (same) { history.replaceState({ ...d, idx: NAV.idx }, ""); }
+  else if (NAV.last) { NAV.idx += 1; NAV.max = NAV.idx; history.pushState({ ...d, idx: NAV.idx }, ""); }
+  else { history.replaceState({ ...d, idx: NAV.idx }, ""); }
+  NAV.last = d;
+  navUpdate();
+}
+async function navRestore(st) {
+  if (st.v === "detail") { return st.at === "group" ? selectGroup(st.aid) : selectSet(st.aid); }
+  const btn = NAV_VIEW_BTN[st.v] && document.getElementById(NAV_VIEW_BTN[st.v]);
+  if (btn) btn.click();
+}
+window.addEventListener("popstate", async (e) => {
+  const st = e.state;
+  if (!st || !st.v) return;
+  NAV.lock = true;
+  NAV.idx = st.idx || 0; NAV.last = { v: st.v, aid: st.aid, at: st.at };
+  try { await navRestore(st); } catch (err) { /* page failed to open: stay on what is shown */ }
+  await new Promise((r) => setTimeout(r, 150));
+  NAV.lock = false; navUpdate();
+});
+document.addEventListener("DOMContentLoaded", () => {
+  const prev = history.state;
+  if (prev && prev.v) { NAV.idx = prev.idx || 0; NAV.max = NAV.idx; }
+  document.getElementById("navBack").addEventListener("click", () => history.back());
+  document.getElementById("navFwd").addEventListener("click", () => history.forward());
+});
 
 function narrateSetAssessment(setData) {
   // A heuristic, generic summary synthesized from the metrics already computed elsewhere
@@ -1789,6 +2445,8 @@ function renderDetail(setData) {
       ${segPill(setData.segment)}
       <span class="pill ${setData.builtin === false ? "pill-user" : ""}">${setData.source}</span>
     </div>
+    ${finalResultBoxHtml(setData.set_id)}
+    ${relationsHtml(setData.set_id)}
     <div class="detail-sub">
       ${setDisplayName !== setData.set_id ? `ID: <span class="mono">${escHtml(setData.set_id)}</span> &middot; ` : ""}Target gene: <b>${gene.target_gene || "NA"}</b>
       ${gene.amplicon_start ? ` &middot; amplicon ${gene.chrom || ""}:${gene.amplicon_start}..${gene.amplicon_end} (${gene.amplicon_size}bp)` : ""}
@@ -1888,9 +2546,30 @@ function renderDetail(setData) {
     <div class="card msa-card" style="margin-bottom:20px;">
       <div class="msa-card-header">
         <h3 style="margin:0;">전체 게놈 정렬 (F / Probe / R 결합을 한번에 보기)</h3>
-        <button id="msaFullscreenBtn" class="btn btn-secondary btn-fullscreen" title="전체화면">&#9974; 전체화면</button>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;"><button id="msaSnapBtn" class="btn btn-secondary btn-fullscreen" title="현재 필터가 적용된 정렬 전체(잘리는 부분 없이)를 PNG 이미지로 저장합니다. 컬럼을 선택해 두었으면 그 구간만 저장합니다.">&#128247; 이미지 저장</button>
+        <button id="msaCopyImgBtn" class="btn btn-secondary btn-fullscreen" title="같은 이미지를 클립보드로 복사합니다 (HTTPS 또는 localhost에서만 가능, 아니면 저장됩니다)">&#128203; 이미지 복사</button>
+        <button id="msaCopyTxtBtn" class="btn btn-secondary btn-fullscreen" title="정렬을 텍스트(accession | lineage | country 탭 서열)로 클립보드에 복사합니다. 컬럼을 선택해 두었으면 그 구간만 복사합니다.">&#128203; 텍스트 복사</button>
+        <button id="msaFullscreenBtn" class="btn btn-secondary btn-fullscreen" title="전체화면">&#9974; 전체화면</button></div>
       </div>
       ${renderMSA(setData)}
+    </div>
+
+    <div class="card probe-design-card" id="probeDesignCard" style="margin-bottom:20px;">
+      <div class="msa-card-header">
+        <h3 style="margin:0;">Probe 자동 설계 · 테스트 <span class="note">(이 세트의 F/R 사이에서 후보 생성)</span></h3>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+          <label class="note" title="표시할 후보 수 (최적 탐색에서는 전부 검증합니다)">후보 <input id="probeDesignTop" type="number" min="1" max="30" value="20" style="width:56px;"></label>
+          <label class="note" title="후보를 어디서 뽑을지: 자체 규칙 / Primer3의 internal oligo 설계 / 둘 다 (둘 다이면 절반씩)">후보 출처 <select id="probeDesignMethod"><option value="both">둘 다</option><option value="primer3">Primer3</option><option value="own">자체 규칙</option></select></label>
+          <label class="note" title="Probe Tm을 두 프라이머 중 더 높은 쪽보다 몇 도 높게 할지 (최소 ~ 최대). 기본 +3 ~ +10 °C">Tm + <input id="probeDesignTmMin" type="number" step="0.5" value="3" style="width:52px;">~<input id="probeDesignTmMax" type="number" step="0.5" value="10" style="width:52px;">&deg;C</label>
+          <label class="note" title="후보 1개에 넣을 수 있는 IUPAC(변이 허용, 예: R=A/G) 염기 수. 0이면 consensus 그대로">IUPAC 최대 <input id="probeDesignIupac" type="number" min="0" max="4" value="2" style="width:48px;"></label>
+          <label class="note" title="MFEprimer population 검색의 최대 mismatch (기본 0 = 파이프라인의 Probe 기준)">mismatch <input id="probeDesignMm" type="number" min="0" max="3" value="0" style="width:48px;"></label>
+          <button id="probeDesignRunBtn" class="btn btn-secondary">&#9654; Probe 설계 실행</button>
+          <button id="probeBestBtn" class="btn btn-primary" title="위 조건으로 후보를 만들고, 후보 전부를 실제 검증 과정에 태워 결과가 가장 좋은 Probe를 찾습니다 (후보당 약 7초, 후보 20개면 2~3분). 후보 수는 위의 '후보' 칸을 따릅니다 (이 버튼은 기본 20).">&#127942; 최적 Probe 자동 탐색</button>
+        </div>
+      </div>
+      <div id="probeDesignBody"><p class="note">불러오는 중...</p></div>
+      <div id="probeDesignBest"></div>
+      <div id="probeDesignValidations"></div>
     </div>
 
     <div class="card tree-card" style="margin-bottom:20px;">
@@ -1959,11 +2638,15 @@ function renderDetail(setData) {
     });
   });
 
+  initProbeDesign(detail, setData);
   const msaCard = detail.querySelector(".msa-card");
   const MSA_HEADER = `<div class="msa-card-header">
       <h3 style="margin:0;">전체 게놈 정렬 (F / Probe / R 결합을 한번에 보기)</h3>
       <div style="display:flex;gap:6px;">
         <button id="msaExportBtn" class="btn btn-secondary btn-fullscreen" title="FASTA로 내보내서 SeaLion(전문 정렬 뷰어)에서 열기">&#128190; SeaLion용 FASTA</button>
+        <button id="msaSnapBtn" class="btn btn-secondary btn-fullscreen" title="현재 필터가 적용된 정렬 전체(잘리는 부분 없이)를 PNG 이미지로 저장합니다. 컬럼을 선택해 두었으면 그 구간만 저장합니다.">&#128247; 이미지 저장</button>
+        <button id="msaCopyImgBtn" class="btn btn-secondary btn-fullscreen" title="같은 이미지를 클립보드로 복사합니다 (HTTPS 또는 localhost에서만 가능, 아니면 저장됩니다)">&#128203; 이미지 복사</button>
+        <button id="msaCopyTxtBtn" class="btn btn-secondary btn-fullscreen" title="정렬을 텍스트(accession | lineage | country 탭 서열)로 클립보드에 복사합니다. 컬럼을 선택해 두었으면 그 구간만 복사합니다.">&#128203; 텍스트 복사</button>
         <button id="msaFullscreenBtn" class="btn btn-secondary btn-fullscreen" title="전체화면">&#9974; 전체화면</button>
       </div>
     </div>`;
@@ -1995,6 +2678,12 @@ function renderDetail(setData) {
     if (baseSel) baseSel.addEventListener("change", (e) => { state.msaBaseline = e.target.value; refreshMsa(); });
     const fsBtn = $("#msaFullscreenBtn");
     if (fsBtn) fsBtn.addEventListener("click", () => toggleFullscreen(msaCard));
+    const snapBtn = $("#msaSnapBtn");
+    if (snapBtn) snapBtn.addEventListener("click", () => msaSnapshot(msaCard, setData, "save"));
+    const copyImgBtn = $("#msaCopyImgBtn");
+    if (copyImgBtn) copyImgBtn.addEventListener("click", () => msaSnapshot(msaCard, setData, "copy"));
+    const copyTxtBtn = $("#msaCopyTxtBtn");
+    if (copyTxtBtn) copyTxtBtn.addEventListener("click", () => msaCopyText(msaCard, setData));
     const exportBtn = $("#msaExportBtn");
     if (exportBtn) exportBtn.addEventListener("click", () => exportMsaFasta(setData));
   }
@@ -3222,6 +3911,7 @@ function renderGroupDetail(g) {
       <span class="pill">ALL (${g.members.length}개 세트 합집합)</span>
       <button id="deleteGroupBtn" class="btn btn-secondary" style="margin-left:auto;color:var(--bad);border-color:var(--bad);">그룹 삭제</button>
     </div>
+    ${finalResultBoxHtml(g.group_id)}
     <div class="detail-sub">구성 세트: ${memberChips}</div>
 
     ${renderSetAssessment(groupAssessmentInput(g))}
@@ -5635,7 +6325,49 @@ async function loadProfile() {
     if (h1) h1.textContent = `${PROFILE.short_name} Primer/Probe`;
   } catch { /* keep the defaults */ }
   applyProfileText();
+  renderTaxonLine();
+  initPipelineSwitch();
 }
+
+// ---- ICTV taxonomy (profiles/<id>.json "taxonomy"): species under the title, the full rank list in a pop-up ----
+function ictvCrumbHtml() {
+  const t = PROFILE.taxonomy;
+  if (!t || !t.ranks) return "";
+  return `<div class="ictv-crumb" title="${escHtml(t.source || "")}">ICTV 분류: ${t.ranks.map(([rk, nm], i) => (i === t.ranks.length - 1 ? `<i><b>${escHtml(nm)}</b></i>` : `<a class="ictv-open" title="${escHtml(rk)}">${escHtml(nm)}</a>`) + (i === t.ranks.length - 1 ? ` <span>(${escHtml(rk)})</span>` : "")).join(" &rsaquo; ")}</div>`;
+}
+function renderTaxonLine() {
+  const b = document.getElementById("taxonLine"), t = PROFILE.taxonomy;
+  if (!b || !t || !t.ranks) return;
+  const species = t.ranks[t.ranks.length - 1][1], genus = (t.ranks.find((r) => r[0] === "Genus") || [])[1];
+  b.innerHTML = `ICTV · <i>${escHtml(species)}</i> <span style="opacity:.7;">(${escHtml(genus || "")})</span> &#9656;`;
+  b.hidden = false;
+  b.onclick = openTaxonomyModal;
+}
+function openTaxonomyModal() {
+  const t = PROFILE.taxonomy;
+  if (!t) return;
+  openDetailModal({
+    title: `ICTV 분류 &mdash; ${escHtml(t.virus || PROFILE.short_name)}`, subtitle: "Realm &rsaquo; &hellip; &rsaquo; Family &rsaquo; Genus &rsaquo; Species", compact: true,
+    html: `<div class="ictv-ranks">${t.ranks.map(([rk, nm], i) => `<div class="rk">${escHtml(rk)}</div><div class="nm" style="padding-left:${Math.min(i, 9) * 6}px;">${i === t.ranks.length - 1 ? `<i>${escHtml(nm)}</i>` : escHtml(nm)}</div>`).join("")}</div>
+      ${t.former_species ? `<p class="note">이전 종 이름: <i>${escHtml(t.former_species)}</i></p>` : ""}
+      <p class="note">${escHtml(t.source || "")}</p>`,
+  });
+}
+// the LASV / NiV switch in the sidebar: the dashboards listed in entry/pipelines.json, opened on the same host
+async function initPipelineSwitch() {
+  const box = document.getElementById("pipelineSwitch");
+  const link = document.getElementById("entryLink");
+  if (link) link.href = `${location.protocol}//${location.hostname}:8760/`;
+  if (!box) return;
+  let list = [];
+  try { list = await fetchJSON("/api/pipelines"); } catch (e) { /* stand-alone project */ }
+  if (list.length < 2) return;
+  box.innerHTML = list.map((p) => (p.current
+    ? `<span class="pipe-pill current" title="지금 보고 있는 대시보드">${escHtml(p.name)}</span>`
+    : `<a class="pipe-pill" href="${location.protocol}//${location.hostname}:${p.port}/" title="${escHtml(p.name)} 대시보드로 이동">${escHtml(p.name)}</a>`)).join("");
+  box.hidden = false;
+}
+document.addEventListener("click", (e) => { if (e.target.closest(".ictv-open")) openTaxonomyModal(); });
 function splitLineageKeys(segData) {
   const keys = Object.keys(segData.windows || {}).sort();
   return { real: keys.filter((k) => k !== ALL_LASV_KEY), hasAll: keys.includes(ALL_LASV_KEY) };
@@ -6493,6 +7225,474 @@ async function showGeneConservationPage() {
   }
 }
 $("#geneConsBtn").addEventListener("click", showGeneConservationPage);
+
+// ---------------------------------------------------------------------------------------
+// 리니지별 재설계 (varVAMP): per lineage (clade) a degenerate F/Probe/R scheme is designed from that lineage's alignment, then every
+// design goes through the pipeline's real validation. Results exist only on this page (output/redesign/), not in the overview.
+const RD = { seg: null, running: false, engine: "varvamp" };
+
+function rdDesignRow(d, L, run) {
+  const pct = (v) => (v == null ? "&mdash;" : `${Number(v).toFixed(1)}%`);
+  const own = d.own_validated != null ? `<b>${d.own_validated} / ${d.own_total}</b> (${d.own_total ? (100 * d.own_validated / d.own_total).toFixed(1) : "0.0"}%)` : "&mdash;";
+  const chips = (d.lineages || []).filter((x) => x.validated).map((x) => `<span class="pill ${x.lineage === L ? "pill-ok" : "pill-warn"}" title="${escHtml(x.lineage)}: ${x.validated} / ${x.total}">${escHtml(x.lineage)} ${x.validated}/${x.total}</span>`).join(" ");
+  const seqCell = (k, label) => `<div><span class="note">${label}</span> <span class="mono">${escHtml(d[k])}</span> <button type="button" class="btn btn-secondary probe-copy" data-seq="${escHtml(d[k])}" style="padding:0 6px;" title="서열 복사">&#128203;</button> <span class="note" ${k === "P" && d.P_note ? `title="${escHtml(d.P_note)}"` : ""}>${k === "P" && d.P_note ? "⚠ " : ""}${d[k + "_tm"] != null ? `Tm ${d[k + "_tm"]}&deg;C` : ""}${d[k + "_gc"] != null ? ` · ${d[k + "_gc"]}%GC` : ""}${k === "P" && d.P_source ? ` · Probe: ${({ own: "자체 규칙", primer3: "Primer3", "own+primer3": "자체+Primer3" })[d.P_source] || d.P_source}` : ""}</span></div>`;
+  return `<tr>
+    <td class="mono">${escHtml(d.name)}</td>
+    <td>${seqCell("F", "F")}${seqCell("P", "P")}${seqCell("R", "R")}</td>
+    <td>${d.amplicon_len ?? "&mdash;"} bp<div class="note">${d.pair_cov != null ? `표본 쌍 커버리지 ${d.pair_cov}%` : `penalty ${d.penalty ?? "&mdash;"} · ΔG ${d.deltaG ?? "&mdash;"}`}</div></td>
+    <td>${own}</td>
+    <td>${d.validated ?? "&mdash;"} (${pct(d.validated_pct)})<div style="margin-top:2px;">${chips}</div></td>
+    <td>${pct(d.probe_pct)}<div class="note">dropout ${d.dropout ?? "&mdash;"}</div></td>
+    <td>${d.std_ok ? "✅" : "✗"}</td>
+    <td><button type="button" class="btn btn-secondary rd-msa-btn" data-dir="${escHtml(d.dir)}" data-name="${escHtml(L + " / " + d.name)}">&#129516; MSA 보기</button></td></tr>`;
+}
+
+function renderRedesignResults(run, seg) {
+  if (!run || !run.generated) return "<p class='note'>아직 실행하지 않았습니다. 위에서 리니지를 고르고 \"재설계 실행\"을 누르세요.</p>";
+  const stale = state.hostScope && run.host_scope && state.hostScope !== run.host_scope;
+  const head = `<p class="note">${escHtml(run.generated)} 실행 · <span class="pill pill-ok">${run.engine === "primerhunter" ? "PrimerHunter" : "varVAMP"}</span> ${pdScopeBadge(run.host_scope)} <span class="note">(집계 대상 ${run.population_n}개)</span>${run.done ? "" : " · <b>진행 중... 아래는 지금까지의 결과입니다</b>"}</p>`;
+  const blocks = (run.lineages || []).map((e) => {
+    const title = e.lineage === "ALL" ? "전체 (pan, 리니지 구분 없이)" : escHtml(e.lineage);
+    if (e.status !== "ok") return `<div class="card" style="margin-top:10px;"><h4 style="margin:0;">${title} <span class="note">(${e.n}개)</span> <span class="pill pill-warn">${e.status === "skipped" ? "건너뜀" : "설계 없음"}</span></h4><p class="note">${escHtml(e.message || "")}</p></div>`;
+    const cv = e.cover && e.cover.steps && e.cover.steps.length ? `<div style="margin:6px 0;padding:6px 10px;border:1px solid var(--border);border-radius:var(--r-md);background:rgba(84,162,74,.08);">
+        <b>세트 커버</b> <span class="note">(설계를 함께 썼을 때 실제 검증을 통과하는 게놈 — 게놈을 가장 많이 추가하는 순서)</span>
+        <div>${e.cover.steps.map((st, i) => `<span class="pill pill-ok" title="이 설계가 새로 추가한 게놈 ${st.added}개">${i ? "+ " : ""}${escHtml(st.name)} <b>+${st.added}</b> → ${st.covered} (${st.pct}%)</span>`).join(" ")}</div>
+        <div style="margin-top:4px;"><b>합계 ${e.cover.covered} / ${e.cover.total} (${e.cover.pct}%)</b> <span class="note">설계 ${e.cover.steps.length}개 사용 · 위 표의 "이 리니지 Validated"는 설계 하나씩의 값입니다</span></div></div>` : "";
+    return `<div class="card" style="margin-top:10px;"><h4 style="margin:0;">${title} <span class="note">(${e.n}개 게놈 · ${e.sample_n ? `PrimerHunter 대표 표본 ${e.sample_n}개` : `consensus 임계값 ${e.threshold}`})</span></h4>${cv}
+      <div style="overflow:auto;"><table class="mini-reference-table"><tr><th>설계</th><th>서열 (5′→3′, IUPAC 포함)</th><th>Amplicon</th><th>${e.lineage === "ALL" ? "" : "이 리니지 Validated"}</th><th>전체 Validated <span class="note">(통과한 리니지)</span></th><th>Probe 일치</th><th>표준물질</th><th></th></tr>
+      ${e.designs.map((d) => rdDesignRow(d, e.lineage, run)).join("")}</table></div></div>`;
+  }).join("");
+  return head + (stale ? `<p class="note"><span class="pill pill-warn">지금 화면의 숙주 기준과 다릅니다</span> 이 결과는 ${escHtml(PD_SCOPE_LABEL[run.host_scope] || run.host_scope)} 기준입니다.</p>` : "") + blocks;
+}
+
+async function showRedesignPage() {
+  state.activeId = null; state.activeType = null;
+  renderSidebar();
+  showMainView("redesignView");
+  const view = $("#redesignView");
+  const segs = Object.keys((state.hostInfo || {}).segments || {}).map((x) => x.toUpperCase());
+  const allSegs = segs.length ? segs : ["S", "L"];
+  if (!RD.seg || !allSegs.includes(RD.seg)) RD.seg = allSegs[0];
+  view.innerHTML = "<p class='note'>불러오는 중...</p>";
+  let run;
+  try { run = await fetchJSON(`/api/redesign/${RD.seg.toLowerCase()}/run?engine=${RD.engine}`); } catch (e) { view.innerHTML = `<p class="note">불러오기 실패: ${escHtml(e.message)}</p>`; return; }
+  const avail = run.available || {};
+  const checked = RD.checked || {};
+  view.innerHTML = `
+    <h2>🛠 리니지별 재설계</h2>
+    <p class="note">리니지(클레이드)마다 <b>varVAMP</b>(그 리니지의 전체 게놈 정렬, qPCR 모드로 degenerate F/R + Probe) 또는 <b>PrimerHunter</b>(대표 게놈 표본에서 Tm 기반으로 F/R 쌍과 쌍 집합을 설계하고 Probe는 이 도구의 Probe 설계기로 추가)로 프라이머·Probe를 새로 설계하고, 설계된 세트를 <b>이 파이프라인의 실제 검증</b>(F/R mismatch ≤ 기준 + 3′ 끝, Probe 완전 일치, 표준물질, dimer/hairpin)에 태웁니다.
+      consensus 임계값은 높은 값부터 낮춰 가며 설계가 나올 때까지 시도합니다. 결과는 이 페이지에서만 보이며 개요·요약·보고서에는 들어가지 않습니다. 설계는 후보일 뿐이라 합성 전 실험 확인이 필요합니다.</p>
+    <div class="seg-tab-row">${allSegs.map((x) => `<button class="seg-tab ${x === RD.seg ? "active" : ""}" data-rdseg="${x}">${x}</button>`).join("")}</div>
+    <div class="card">
+      <div class="table-toolbar" style="flex-wrap:wrap;gap:12px;">
+        <span class="note">숙주 기준 ${pdScopeBadge(run.active_scope)}</span>
+        <label class="note" title="설계 도구. PrimerHunter는 느립니다(리니지당 수 분~수십 분)">도구 <select id="rdEngine"><option value="varvamp" ${RD.engine === "varvamp" ? "selected" : ""}>varVAMP</option><option value="primerhunter" ${RD.engine === "primerhunter" ? "selected" : ""}>PrimerHunter</option></select></label>
+        <label class="note" ${RD.engine === "primerhunter" ? "" : 'hidden'} title="PrimerHunter는 모든 게놈이 아니라 가장 다양한 대표 게놈 N개로 설계합니다 (검증은 리니지 전체로)">대표 표본 <input id="rdSample" type="number" min="5" max="100" value="${RD.sample ?? 25}" style="width:56px;"></label>
+        <label class="note" ${RD.engine === "primerhunter" ? "" : 'hidden'} title="프라이머-표본 결합의 최소 Tm(℃). 높일수록 mismatch가 적은(우리 검증 기준에 가까운) 프라이머만 남지만 후보가 줄어듭니다">최소 Tm <input id="rdMinTm" type="number" min="40" max="70" value="${RD.minTm ?? 56}" style="width:56px;"></label>
+        <label class="note" ${RD.engine === "primerhunter" ? "" : 'hidden'} title="한 프라이머가 이 비율 이상의 표본에 결합해야 합니다. 100 미만이면 여러 쌍으로 전체를 덮는 세트 커버를 씁니다">최소 커버리지 % <input id="rdMinCov" type="number" min="10" max="100" value="${RD.minCov ?? 80}" style="width:56px;"></label>
+        <label class="note" title="consensus 임계값: 높을수록 특이적이지만 설계가 안 나올 수 있습니다">임계값 <input id="rdThr" type="number" step="0.05" min="0.3" max="1" value="${RD.thr ?? 0.9}" style="width:62px;"> → 최저 <input id="rdMinThr" type="number" step="0.05" min="0.3" max="1" value="${RD.minThr ?? 0.6}" style="width:62px;"></label>
+        <label class="note" title="F/R 프라이머 하나에 넣을 수 있는 모호 염기(IUPAC) 최대 수">F/R IUPAC <input id="rdAmbig" type="number" min="0" max="8" value="${RD.ambig ?? 2}" style="width:48px;"></label>
+        <label class="note" title="Probe의 모호 염기 최대 수 (프라이머보다 엄격하게 1 적게가 권장)">Probe IUPAC <input id="rdPAmbig" type="number" min="0" max="6" value="${RD.pAmbig ?? 1}" style="width:48px;"></label>
+        <label class="note" title="리니지마다 검증할 설계 수">설계 수 <input id="rdTop" type="number" min="1" max="8" value="${RD.top ?? 3}" style="width:48px;"></label>
+        <label class="note" title="게놈이 이보다 적은 리니지는 건너뜁니다">최소 게놈 수 <input id="rdMinN" type="number" min="3" max="1000" value="${RD.minN ?? 5}" style="width:56px;"></label>
+        <button id="rdRunBtn" class="btn btn-primary">&#9654; 재설계 실행</button>
+      </div>
+      <div style="margin-top:8px;"><b class="note">리니지 선택</b>
+        ${Object.entries(avail).map(([L, n]) => `<label class="note" style="margin-right:12px;"><input type="checkbox" class="rd-lin" value="${escHtml(L)}" ${(checked[L] ?? n >= (RD.minN ?? 5)) ? "checked" : ""}> ${escHtml(L)} <span class="mono">${n}</span></label>`).join("")}
+        <label class="note" style="margin-right:12px;"><input type="checkbox" id="rdAll" ${RD.all ? "checked" : ""}> 전체(pan)도 함께</label></div>
+      <div id="rdStatus" class="note" style="margin-top:6px;"></div>
+    </div>
+    <div id="rdResults">${renderRedesignResults(run, RD.seg)}</div>`;
+  const results = view.querySelector("#rdResults"), statusEl = view.querySelector("#rdStatus"), runBtn = view.querySelector("#rdRunBtn");
+  view.querySelectorAll("[data-rdseg]").forEach((b) => b.addEventListener("click", () => { RD.seg = b.dataset.rdseg; showRedesignPage(); }));
+  view.querySelector("#rdEngine").addEventListener("change", (e) => { RD.engine = e.target.value; showRedesignPage(); });
+  results.addEventListener("click", (e) => {
+    const c = e.target.closest(".probe-copy");
+    if (c) { copyTextToClipboard(c.dataset.seq).then(() => { c.textContent = "✓"; setTimeout(() => { c.innerHTML = "&#128203;"; }, 1000); }).catch(() => uiAlert("복사하지 못했습니다.")); return; }
+    const m = e.target.closest(".rd-msa-btn");
+    if (m) openProbeMsaModal({ set_id: m.dataset.name }, "", `/api/redesign/${RD.seg.toLowerCase()}/msa?engine=${RD.engine}&host=${encodeURIComponent(state.hostScope || "")}&dir=${encodeURIComponent(m.dataset.dir)}`,
+      `전체 게놈 정렬 (MSA) &mdash; 재설계 ${escHtml(m.dataset.name)}`);
+  });
+  const poll = async (jobId) => {
+    RD.running = true; runBtn.disabled = true;
+    for (;;) {
+      let j;
+      try { j = await fetchJSON(`/api/jobs/${jobId}`); } catch (e) { break; }
+      if (!document.body.contains(results)) { RD.running = false; return; }
+      if (j.status !== "running") { if (j.status === "error") uiAlert("재설계에 실패했습니다: " + (j.error || "")); break; }
+      statusEl.textContent = `⏳ ${j.progress || ""} (${j.elapsed_sec ?? 0}초)`;
+      try { results.innerHTML = renderRedesignResults(await fetchJSON(`/api/redesign/${RD.seg.toLowerCase()}/run?engine=${RD.engine}`), RD.seg); } catch (e) { /* keep the last view */ }
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+    RD.running = false; runBtn.disabled = false; statusEl.textContent = "";
+    if (document.body.contains(results)) results.innerHTML = renderRedesignResults(await fetchJSON(`/api/redesign/${RD.seg.toLowerCase()}/run?engine=${RD.engine}`), RD.seg);
+  };
+  runBtn.addEventListener("click", async () => {
+    const num = (id) => Number(view.querySelector(id).value);
+    Object.assign(RD, { thr: num("#rdThr"), minThr: num("#rdMinThr"), ambig: num("#rdAmbig"), pAmbig: num("#rdPAmbig"), top: num("#rdTop"), minN: num("#rdMinN"), all: view.querySelector("#rdAll").checked, sample: num("#rdSample"), minCov: num("#rdMinCov"), minTm: num("#rdMinTm") });
+    RD.checked = Object.fromEntries([...view.querySelectorAll(".rd-lin")].map((x) => [x.value, x.checked]));
+    const lineages = [...view.querySelectorAll(".rd-lin:checked")].map((x) => x.value);
+    if (!lineages.length && !RD.all) { uiAlert("리니지를 하나 이상 고르세요."); return; }
+    if (!(await uiConfirm(`${lineages.length}개 리니지${RD.all ? " + 전체" : ""}를 설계하고 설계마다 실제 검증을 돌립니다. ${RD.engine === "primerhunter" ? "PrimerHunter는 리니지당 수 분에서 수십 분이 걸리고 CPU를 여러 개 씁니다." : "리니지당 1분 안팎이 걸립니다."} 그동안 서버가 계산에 쓰입니다. 계속할까요?`, { title: "리니지별 재설계", okLabel: "시작" }))) return;
+    try {
+      const { job_id, error } = await fetchJSON("/api/redesign", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ segment: RD.seg.toLowerCase(), host: state.hostScope, lineages, include_all: RD.all, threshold: RD.thr, min_threshold: RD.minThr, ambig: RD.ambig, probe_ambig: RD.pAmbig, top: RD.top, min_n: RD.minN, engine: RD.engine, ph_sample: RD.sample, ph_min_cov: RD.minCov, ph_min_tm: RD.minTm }) });
+      if (error) throw new Error(error);
+      poll(job_id);
+    } catch (err) { uiAlert("재설계를 시작하지 못했습니다: " + err.message); }
+  });
+  try {                                                         // pick up a run that is already going (started from another computer)
+    const active = (await fetchJSON("/api/jobs/active")).find((j) => j.kind === "redesign");
+    if (active) poll(active.job_id);
+  } catch (e) { /* ignore */ }
+}
+$("#redesignBtn").addEventListener("click", showRedesignPage);
+
+// 사이드바 메뉴 묶음(분석·설계·정보·관리): 열림/닫힘을 이 브라우저에 기억합니다.
+(function initMenuGroups() {
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem("lasv_menu_open") || "{}"); } catch (e) { /* ignore */ }
+  document.querySelectorAll(".menu-group").forEach((d) => {
+    const k = d.dataset.menu;
+    if (k in saved) d.open = !!saved[k];
+    d.addEventListener("toggle", () => {
+      saved[k] = d.open;
+      try { localStorage.setItem("lasv_menu_open", JSON.stringify(saved)); } catch (e) { /* ignore */ }
+    });
+  });
+})();
+
+// ---------------------------------------------------------------------------------------
+// 사이드바 접기 / 펼치기 (« / », Ctrl+B) -- 선택은 이 브라우저에 기억됩니다.
+(function initSidebarCollapse() {
+  const app = $("#appRoot"), openBtn = $("#sidebarOpenBtn"), closeBtn = $("#sidebarCollapseBtn");
+  const apply = (collapsed) => {
+    app.classList.toggle("sidebar-collapsed", collapsed);
+    openBtn.hidden = !collapsed;
+    try { localStorage.setItem("lasv_sidebar_collapsed", collapsed ? "1" : "0"); } catch (e) { /* private mode */ }
+  };
+  closeBtn.addEventListener("click", () => apply(true));
+  openBtn.addEventListener("click", () => apply(false));
+  document.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "b" && !/^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || "")) {
+      e.preventDefault(); apply(!app.classList.contains("sidebar-collapsed"));
+    }
+  });
+  let saved = null;
+  try { saved = localStorage.getItem("lasv_sidebar_collapsed"); } catch (e) { /* ignore */ }
+  apply(saved === "1");
+})();
+
+// parent / variants / identical-sequence facts of a set (computed by the server, see annotate_set_relations)
+function relationsHtml(setId) {
+  const me = state.sets.find((x) => x.set_id === setId);
+  if (!me) return "";
+  const nameOf = (id) => ((state.sets.find((x) => x.set_id === id) || {}).display_name || id);
+  const link = (id) => `<a href="#" class="rel-link" data-set-id="${escHtml(id)}">${escHtml(nameOf(id))}</a>`;
+  const parts = [];
+  if (me.parent_id) parts.push(`<b>변이 세트</b> · 부모: ${link(me.parent_id)} <span class="note">(${me.parent_origin === "manual" ? "직접 지정" : "이름 규칙 \"-숫자\"로 추정"})</span>`);
+  const variants = state.sets.filter((x) => x.parent_id === setId);
+  if (variants.length) parts.push(`<b>변이 ${variants.length}개</b>: ${variants.map((v) => link(v.set_id)).join(" · ")}`);
+  if (me.duplicate_ids && me.duplicate_ids.length) parts.push(`<span class="dup-badge">동일 서열</span> F/R/Probe가 같은 세트: ${me.duplicate_ids.map(link).join(" · ")} <span class="note">(이름만 다른 중복 등록이면 하나만 남기거나 그룹에서 한쪽만 쓰세요)</span>`);
+  return `<div class="relations-box note">${parts.map((x) => `<div>${x}</div>`).join("")}<div><button type="button" class="btn btn-secondary rel-parent-edit" data-set-id="${escHtml(setId)}" style="padding:1px 10px;">부모 세트 ${me.parent_id ? "변경" : "지정"}</button></div></div>`;
+}
+
+document.addEventListener("click", async (e) => {
+  const lk = e.target.closest(".rel-link");
+  if (lk) { e.preventDefault(); selectSet(lk.dataset.setId); return; }
+  const eb = e.target.closest(".rel-parent-edit");
+  if (!eb) return;
+  const me = state.sets.find((x) => x.set_id === eb.dataset.setId);
+  if (!me) return;
+  const cands = state.sets.filter((x) => x.segment === me.segment && x.set_id !== me.set_id && !x.parent_id)
+    .sort((a, b) => (a.display_name || a.set_id).localeCompare(b.display_name || b.set_id, undefined, { numeric: true }));
+  const { close, overlay } = openDetailModal({
+    title: "부모 세트 지정", subtitle: `${escHtml(me.display_name || me.set_id)}가 어느 세트에서 변형한 것인지 고릅니다 (한 단계만 지원)`, compact: true,
+    html: `<select id="relParentSel" style="width:100%;margin:8px 0;"><option value="">(부모 없음)</option>${cands.map((c) => `<option value="${escHtml(c.set_id)}" ${c.set_id === me.parent_id ? "selected" : ""}>${escHtml(c.display_name || c.set_id)}</option>`).join("")}</select>
+      <button type="button" class="btn btn-primary" id="relParentSave">저장</button> <span class="note" id="relParentMsg"></span>`,
+  });
+  overlay.querySelector("#relParentSave").addEventListener("click", async () => {
+    const parent = overlay.querySelector("#relParentSel").value;
+    try {
+      const r = await fetch(`/api/set-parent/${encodeURIComponent(me.set_id)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ parent }) });
+      const out = await r.json();
+      if (!r.ok) throw new Error(out.error || r.status);
+      close(); await loadSets(); selectSet(me.set_id);
+    } catch (err) { overlay.querySelector("#relParentMsg").textContent = "저장 실패: " + err.message; }
+  });
+});
+
+// ---------------------------------------------------------------------------------------
+// 사용자의 최종 결과(판정): 세트·그룹마다 채택 / 보류 / 탈락 + 한 줄 메모. 이 대시보드를 쓰는 사람이 직접 정하는 표시이며 파이프라인 계산에는 쓰이지 않습니다.
+const FR_LABEL = { adopt: "✅ 채택", hold: "⏸ 보류", reject: "✖ 탈락" };
+state.finalResults = {};
+async function loadFinalResults() {
+  try { state.finalResults = await fetchJSON("/api/final-results"); } catch (e) { /* keep the last known */ }
+}
+function finalChipHtml(id) {
+  const r = (state.finalResults || {})[id];
+  if (!r || (!r.verdict && !r.note)) return '<span class="note">&mdash;</span>';
+  return `${r.verdict ? `<span class="fr-chip ${r.verdict}" title="${escHtml(r.updated || "")}">${FR_LABEL[r.verdict]}</span>` : ""}${r.note ? `<div class="note" title="${escHtml(r.note)}" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(r.note)}</div>` : ""}`;
+}
+function finalResultBoxHtml(id) { return `<div class="final-result-box" data-fr-id="${escHtml(id)}"></div>`; }
+function initFinalResult(root) {
+  const box = root && root.querySelector(".final-result-box");
+  if (!box) return;
+  const id = box.dataset.frId;
+  const draw = () => {
+    const r = (state.finalResults || {})[id] || { verdict: "", note: "" };
+    box.innerHTML = `<span class="fr-label">최종 결과</span>
+      ${["adopt", "hold", "reject"].map((v) => `<button type="button" class="fr-btn ${v} ${r.verdict === v ? "on" : ""}" data-verdict="${v}">${FR_LABEL[v]}</button>`).join("")}
+      <button type="button" class="fr-btn" data-verdict="" title="판정을 지웁니다">미정</button>
+      <input type="text" class="fr-note" maxlength="500" placeholder="사유·메모 (예: 실험 후 채택, GPC 쪽이 더 안정적...)" value="${escHtml(r.note || "")}">
+      <span class="note fr-status">${r.updated ? `마지막 저장 ${escHtml(r.updated)}` : "아직 표시하지 않았습니다"}</span>`;
+  };
+  const save = async (verdict, note) => {
+    const st = box.querySelector(".fr-status");
+    if (st) st.textContent = "저장 중...";
+    try {
+      const out = await fetchJSON(`/api/final-results/${encodeURIComponent(id)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ verdict, note }) });
+      if (out.result) state.finalResults[id] = out.result; else delete state.finalResults[id];
+      draw();
+    } catch (e) { if (st) st.textContent = "저장 실패: " + e.message; }
+  };
+  draw();
+  box.addEventListener("click", (e) => {
+    const b = e.target.closest(".fr-btn");
+    if (b) save(b.dataset.verdict, box.querySelector(".fr-note").value);
+  });
+  box.addEventListener("change", (e) => {
+    if (e.target.classList.contains("fr-note")) save(((state.finalResults || {})[id] || {}).verdict || "", e.target.value);
+  });
+}
+
+// ---------------------------------------------------------------------------------------
+// 커버리지 벤 다이어그램: which genomes do the selected primer sets / groups validate -- union, intersection, every overlap region and the genomes
+// no selected set catches (population minus union). Built from /api/venn (validated ids per set and group, in the active host scope).
+const VN = { seg: null, selected: null, lineage: "ALL", data: null, region: null };
+const VN_COLORS = ["#4C78A8", "#F2A65A", "#54A24B", "#B279A2", "#E45756", "#72B7B2", "#9D755D", "#BAB0AC"];
+
+function vnEllipses(k) {
+  // unit-space geometry [cx, cy, a, b, rotation deg]; scale/offset to pixels in vnToPx
+  if (k === 1) return { es: [[0, 0, 1, 1, 0]], scale: 130 };
+  if (k === 2) return { es: [[-0.55, 0, 1, 1, 0], [0.55, 0, 1, 1, 0]], scale: 125 };
+  if (k === 3) return { es: [[-0.55, -0.35, 1, 1, 0], [0.55, -0.35, 1, 1, 0], [0, 0.6, 1, 1, 0]], scale: 105 };
+  return { es: [[-0.7, -0.3, 2.0, 1.1, 45], [-0.2, -0.7, 2.0, 1.1, 45], [0.2, -0.7, 2.0, 1.1, -45], [0.7, -0.3, 2.0, 1.1, -45]], scale: 78 };
+}
+function vnInside(e, x, y) {
+  const t = (e[4] * Math.PI) / 180, dx = x - e[0], dy = y - e[1];
+  const u = dx * Math.cos(t) + dy * Math.sin(t), w = -dx * Math.sin(t) + dy * Math.cos(t);
+  return (u / e[2]) ** 2 + (w / e[3]) ** 2 <= 1;
+}
+function vnMask(es, x, y) { let m = 0; es.forEach((e, i) => { if (vnInside(e, x, y)) m |= 1 << i; }); return m; }
+
+function vnCompute() {
+  const d = VN.data, sel = d.items.filter((it) => VN.selected.has(it.key));
+  const inLin = (lin) => VN.lineage === "ALL" || lin === VN.lineage;
+  const sets = sel.map((it) => new Set(it.ids));
+  const maskOf = (id) => { let m = 0; sets.forEach((st, i) => { if (st.has(id)) m |= 1 << i; }); return m; };
+  const byMask = new Map(), all = [];
+  const perLin = new Map();
+  for (const [id, lin, country] of d.genomes) {
+    const m = maskOf(id);
+    const rec = { id, lin, country, m };
+    if (!perLin.has(lin)) perLin.set(lin, { n: 0, union: 0, inter: 0, none: 0, each: sel.map(() => 0) });
+    const pl = perLin.get(lin);
+    pl.n += 1; if (m) pl.union += 1; else pl.none += 1; if (sel.length && m === (1 << sel.length) - 1) pl.inter += 1;
+    sel.forEach((_, i) => { if (m & (1 << i)) pl.each[i] += 1; });
+    if (!inLin(lin)) continue;
+    all.push(rec);
+    if (!byMask.has(m)) byMask.set(m, []);
+    byMask.get(m).push(rec);
+  }
+  const n = all.length, full = (1 << sel.length) - 1;
+  const union = all.filter((r) => r.m).length, inter = sel.length ? (byMask.get(full) || []).length : 0;
+  return { sel, byMask, all, n, union, inter, none: n - union, full, perLin };
+}
+
+function vnRegionName(m, sel) {
+  if (!m) return "어느 세트도 못 잡음";
+  const names = sel.filter((_, i) => m & (1 << i)).map((x) => x.name);
+  const only = names.length === 1;
+  return only ? `${names[0]} 단독` : names.join(" ∩ ");
+}
+
+function vnDiagram(c) {
+  const k = c.sel.length;
+  if (k < 1 || k > 4) return "";
+  const { es, scale } = vnEllipses(k), W = 560, H = 430, cx = 280, cy = 215;
+  const toPx = (x, y) => [cx + x * scale, cy + y * scale];
+  // a representative point inside every region (the sampled point of the region nearest to its centroid)
+  const pts = new Map();
+  for (let i = -330; i <= 330; i += 3) for (let j = -330; j <= 330; j += 3) {
+    const x = i / 100, y = j / 100, m = vnMask(es, x, y);
+    if (!m) continue;
+    if (!pts.has(m)) pts.set(m, []);
+    pts.get(m).push([x, y]);
+  }
+  const anchor = (m) => {
+    const a = pts.get(m); if (!a || !a.length) return null;
+    const mx = a.reduce((s2, p) => s2 + p[0], 0) / a.length, my = a.reduce((s2, p) => s2 + p[1], 0) / a.length;
+    return a.reduce((best, p) => ((p[0] - mx) ** 2 + (p[1] - my) ** 2 < (best[0] - mx) ** 2 + (best[1] - my) ** 2 ? p : best), a[0]);
+  };
+  const shapes = es.map((e, i) => {
+    const [px, py] = toPx(e[0], e[1]);
+    return `<ellipse cx="${px}" cy="${py}" rx="${e[2] * scale}" ry="${e[3] * scale}" transform="rotate(${e[4]} ${px} ${py})" fill="${VN_COLORS[i]}" fill-opacity=".22" stroke="${VN_COLORS[i]}" stroke-width="2.5"/>`;
+  }).join("");
+  const labels = [...pts.keys()].map((m) => {
+    const a = anchor(m), cnt = (c.byMask.get(m) || []).length, [px, py] = toPx(a[0], a[1]);
+    const pct = c.n ? (100 * cnt / c.n).toFixed(1) : "0.0";
+    const hot = VN.region === m;
+    return `<g class="vn-region-label" data-mask="${m}" style="cursor:pointer;"><title>${escHtml(vnRegionName(m, c.sel))}: ${cnt}개 (${pct}%)</title>
+      <text x="${px}" y="${py}" text-anchor="middle" font-size="${k === 4 ? 14 : 18}" font-weight="700" fill="currentColor"${hot ? ' text-decoration="underline"' : ""}>${cnt}</text>
+      ${k <= 3 ? `<text x="${px}" y="${py + 15}" text-anchor="middle" font-size="11" fill="currentColor" opacity=".7">${pct}%</text>` : ""}</g>`;
+  }).join("");
+  const none = c.none, nonePct = c.n ? (100 * none / c.n).toFixed(1) : "0.0";
+  return `<svg id="vnSvg" viewBox="0 0 ${W} ${H}" style="width:100%;max-width:640px;height:auto;display:block;margin:auto;color:var(--fg);">
+    <rect x="4" y="4" width="${W - 8}" height="${H - 8}" rx="12" fill="none" stroke="var(--border)" stroke-width="2"/>
+    <text x="16" y="24" font-size="12" fill="currentColor" opacity=".75">전체 ${c.n}개${VN.lineage === "ALL" ? "" : ` (${escHtml(VN.lineage)})`}</text>
+    ${shapes}${labels}
+    <g class="vn-region-label" data-mask="0" style="cursor:pointer;"><title>어느 세트도 못 잡는 유전체</title>
+      <rect x="${W - 150}" y="${H - 52}" width="138" height="40" rx="8" fill="var(--bad)" fill-opacity=".14" stroke="var(--bad)"/>
+      <text x="${W - 81}" y="${H - 34}" text-anchor="middle" font-size="12" fill="currentColor">못 잡음 (차집합)</text>
+      <text x="${W - 81}" y="${H - 18}" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">${none} (${nonePct}%)</text></g>
+  </svg>`;
+}
+
+function vnRegionTable(c) {
+  const rows = [...c.byMask.entries()].sort((a, b) => b[1].length - a[1].length).map(([m, arr]) => {
+    const pct = c.n ? (100 * arr.length / c.n).toFixed(1) : "0.0";
+    const bad = m === 0;
+    return `<tr class="vn-region-row" data-mask="${m}" style="cursor:pointer;${bad ? "background:rgba(228,87,86,.08);" : ""}"><td>${escHtml(vnRegionName(m, c.sel))}</td>
+      <td>${c.sel.map((_, i) => `<span class="dot" style="background:${m & (1 << i) ? VN_COLORS[i] : "transparent"};border:1px solid ${VN_COLORS[i]};display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:2px;"></span>`).join("")}</td>
+      <td><b>${arr.length}</b></td><td>${pct}%</td></tr>`;
+  }).join("");
+  return `<table class="mini-reference-table"><tr><th>영역 (겹침 조합)</th><th></th><th>유전체 수</th><th>전체 대비</th></tr>${rows}</table>`;
+}
+
+function vnLineageTable(c) {
+  const lins = [...c.perLin.keys()].sort((a, b) => a.localeCompare(b));
+  const pct = (v, n) => (n ? (100 * v / n).toFixed(1) : "0.0");
+  const head = `<tr><th>${escHtml((PROFILE.lineage && PROFILE.lineage.label) || "Lineage")}</th><th>유전체</th>${c.sel.map((x, i) => `<th style="border-bottom:3px solid ${VN_COLORS[i]};">${escHtml(x.name)}</th>`).join("")}<th>합집합</th><th>교집합</th><th>못 잡음</th></tr>`;
+  const body = lins.map((L) => {
+    const r = c.perLin.get(L), cur = VN.lineage === L;
+    return `<tr${cur ? ' style="background:rgba(76,120,168,.12);"' : ""}><td><a href="#" class="vn-pick-lin" data-lin="${escHtml(L)}">${escHtml(L)}</a></td><td>${r.n}</td>
+      ${r.each.map((v) => `<td>${v} <span class="note">${pct(v, r.n)}%</span></td>`).join("")}
+      <td><b>${r.union}</b> <span class="note">${pct(r.union, r.n)}%</span></td><td>${r.inter} <span class="note">${pct(r.inter, r.n)}%</span></td>
+      <td><a href="#" class="vn-none-lin" data-lin="${escHtml(L)}" style="color:var(--bad);font-weight:600;">${r.none}</a> <span class="note">${pct(r.none, r.n)}%</span></td></tr>`;
+  }).join("");
+  const tot = [...c.perLin.values()].reduce((a, r) => ({ n: a.n + r.n, union: a.union + r.union, inter: a.inter + r.inter, none: a.none + r.none, each: a.each.map((v, i) => v + r.each[i]) }), { n: 0, union: 0, inter: 0, none: 0, each: c.sel.map(() => 0) });
+  const foot = `<tr style="font-weight:700;border-top:2px solid var(--border);"><td>전체</td><td>${tot.n}</td>${tot.each.map((v) => `<td>${v} <span class="note">${pct(v, tot.n)}%</span></td>`).join("")}<td>${tot.union} <span class="note">${pct(tot.union, tot.n)}%</span></td><td>${tot.inter} <span class="note">${pct(tot.inter, tot.n)}%</span></td><td>${tot.none} <span class="note">${pct(tot.none, tot.n)}%</span></td></tr>`;
+  return `<div style="overflow:auto;"><table class="mini-reference-table">${head}${body}${foot}</table></div>`;
+}
+
+function vnRegionList(c) {
+  if (VN.region === null) return "<p class='note'>다이어그램의 숫자나 위 표의 행을 누르면 그 영역의 유전체 목록이 여기에 나옵니다. \"못 잡음\"을 누르면 어떤 세트도 못 잡는 유전체가 나옵니다.</p>";
+  const arr = (c.byMask.get(VN.region) || []).slice().sort((a, b) => a.lin.localeCompare(b.lin) || a.id.localeCompare(b.id));
+  const byLin = {};
+  arr.forEach((r) => { byLin[r.lin] = (byLin[r.lin] || 0) + 1; });
+  return `<div class="card" style="margin-top:12px;"><h4 style="margin:0;">${escHtml(vnRegionName(VN.region, c.sel))} <span class="note">· ${arr.length}개${VN.lineage === "ALL" ? "" : ` (${escHtml(VN.lineage)})`}</span></h4>
+    <p class="note">${Object.entries(byLin).map(([l, k]) => `${escHtml(l)} ${k}`).join(" · ") || "해당 유전체 없음"}</p>
+    <div style="margin:6px 0;"><button type="button" class="btn btn-secondary" id="vnCopyBtn">&#128203; accession 복사</button> <button type="button" class="btn btn-secondary" id="vnCsvBtn">&#128190; CSV 저장</button></div>
+    <div style="max-height:320px;overflow:auto;"><table class="mini-reference-table"><tr><th>Accession</th><th>Lineage</th><th>나라</th></tr>
+      ${arr.slice(0, 500).map((r) => `<tr><td class="mono">${escHtml(r.id)}</td><td>${escHtml(r.lin)}</td><td>${escHtml(r.country || "—")}</td></tr>`).join("")}</table>
+      ${arr.length > 500 ? `<p class="note">처음 500개만 표시합니다. 복사·CSV에는 전부 들어갑니다.</p>` : ""}</div></div>`;
+}
+
+function vnDraw(view) {
+  const d = VN.data, c = vnCompute();
+  view._vn = c;
+  const pct = (v) => (c.n ? (100 * v / c.n).toFixed(1) : "0.0");
+  const tiles = c.sel.length ? `<div style="display:flex;gap:14px;flex-wrap:wrap;margin:10px 0;">
+      <div class="card" style="padding:8px 14px;"><div class="note">대상 유전체</div><b style="font-size:20px;">${c.n}</b></div>
+      <div class="card" style="padding:8px 14px;"><div class="note">합집합 (하나라도 잡음)</div><b style="font-size:20px;">${c.union}</b> <span class="note">${pct(c.union)}%</span></div>
+      <div class="card" style="padding:8px 14px;"><div class="note">교집합 (모두가 잡음)</div><b style="font-size:20px;">${c.inter}</b> <span class="note">${pct(c.inter)}%</span></div>
+      <div class="card" style="padding:8px 14px;cursor:pointer;border-color:var(--bad);" id="vnNoneTile"><div class="note">못 잡음 (차집합)</div><b style="font-size:20px;color:var(--bad);">${c.none}</b> <span class="note">${pct(c.none)}%</span></div></div>` : "";
+  const diagram = c.sel.length === 0 ? "<p class='note'>위에서 비교할 프라이머 세트·그룹을 고르세요.</p>"
+    : c.sel.length > 4 ? "<p class='note'>5개 이상 고르면 벤 다이어그램 대신 아래 \"겹침 조합 표\"로 보여 줍니다 (4개 이하로 줄이면 그림이 나옵니다).</p>" : vnDiagram(c);
+  view.querySelector("#vnBody").innerHTML = `${tiles}
+    <div style="display:grid;grid-template-columns:minmax(300px,1.2fr) minmax(280px,1fr);gap:16px;align-items:start;">
+      <div class="card">${diagram}</div>
+      <div class="card"><h4 style="margin:0 0 6px;">겹침 조합 표</h4>${c.sel.length ? vnRegionTable(c) : ""}</div></div>
+    <div id="vnList">${vnRegionList(c)}</div>
+    <h3 style="margin:18px 0 6px;">리니지별 커버리지 <span class="note">(선택한 세트의 실제 검증 통과 기준 · 리니지 이름을 누르면 위 다이어그램이 그 리니지만 보여 줍니다)</span></h3>
+    ${c.sel.length ? vnLineageTable(c) : ""}`;
+}
+
+async function showVennPage() {
+  state.activeId = null; state.activeType = null;
+  renderSidebar();
+  showMainView("vennView");
+  const view = $("#vennView");
+  const segs = Object.keys((state.hostInfo || {}).segments || {}).map((x) => x.toUpperCase());
+  const allSegs = segs.length ? segs : ["S", "L"];
+  if (!VN.seg || !allSegs.includes(VN.seg)) VN.seg = allSegs[0];
+  view.innerHTML = "<p class='note'>불러오는 중...</p>";
+  try { VN.data = await fetchJSON(`/api/venn/${VN.seg.toLowerCase()}`); } catch (e) { view.innerHTML = `<p class="note">불러오기 실패: ${escHtml(e.message)}</p>`; return; }
+  const d = VN.data;
+  if (!VN.selected || VN.selSeg !== VN.seg) {                       // first visit / other segment: the groups, else the first sets
+    const groups = d.items.filter((it) => it.kind === "group").slice(0, 3);
+    VN.selected = new Set((groups.length >= 2 ? groups : d.items.slice(0, 2)).map((it) => it.key));
+    VN.selSeg = VN.seg; VN.lineage = "ALL"; VN.region = null;
+  }
+  const lins = [...new Set(d.genomes.map((g) => g[1]))].sort((a, b) => a.localeCompare(b));
+  const itemChk = (it) => {
+    const idx = [...VN.selected].indexOf(it.key);
+    return `<label style="display:inline-flex;align-items:center;gap:4px;margin:2px 10px 2px 0;"><input type="checkbox" class="vn-item" value="${escHtml(it.key)}" ${VN.selected.has(it.key) ? "checked" : ""}>
+      ${idx >= 0 && idx < 8 ? `<span style="width:10px;height:10px;border-radius:50%;background:${VN_COLORS[idx]};display:inline-block;"></span>` : ""}
+      <span>${escHtml(it.name)}</span> <span class="note">${it.ids.length}</span></label>`;
+  };
+  view.innerHTML = `<h2>🔵 커버리지 벤 다이어그램</h2>
+    <p class="note">고른 프라이머 세트·그룹이 <b>실제 검증을 통과시킨 유전체</b>를 겹쳐 봅니다: 합집합(하나라도 잡음), 교집합(모두 잡음), 영역별 단독·겹침, 그리고 어느 것도 못 잡는 유전체(차집합). 그룹은 교차 결합으로 통과한 유전체까지 포함합니다. ${pdScopeBadge(d.host_scope && d.host_scope.scope)} 숙주 기준을 따릅니다.</p>
+    <div class="seg-tab-row">${allSegs.map((x) => `<button class="seg-tab ${x === VN.seg ? "active" : ""}" data-vnseg="${x}">${x}</button>`).join("")}</div>
+    <div class="card">
+      <div><b class="note">세트</b> ${d.items.filter((it) => it.kind === "set").map(itemChk).join("") || "<span class='note'>없음</span>"}</div>
+      <div style="margin-top:6px;"><b class="note">그룹</b> ${d.items.filter((it) => it.kind === "group").map(itemChk).join("") || "<span class='note'>없음</span>"}</div>
+      <div class="table-toolbar" style="margin-top:8px;gap:12px;">
+        <label class="note">범위 <select id="vnLin"><option value="ALL">전체</option>${lins.map((L) => `<option value="${escHtml(L)}" ${VN.lineage === L ? "selected" : ""}>${escHtml(L)} (${d.genomes.filter((g) => g[1] === L).length})</option>`).join("")}</select></label>
+        <button type="button" class="btn btn-secondary" id="vnClear">선택 해제</button>
+        <span class="note">그림은 4개까지, 더 고르면 표로 보여 줍니다</span></div></div>
+    <div id="vnBody"></div>`;
+  const redraw = () => vnDraw(view);
+  view._vnRedraw = redraw;
+  view.querySelectorAll("[data-vnseg]").forEach((b) => b.addEventListener("click", () => { VN.seg = b.dataset.vnseg; VN.selected = null; showVennPage(); }));
+  view.querySelectorAll(".vn-item").forEach((x) => x.addEventListener("change", () => {
+    if (x.checked) VN.selected.add(x.value); else VN.selected.delete(x.value);
+    VN.region = null; showVennPage();                                  // re-render so the colour chips follow the selection order
+  }));
+  view.querySelector("#vnLin").addEventListener("change", (e) => { VN.lineage = e.target.value; VN.region = null; redraw(); });
+  view.querySelector("#vnClear").addEventListener("click", () => { VN.selected = new Set(); VN.region = null; showVennPage(); });
+  if (!view._vnWired) {                                         // the page element is reused: wire its delegated handlers only once
+  view._vnWired = true;
+  view.addEventListener("click", (e) => {
+    const c = view._vn;
+    const reg = e.target.closest(".vn-region-label, .vn-region-row");
+    if (reg) { VN.region = Number(reg.dataset.mask); redraw(); view.querySelector("#vnList").scrollIntoView({ behavior: "smooth", block: "nearest" }); return; }
+    if (e.target.closest("#vnNoneTile")) { VN.region = 0; redraw(); return; }
+    const pl = e.target.closest(".vn-pick-lin");
+    if (pl) { e.preventDefault(); VN.lineage = pl.dataset.lin; VN.region = null; view.querySelector("#vnLin").value = VN.lineage; redraw(); return; }
+    const nl = e.target.closest(".vn-none-lin");
+    if (nl) { e.preventDefault(); VN.lineage = nl.dataset.lin; VN.region = 0; view.querySelector("#vnLin").value = VN.lineage; redraw(); return; }
+    const arr = () => (c.byMask.get(VN.region) || []).slice().sort((a, b) => a.lin.localeCompare(b.lin) || a.id.localeCompare(b.id));
+    if (e.target.closest("#vnCopyBtn")) { copyTextToClipboard(arr().map((r) => r.id).join("\n")).then(() => uiAlert(`${arr().length}개 accession을 복사했습니다.`)).catch(() => uiAlert("복사하지 못했습니다.")); return; }
+    if (e.target.closest("#vnCsvBtn")) {
+      const csv = "accession,lineage,country\n" + arr().map((r) => [r.id, r.lin, r.country].map((x) => `"${String(x).replace(/"/g, '""')}"`).join(",")).join("\n") + "\n";
+      const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); a.download = `venn_${VN.seg}_${vnRegionName(VN.region, c.sel).replace(/[^\w가-힣-]+/g, "_")}.csv`;
+      document.body.appendChild(a); a.click(); a.remove(); return;
+    }
+  });
+  // a click on the empty part of a circle (not on a number) also picks the region under the cursor
+  view.addEventListener("click", (e) => {
+    const svg = e.target.closest("#vnSvg"); if (!svg || e.target.closest(".vn-region-label")) return;
+    const c = view._vn; if (!c || !c.sel.length) return;
+    const { es, scale } = vnEllipses(c.sel.length), pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+    const q = pt.matrixTransform(svg.getScreenCTM().inverse());
+    VN.region = vnMask(es, (q.x - 280) / scale, (q.y - 215) / scale); redraw();
+  });
+  }
+  redraw();
+}
+$("#vennBtn").addEventListener("click", showVennPage);
 
 // ---------------------------------------------------------------------------------------
 // 세트 상세 페이지: 프라이머/프로브 결합 위치를 리니지별 pixy π 커브 위에 오버레이 --
@@ -7364,16 +8564,48 @@ function heatmapCellStyle(v, vmax) {
   return `background: rgba(76,120,168,${alpha.toFixed(2)})`;
 }
 
+// The overview lists groups and sets in the same tree order as the sidebar (group, then its sets, variants right under their parent,
+// then the sets without a group by vendor) instead of by validated %, so a set is always found in the same place.
+function overviewOrder(data) {
+  const setById = new Map((data.sets || []).map((x) => [x.set_id, x]));
+  const groupById = new Map((data.groups || []).map((x) => [x.group_id, x]));
+  const rows = [];
+  const segs = [...new Set([...(data.sets || []).map((x) => x.segment), ...(data.groups || []).map((x) => x.segment)])].sort((x, y) => (x === "S" ? 0 : x === "L" ? 1 : 2) - (y === "S" ? 0 : y === "L" ? 1 : 2) || x.localeCompare(y));
+  const addSet = (en, level) => {
+    const s = setById.get(en.s.set_id);
+    if (!s) return;
+    rows.push({ kind: "set", s, level });
+    for (const v of en.variants) { const vs = setById.get(v.set_id); if (vs) rows.push({ kind: "set", s: vs, level: level + 1 }); }
+  };
+  for (const seg of segs) {
+    for (const node of buildSetTree(seg, "")) {
+      if (node.type === "group") {
+        const g = groupById.get(node.g.group_id);
+        if (!g) continue;
+        rows.push({ kind: "group", g });
+        node.kids.forEach((k) => addSet(k, 1));
+      } else {
+        rows.push({ kind: "vendor", name: node.name, seg });
+        node.sets.forEach((k) => addSet(k, 0));
+      }
+    }
+  }
+  return rows;
+}
+
 function renderOverviewHtml(data) {
-  const sets = (data.sets || []).slice().sort((a, b) => (b.summary?.validated_pct || 0) - (a.summary?.validated_pct || 0));
+  const order = overviewOrder(data);
+  const sets = order.filter((r) => r.kind === "set").map((r) => r.s);
+  const levelOf = new Map(order.filter((r) => r.kind === "set").map((r) => [r.s.set_id, r.level]));
   const groups = data.groups || [];
   const lineageRows = data.lineage || [];
   const ds = data.dataset_sizes || {};
 
-  const tableRows = sets.map((s) => {
+  const setRowHtml = (s) => {
     const sm = s.summary || {};
+    const lv = levelOf.get(s.set_id) || 0;
     return `<tr class="genome-row" data-set-id="${s.set_id}">
-      <td class="mono">${escHtml(s.display_name || s.set_id)}</td>
+      <td class="mono" style="padding-left:${10 + lv * 16}px;">${lv ? "↳ " : ""}${escHtml(s.display_name || s.set_id)}${s.duplicate_of ? ` <span class="dup-badge" title="F/R/Probe가 ${escHtml(s.duplicate_of)}와 같은 서열">= ${escHtml(s.duplicate_of)}</span>` : ""}</td>
       ${hasSegs() ? `<td>${segPill(s.segment)}</td>` : ""}
       <td>${s.source}</td>
       <td>${fmtPct(sm.primer_coverage_mm0_pct)}</td>
@@ -7383,7 +8615,13 @@ function renderOverviewHtml(data) {
       <td>${sm.probe_dropout ?? "—"}</td>
       <td style="font-weight:700;color:var(--accent);">${fmtPct(sm.validated_pct)}</td>
       <td>${evaluationPillHtml(s.evaluation)}</td>
+      <td>${finalChipHtml(s.set_id)}</td>
     </tr>`;
+  };
+  const tableRows = order.map((r) => {
+    if (r.kind === "set") return setRowHtml(r.s);
+    if (r.kind === "group") return `<tr class="genome-row ov-group-head" data-group-id="${r.g.group_id}"><td colspan="11">&#9633; <b>${escHtml(r.g.label)}</b> <span class="note">(${(r.g.members || "").split(";").filter(Boolean).length}개 세트 ALL · 합집합 ${fmtPct(r.g.validated_pct)} · 교차 포함 ${fmtPct(r.g.validated_with_cross_pct ?? r.g.validated_pct)}) ${finalChipHtml(r.g.group_id)}</span></td></tr>`;
+    return `<tr class="ov-vendor-head"><td colspan="11">그룹 없음 · ${escHtml(r.name)}</td></tr>`;
   }).join("");
 
   const groupRows = groups.map((g) => `
@@ -7394,6 +8632,7 @@ function renderOverviewHtml(data) {
       <td>${g.total_genomes}</td>
       <td style="font-weight:700;color:var(--accent);">${g.validated} (${fmtPct(g.validated_pct)})</td>
       <td style="font-weight:700;color:var(--accent);">${g.validated_with_cross ?? g.validated} (${fmtPct(g.validated_with_cross_pct ?? g.validated_pct)})</td>
+      <td>${finalChipHtml(g.group_id)}</td>
     </tr>`).join("");
 
   // lineage heatmap (count and % of that lineage's total population captured), merged into
@@ -7414,7 +8653,7 @@ function renderOverviewHtml(data) {
   // table -- they only have ONE coverage metric (the union's validated_pct, no separate
   // primer/probe split the way an individual set does), so their coverage cell shows a
   // single bar instead of the usual three.
-  const groupHeatRows = groups.map((g) => {
+  const groupHeatRow = (g) => {
     const segTotals = lineageTotals[g.segment] || {};
     const cells = lineages.map((l) => {
       const v = (perSet[g.group_id] || {})[l] || 0;
@@ -7435,9 +8674,9 @@ function renderOverviewHtml(data) {
         </td>
         ${cells}
       </tr>`;
-  }).join("");
+  };
 
-  const mergedRows = sets.map((s) => {
+  const mergedRow = (s) => {
     const sm = s.summary || {};
     const std = s.standard || {};
     const oxHtml = std.ok ? `<span class="ox ox-o">O</span>` : `<span class="ox ox-x">X</span>`;
@@ -7451,7 +8690,7 @@ function renderOverviewHtml(data) {
     }).join("");
     return `
       <tr class="cov-heat-row" data-set-id="${s.set_id}">
-        <th>${segPill(s.segment)} ${escHtml(s.display_name || s.set_id)} ${oxHtml}</th>
+        <th style="padding-left:${10 + (levelOf.get(s.set_id) || 0) * 16}px;">${segPill(s.segment)} ${levelOf.get(s.set_id) ? "↳ " : ""}${escHtml(s.display_name || s.set_id)} ${oxHtml}</th>
         <td class="cov-cell">
           <div class="cov-bars">
             <div class="cov-bar-track"><div class="cov-bar-fill primer" style="width:${sm.primer_coverage_mm1_pct || 0}%"></div></div>
@@ -7461,6 +8700,11 @@ function renderOverviewHtml(data) {
         </td>
         ${cells}
       </tr>`;
+  };
+  const heatBody = order.map((r) => {
+    if (r.kind === "group") return groupHeatRow(r.g);
+    if (r.kind === "set") return mergedRow(r.s);
+    return `<tr class="ov-vendor-head"><td colspan="${2 + lineages.length}">그룹 없음 · ${escHtml(r.name)}</td></tr>`;
   }).join("");
   const lineageHeaderRow = lineages.map((l) => {
     // find denominator from whichever segment this lineage belongs to (S/L totals rarely overlap by name)
@@ -7470,6 +8714,7 @@ function renderOverviewHtml(data) {
 
   return `
     <h2>${escHtml(PROFILE.short_name)} Primer/Probe 전체 대시보드</h2>
+    ${ictvCrumbHtml()}
     <div class="subtitle">Nextstrain(${escHtml(PROFILE.id)}) 최신 데이터셋 &middot; 판정 기준: primer mismatch&le;1, probe mismatch=0(완전일치)</div>
 
     <div class="stat-tiles">
@@ -7486,10 +8731,10 @@ function renderOverviewHtml(data) {
     </div>
     <div class="heatmap-wrap">
       <table class="heatmap cov-heatmap"><thead><tr><th></th><th>커버리지</th>${lineageHeaderRow}</tr></thead>
-      <tbody>${groupHeatRows}${mergedRows}</tbody></table>
+      <tbody>${heatBody}</tbody></table>
     </div>
 
-    <div class="section-title">세트별 상세 요약 (validated_pct 내림차순, 클릭하면 상세보기)</div>
+    <div class="section-title">세트별 상세 요약 (그룹 → 세트 순서, 사이드바와 같은 순서 · 클릭하면 상세보기)</div>
     <div class="note" style="margin:2px 0 8px;">
       <b>평가</b> 기준(각 세트 상세 페이지의 "종합 평가" 박스와 동일한 자동 채점): Population
       커버리지(&ge;95% +2점 / &ge;80% +1점 / &ge;50% -1점 / 미만 -2점), Probe dropout 비율(30%
@@ -7506,6 +8751,7 @@ function renderOverviewHtml(data) {
           <th>primer mm=0</th><th>primer mm=1</th><th>primer mm=2</th>
           <th>probe mm=0</th><th>probe dropout</th><th>validated</th>
           <th title="세트 상세 페이지의 종합 평가와 동일한 기준 — 위 설명 참고">평가</th>
+          <th title="사용자가 세트 상세 화면에서 직접 표시한 최종 결과">최종 결과</th>
         </tr></thead>
         <tbody>${tableRows}</tbody>
       </table>
@@ -7515,7 +8761,7 @@ function renderOverviewHtml(data) {
     <div class="section-title">세트 조합("ALL") 합집합 커버리지</div>
     <div class="genome-table-wrap" style="max-height:none;">
       <table class="genome-table">
-        <thead><tr><th>조합</th>${hasSegs() ? "<th>segment</th>" : ""}<th>구성 세트</th><th>total</th><th title="세트별 단독 통과의 합집합">합집합 validated</th><th title="합집합 + 세트 간 교차 조합으로 통과하는 게놈">교차 포함 validated</th></tr></thead>
+        <thead><tr><th>조합</th>${hasSegs() ? "<th>segment</th>" : ""}<th>구성 세트</th><th>total</th><th title="세트별 단독 통과의 합집합">합집합 validated</th><th title="합집합 + 세트 간 교차 조합으로 통과하는 게놈">교차 포함 validated</th><th title="사용자가 그룹 상세 화면에서 직접 표시한 최종 결과">최종 결과</th></tr></thead>
         <tbody>${groupRows}</tbody>
       </table>
     </div>` : ""}
@@ -7529,6 +8775,7 @@ async function showOverview() {
   const overview = $("#overview");
   overview.innerHTML = "<p class='note'>불러오는 중...</p>";
   try {
+    await loadFinalResults();
     const data = await fetchJSON("/api/overview");
     overview.innerHTML = hostScopeBadgeHtml(data.host_scope) + renderOverviewHtml(data);
     overview.querySelectorAll("[data-set-id]").forEach((el2) => {
