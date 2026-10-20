@@ -1116,3 +1116,15 @@ a.pipe-pill:hover { border-color: var(--accent); color: var(--accent); }
 .nav-bar .btn:disabled { opacity: .4; cursor: default; }
 .nav-crumb { margin-left: 8px; font-size: var(--fs-sm); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .detail-tabs { top: 34px; }
+
+/* ---- sidebar hide: labelled button in the header + a handle on the sidebar edge that is always visible ---- */
+.sidebar-collapse-btn { right: 72px; width: auto; padding: 0 10px; border-radius: var(--r-pill); font-size: var(--fs-2xs); font-weight: 700; }
+.sidebar-edge-btn {
+  position: fixed; top: 50%; left: 319px; transform: translateY(-50%); z-index: 850; width: 16px; height: 64px; padding: 0;
+  border: 1px solid var(--border); border-left: 0; border-radius: 0 var(--r-md) var(--r-md) 0; background: var(--bg); color: var(--muted);
+  cursor: pointer; font-size: 18px; line-height: 1; display: flex; align-items: center; justify-content: center; transition: left .2s var(--ease), color .12s;
+}
+.sidebar-edge-btn:hover { color: var(--accent); border-color: var(--accent); width: 20px; }
+.app.sidebar-collapsed .sidebar-edge-btn { left: 0; }
+.app.sidebar-collapsed .sidebar-open-btn { display: none; }          /* the edge handle already opens it */
+@media (max-width: 760px) { .sidebar-edge-btn { display: none; } }
