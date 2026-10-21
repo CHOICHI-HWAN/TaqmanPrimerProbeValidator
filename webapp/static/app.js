@@ -2224,10 +2224,12 @@ function renderMSA(setData) {
   `;
 }
 
+// the pass rule of the pipeline (Parameters page): F/R mismatch <= primer_mismatch_pass, probe mismatch <= probe_mismatch
+const PASS = { mm: 1, pm: 0 };
 function isValidatedGenome(g) {
-  return g.f_mismatch !== null && g.f_mismatch <= 1 &&
-    g.p_mismatch === 0 &&
-    g.r_mismatch !== null && g.r_mismatch <= 1;
+  return g.f_mismatch !== null && g.f_mismatch <= PASS.mm &&
+    g.p_mismatch !== null && g.p_mismatch <= PASS.pm &&
+    g.r_mismatch !== null && g.r_mismatch <= PASS.mm;
 }
 
 // A lineage with very few sampled genomes in the whole filtered population gives coverage
@@ -6331,6 +6333,11 @@ async function loadProfile() {
   applyProfileText();
   renderTaxonLine();
   initPipelineSwitch();
+  try {                                                   // the figures built in the browser must follow the same pass rule as the server's
+    const prm = await fetchJSON("/api/params");
+    if (Number.isFinite(prm.primer_mismatch_pass)) PASS.mm = prm.primer_mismatch_pass;
+    if (Number.isFinite(prm.probe_mismatch)) PASS.pm = prm.probe_mismatch;
+  } catch { /* keep the defaults */ }
 }
 
 // ---- ICTV taxonomy (profiles/<id>.json "taxonomy"): species under the title, the full rank list in a pop-up ----

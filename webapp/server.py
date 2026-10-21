@@ -1151,18 +1151,31 @@ def group_cross_ids(group_id):
     F/R mismatch <= 1 with intact 3' ends, probe perfect) -- invisible to the plain union of each set's own result."""
     path = ROOT / "output" / "groups" / group_id / "combo_mismatch_table.tsv"
     ids = set()
+    params = load_params()                                     # the same pass rule as the set results (primer_mismatch_pass, probe_mismatch)
+    pass_mm, probe_mm = params["primer_mismatch_pass"], params["probe_mismatch"]
     if path.exists():
         for r in read_tsv(path):
             try:
                 f, rr, p = int(r["f_mismatch"]), int(r["r_mismatch"]), int(r["p_mismatch"])
             except (KeyError, TypeError, ValueError):
                 continue
-            if f <= 1 and rr <= 1 and p == 0 and r.get("f_3p_ok", "") != "0" and r.get("r_3p_ok", "") != "0":
+            if f <= pass_mm and rr <= pass_mm and p <= probe_mm and r.get("f_3p_ok", "") != "0" and r.get("r_3p_ok", "") != "0":
                 ids.add(r["genome_id"])
     return ids
 
 
 def _read_validated_ids(group_id):
+    """A group's union: the genomes any member set validates, recounted from the member sets' own mismatch tables (the same numbers
+    as the set cards). The group's validated_ids.txt is only a fallback: it is a snapshot of the last group run and goes stale whenever
+    the sets are recomputed (e.g. after the mismatch parameter was changed) without re-running the group."""
+    members = next((r["member_ids"].split(";") for r in load_groups_config() if r["group_id"] == group_id), [])
+    seg = _group_segment(group_id)
+    if members and seg in seg_keys():
+        view = scope_ctx()
+        try:
+            return set().union(*[view.set_validated_ids(m, seg, "all") for m in members if (ROOT / "output" / "primers" / m / "alignment" / "mismatch_table.tsv").exists()])
+        except (OSError, KeyError):
+            pass
     path = ROOT / "output" / "groups" / group_id / "validated_ids.txt"
     if not path.exists():
         return set()
@@ -1266,10 +1279,7 @@ def load_group_detail(group_id):
     members = row["member_ids"].split(";")
     summary = load_group_summary().get(group_id, {})
 
-    validated_path = ROOT / "output" / "groups" / group_id / "validated_ids.txt"
-    validated_ids = set()
-    if validated_path.exists():
-        validated_ids = {ln.strip() for ln in validated_path.read_text(encoding="utf-8").splitlines() if ln.strip()}
+    validated_ids = _read_validated_ids(group_id)           # the members' union, recounted (see there)
     view = scope_ctx()
     keep_ids = view.ids(seg.lower())                      # the genomes of the active host scope
     validated_ids &= keep_ids
@@ -1479,10 +1489,9 @@ def load_group_lineage_rows():
     rows = []
     for row in load_groups_config():
         gid, seg = row["group_id"], row["segment"]
-        validated_path = ROOT / "output" / "groups" / gid / "validated_ids.txt"
-        if not validated_path.exists():
+        validated_ids = _read_validated_ids(gid)
+        if not validated_ids and not (ROOT / "output" / "groups" / gid / "validated_ids.txt").exists():
             continue
-        validated_ids = {ln.strip() for ln in validated_path.read_text(encoding="utf-8").splitlines() if ln.strip()}
         validated_ids |= group_cross_ids(gid)             # the overview heatmap shows the cross-inclusive coverage
         if seg.lower() in seg_keys():
             validated_ids &= scope_ctx().ids(seg.lower())         # ... inside the active host scope
@@ -1569,8 +1578,10 @@ def load_venn(seg):
     for st in load_builtin_sets():
         if str(st.get("segment", "")).lower() != seg:
             continue
-        path = ROOT / "output" / "primers" / st["set_id"] / "final" / "validated_ids.txt"
-        ids = {ln.strip() for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()} if path.exists() else set()
+        try:                                  # recounted like the set card (same mismatch table, same parameters, same host scope)
+            ids = v.set_validated_ids(st["set_id"], seg)
+        except (OSError, KeyError):
+            ids = set()
         items.append({"key": st["set_id"], "kind": "set", "name": st.get("display_name") or st["set_id"], "ids": sorted(ids & keep)})
     for g in load_groups_config():
         if str(g.get("segment", "")).lower() != seg:
@@ -2133,11 +2144,11 @@ def load_metadata_table():
         seg_sets = [sid for sid, r in load_manifest().items() if r["segment"].lower() == seg]
         counts = {}
         for sid in seg_sets:
-            vp = ROOT / "output" / "primers" / sid / "final" / "validated_ids.txt"
-            if vp.exists():
-                for ln in vp.read_text(encoding="utf-8").splitlines():
-                    if ln.strip():
-                        counts[ln.strip()] = counts.get(ln.strip(), 0) + 1
+            try:                                              # recounted like the set cards
+                for gid_ in scope_ctx().set_validated_ids(sid, seg, "all"):
+                    counts[gid_] = counts.get(gid_, 0) + 1
+            except (OSError, KeyError):
+                pass
         filtered = {f["accession"]: f for f in read_tsv(ROOT / "data" / "filtered" / f"{seg}_filtered_metadata.tsv")}
         host_cls = scope_ctx().classes(seg)
         curated = {c["accession"]: c for c in read_tsv(ROOT / "data" / "renamed" / f"{seg}_metadata_curated.tsv")}

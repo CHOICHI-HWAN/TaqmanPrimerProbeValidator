@@ -5,6 +5,11 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.22.3] - 2026-10-21
+
+### Fixed
+- **그룹/벤 다이어그램 숫자가 세트 카드와 어긋나던 문제**: 그룹의 합집합이 그룹 실행 때 저장된 `validated_ids.txt`(옛 결과)를 그대로 읽어서, 세트 결과를 다시 계산한 뒤(예: `primer_mismatch_pass` 변경) 그룹을 다시 돌리기 전까지 구성 세트의 합과 달랐습니다. 이제 그룹 합집합은 구성 세트의 불일치 표를 현재 파라미터로 다시 세어 만들고(세트 카드와 같은 계산), 교차 결합 판정도 하드코딩된 `mismatch ≤ 1` 대신 같은 통과 규칙(`primer_mismatch_pass`, `probe_mismatch`)을 씁니다. 브라우저에서 계산하는 "검증 통과 게놈의 리니지 분포"도 같은 규칙을 따릅니다. 4개 숙주 기준 모두에서 벤 항목 = 세트·그룹 카드 숫자임을 확인했습니다.
+
 ## [0.22.2] - 2026-10-21
 
 ### Added
