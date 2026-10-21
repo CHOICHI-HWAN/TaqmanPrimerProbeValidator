@@ -97,6 +97,14 @@ class View:
         rows = _cached(path, None, lambda p: {r["genome_id"]: r for r in _read_tsv(p)})
         return self.summary_from_rows(seg, rows, scope)
 
+    def set_validated_ids(self, set_id, seg, scope=None):
+        """The genomes a set validates, recounted from its mismatch table with the CURRENT parameters inside `scope` -- exactly the rule
+        behind the set card's number (set_summary), so a figure built from these ids can never disagree with the card."""
+        path = self.root / "output" / "primers" / set_id / "alignment" / "mismatch_table.tsv"
+        rows = _cached(path, None, lambda p: {r["genome_id"]: r for r in _read_tsv(p)})
+        ids = sorted(self.ids(seg, scope))
+        return set(H.summarize(ids, rows, self.mm, self.pm, probe_inside_amplicon)["_validated_ids"])
+
     def lineage_of(self, seg):
         return _cached(self.root / "data" / "filtered" / f"{seg.lower()}_filtered_metadata.tsv", "lineage",
                        lambda p: {r["accession"]: (r.get("lineage") or "NA") for r in _read_tsv(p)})
