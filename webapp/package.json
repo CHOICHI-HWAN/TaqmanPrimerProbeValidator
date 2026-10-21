@@ -1,7 +1,7 @@
 {
   "name": "lasv-dashboard-webapp",
   "private": true,
-  "version": "0.22.5",
+  "version": "0.22.6",
   "description": "Build tooling for the LASV primer/probe validation dashboard's frontend. server.py serves static files directly and has no Node dependency at runtime -- this is a dev-time-only step that produces a minified static/app.min.js.",
   "scripts": {
     "build": "esbuild static/app.js --minify --target=es2019 --outfile=static/app.min.js",

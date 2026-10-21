@@ -7513,7 +7513,8 @@ function vnInside(e, x, y) {
 function vnMask(es, x, y) { let m = 0; es.forEach((e, i) => { if (vnInside(e, x, y)) m |= 1 << i; }); return m; }
 
 function vnCompute() {
-  const d = VN.data, sel = d.items.filter((it) => VN.selected.has(it.key));
+  const d = VN.data, byKey = new Map(d.items.map((it) => [it.key, it]));
+  const sel = [...VN.selected].map((k) => byKey.get(k)).filter(Boolean);          // selection order = colour order, everywhere on the page
   const inLin = (lin) => VN.lineage === "ALL" || lin === VN.lineage;
   const sets = sel.map((it) => new Set(it.ids));
   const maskOf = (id) => { let m = 0; sets.forEach((st, i) => { if (st.has(id)) m |= 1 << i; }); return m; };
@@ -7534,6 +7535,11 @@ function vnCompute() {
   const n = all.length, full = (1 << sel.length) - 1;
   const union = all.filter((r) => r.m).length, inter = sel.length ? (byMask.get(full) || []).length : 0;
   return { sel, byMask, all, n, union, inter, none: n - union, full, perLin };
+}
+
+// the circles' colours, named: one chip per selected set/group in the same colour as its circle, its column in the lineage table and its checkbox
+function vnLegendHtml(c) {
+  return `<div class="vn-legend">${c.sel.map((x, i) => `<span class="vn-chip"><i style="background:${VN_COLORS[i % VN_COLORS.length]}"></i>${escHtml(x.name)} <b>${x.ids.length}</b></span>`).join("")}</div>`;
 }
 
 function vnRegionName(m, sel) {
@@ -7638,7 +7644,7 @@ function vnDraw(view) {
     : c.sel.length > 4 ? "<p class='note'>5개 이상 고르면 벤 다이어그램 대신 아래 \"겹침 조합 표\"로 보여 줍니다 (4개 이하로 줄이면 그림이 나옵니다).</p>" : vnDiagram(c);
   view.querySelector("#vnBody").innerHTML = `${tiles}
     <div style="display:grid;grid-template-columns:minmax(300px,1.2fr) minmax(280px,1fr);gap:16px;align-items:start;">
-      <div class="card">${diagram}</div>
+      <div class="card vn-diagram-card">${c.sel.length ? vnLegendHtml(c) : ""}${diagram}</div>
       <div class="card"><h4 style="margin:0 0 6px;">겹침 조합 표</h4>${c.sel.length ? vnRegionTable(c) : ""}</div></div>
     <div id="vnList">${vnRegionList(c)}</div>
     <h3 style="margin:18px 0 6px;">리니지별 커버리지 <span class="note">(선택한 세트의 실제 검증 통과 기준 · 리니지 이름을 누르면 위 다이어그램이 그 리니지만 보여 줍니다)</span></h3>
@@ -7662,21 +7668,33 @@ async function showVennPage() {
     VN.selSeg = VN.seg; VN.lineage = "ALL"; VN.region = null;
   }
   const lins = [...new Set(d.genomes.map((g) => g[1]))].sort((a, b) => a.localeCompare(b));
-  const itemChk = (it) => {
+  const byKey = new Map(d.items.map((it) => [it.key, it]));
+  const itemChk = (it, level) => {
     const idx = [...VN.selected].indexOf(it.key);
-    return `<label style="display:inline-flex;align-items:center;gap:4px;margin:2px 10px 2px 0;"><input type="checkbox" class="vn-item" value="${escHtml(it.key)}" ${VN.selected.has(it.key) ? "checked" : ""}>
-      ${idx >= 0 && idx < 8 ? `<span style="width:10px;height:10px;border-radius:50%;background:${VN_COLORS[idx]};display:inline-block;"></span>` : ""}
-      <span>${escHtml(it.name)}</span> <span class="note">${it.ids.length}</span></label>`;
+    const col = idx >= 0 ? VN_COLORS[idx % VN_COLORS.length] : "transparent";
+    return `<label class="vn-pick" style="margin-left:${level * 18}px;"><input type="checkbox" class="vn-item" value="${escHtml(it.key)}" ${VN.selected.has(it.key) ? "checked" : ""}>
+      <span class="vn-dot" style="background:${col};border-color:${idx >= 0 ? col : "var(--border)"};"></span>
+      <span>${it.kind === "group" ? "&#9633; " : ""}${escHtml(it.name)}</span> <span class="note">${it.ids.length}</span></label>`;
   };
+  // the same group > set > variant tree as the sidebar: pick a whole group, or just its member sets
+  const selectorHtml = buildSetTree(VN.seg, "").map((node) => {
+    const row = (en, lv) => (byKey.has(en.s.set_id) ? itemChk(byKey.get(en.s.set_id), lv) : "") + en.variants.map((v) => (byKey.has(v.set_id) ? itemChk(byKey.get(v.set_id), lv + 1) : "")).join("");
+    if (node.type === "group") return `<div class="vn-tree-group">${byKey.has(node.g.group_id) ? itemChk(byKey.get(node.g.group_id), 0) : ""}${node.kids.map((k) => row(k, 1)).join("")}</div>`;
+    return `<div class="vn-tree-group"><div class="vn-tree-vendor">그룹 없음 · ${escHtml(node.name)}</div>${node.sets.map((k) => row(k, 1)).join("")}</div>`;
+  }).join("") || "<span class='note'>없음</span>";
+  let savedList = [];
+  try { savedList = (await fetchJSON("/api/venn-saved")).filter((x) => String(x.seg).toUpperCase() === VN.seg.toUpperCase()); } catch (e) { /* none */ }
   view.innerHTML = `<h2>🔵 커버리지 벤 다이어그램</h2>
     <p class="note">고른 프라이머 세트·그룹이 <b>실제 검증을 통과시킨 유전체</b>를 겹쳐 봅니다: 합집합(하나라도 잡음), 교집합(모두 잡음), 영역별 단독·겹침, 그리고 어느 것도 못 잡는 유전체(차집합). 그룹은 교차 결합으로 통과한 유전체까지 포함합니다. ${pdScopeBadge(d.host_scope && d.host_scope.scope)} 숙주 기준을 따릅니다.</p>
     <div class="seg-tab-row">${allSegs.map((x) => `<button class="seg-tab ${x === VN.seg ? "active" : ""}" data-vnseg="${x}">${x}</button>`).join("")}</div>
     <div class="card">
-      <div><b class="note">세트</b> ${d.items.filter((it) => it.kind === "set").map(itemChk).join("") || "<span class='note'>없음</span>"}</div>
-      <div style="margin-top:6px;"><b class="note">그룹</b> ${d.items.filter((it) => it.kind === "group").map(itemChk).join("") || "<span class='note'>없음</span>"}</div>
+      <div class="vn-selector">${selectorHtml}</div>
+      <div class="vn-saved" style="margin-top:8px;"><b class="note">저장한 선택</b> ${savedList.length ? savedList.map((x) => `<span class="vn-saved-chip"><a href="#" class="vn-load" data-id="${x.id}" title="${escHtml(x.keys.length)}개 · ${escHtml(x.created || "")}${x.lineage && x.lineage !== "ALL" ? " · " + escHtml(x.lineage) : ""}">${escHtml(x.name)}</a><button type="button" class="vn-del vn-write" data-id="${x.id}" title="삭제">&times;</button></span>`).join("") : "<span class='note'>아직 없음 — 아래 \"선택 저장\"으로 지금 고른 조합을 이름 붙여 남깁니다</span>"}</div>
       <div class="table-toolbar" style="margin-top:8px;gap:12px;">
         <label class="note">범위 <select id="vnLin"><option value="ALL">전체</option>${lins.map((L) => `<option value="${escHtml(L)}" ${VN.lineage === L ? "selected" : ""}>${escHtml(L)} (${d.genomes.filter((g) => g[1] === L).length})</option>`).join("")}</select></label>
         <button type="button" class="btn btn-secondary" id="vnClear">선택 해제</button>
+        <button type="button" class="btn btn-secondary vn-write" id="vnSave" title="지금 고른 세트·그룹과 범위(리니지)를 이름을 붙여 저장합니다 (이 대시보드를 쓰는 모두에게 보입니다)">&#128190; 선택 저장</button>
+        <button type="button" class="btn btn-secondary" id="vnPng" title="벤 다이어그램(범례 포함)을 PNG 이미지로 저장합니다">&#128247; 그림 저장</button>
         <span class="note">그림은 4개까지, 더 고르면 표로 보여 줍니다</span></div></div>
     <div id="vnBody"></div>`;
   const redraw = () => vnDraw(view);
@@ -7688,6 +7706,33 @@ async function showVennPage() {
   }));
   view.querySelector("#vnLin").addEventListener("change", (e) => { VN.lineage = e.target.value; VN.region = null; redraw(); });
   view.querySelector("#vnClear").addEventListener("click", () => { VN.selected = new Set(); VN.region = null; showVennPage(); });
+  view.querySelector("#vnSave").addEventListener("click", async () => {
+    if (!VN.selected.size) { uiAlert("저장할 세트·그룹을 먼저 고르세요."); return; }
+    const names = [...VN.selected].map((k) => (byKey.get(k) || {}).name).filter(Boolean);
+    const name = await uiPrompt("이 선택의 이름 (같은 이름이 있으면 덮어씁니다)", names.slice(0, 3).join(" + "), { title: "벤 다이어그램 선택 저장" });
+    if (!name || !name.trim()) return;
+    try {
+      await fetchJSON("/api/venn-saved", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim(), seg: VN.seg.toLowerCase(), keys: [...VN.selected], lineage: VN.lineage }) });
+      showVennPage();
+    } catch (e) { uiAlert("저장하지 못했습니다: " + e.message); }
+  });
+  view.querySelector("#vnPng").addEventListener("click", async () => {
+    const card = view.querySelector(".vn-diagram-card");
+    if (!card || !VN.selected.size) { uiAlert("그릴 선택이 없습니다."); return; }
+    try { downloadBlob(await domToPngBlob(card), `venn_${VN.seg}_${[...VN.selected].join("_")}.png`.slice(0, 120)); } catch (e) { uiAlert(e.message); }
+  });
+  view.querySelectorAll(".vn-load").forEach((a) => a.addEventListener("click", (e) => {
+    e.preventDefault();
+    const it = savedList.find((x) => x.id === a.dataset.id);
+    if (!it) return;
+    VN.selected = new Set(it.keys.filter((k) => byKey.has(k)));
+    VN.lineage = it.lineage || "ALL"; VN.region = null;
+    showVennPage();
+  }));
+  view.querySelectorAll(".vn-del").forEach((b) => b.addEventListener("click", async () => {
+    if (!(await uiConfirm("이 저장한 선택을 삭제할까요?", { title: "삭제", okLabel: "삭제" }))) return;
+    try { await fetchJSON(`/api/venn-saved/${b.dataset.id}/delete`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); showVennPage(); } catch (e) { uiAlert(e.message); }
+  }));
   if (!view._vnWired) {                                         // the page element is reused: wire its delegated handlers only once
   view._vnWired = true;
   view.addEventListener("click", (e) => {
