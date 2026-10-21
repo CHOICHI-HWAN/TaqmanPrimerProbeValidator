@@ -7229,6 +7229,21 @@ async function showRedesignPage() {
 }
 $("#redesignBtn").addEventListener("click", showRedesignPage);
 
+// 사이드바의 메뉴 버튼 전체 접기/펼치기(프라이머 그룹·세트 목록은 그대로 보임): 이 브라우저에 기억합니다.
+(function initMenuToggle() {
+  const btn = document.getElementById("menuToggleBtn"), menu = document.getElementById("sidebarMenu");
+  if (!btn || !menu) return;
+  const apply = (hidden) => {
+    menu.hidden = hidden;
+    btn.innerHTML = hidden ? "&#9776; 메뉴 펼치기 &#9662;" : "&#9776; 메뉴 접기 &#9652;";
+    try { localStorage.setItem("lasv_menu_hidden", hidden ? "1" : "0"); } catch (e) { /* ignore */ }
+  };
+  btn.addEventListener("click", () => apply(!menu.hidden));
+  let saved = null;
+  try { saved = localStorage.getItem("lasv_menu_hidden"); } catch (e) { /* ignore */ }
+  apply(saved === "1");
+})();
+
 // 사이드바 메뉴 묶음(분석·설계·정보·관리): 열림/닫힘을 이 브라우저에 기억합니다.
 (function initMenuGroups() {
   let saved = {};
@@ -7537,15 +7552,15 @@ async function showVennPage() {
   const itemChk = (it, level) => {
     const idx = [...VN.selected].indexOf(it.key);
     const col = idx >= 0 ? VN_COLORS[idx % VN_COLORS.length] : "transparent";
-    return `<label class="vn-pick" style="margin-left:${level * 18}px;"><input type="checkbox" class="vn-item" value="${escHtml(it.key)}" ${VN.selected.has(it.key) ? "checked" : ""}>
-      <span class="vn-dot" style="background:${col};border-color:${idx >= 0 ? col : "var(--border)"};"></span>
-      <span>${it.kind === "group" ? "&#9633; " : ""}${escHtml(it.name)}</span> <span class="note">${it.ids.length}</span></label>`;
+    return `<label class="vn-pick${idx >= 0 ? " on" : ""}${it.kind === "group" ? " vn-pick-group" : ""}" style="--c:${col};margin-left:${level > 1 ? (level - 1) * 16 : 0}px;"><input type="checkbox" class="vn-item" value="${escHtml(it.key)}" ${VN.selected.has(it.key) ? "checked" : ""}>
+      <span class="vn-dot" style="background:${col};border-color:${idx >= 0 ? col : "var(--muted)"};"></span>
+      <span class="vn-name">${it.kind === "group" ? "&#9633; " : ""}${escHtml(it.name)}</span><span class="vn-count">${it.ids.length}</span></label>`;
   };
   // the same group > set > variant tree as the sidebar: pick a whole group, or just its member sets
   const selectorHtml = buildSetTree(VN.seg, "").map((node) => {
     const row = (en, lv) => (byKey.has(en.s.set_id) ? itemChk(byKey.get(en.s.set_id), lv) : "") + en.variants.map((v) => (byKey.has(v.set_id) ? itemChk(byKey.get(v.set_id), lv + 1) : "")).join("");
-    if (node.type === "group") return `<div class="vn-tree-group">${byKey.has(node.g.group_id) ? itemChk(byKey.get(node.g.group_id), 0) : ""}${node.kids.map((k) => row(k, 1)).join("")}</div>`;
-    return `<div class="vn-tree-group"><div class="vn-tree-vendor">그룹 없음 · ${escHtml(node.name)}</div>${node.sets.map((k) => row(k, 1)).join("")}</div>`;
+    if (node.type === "group") return `<div class="vn-tree-group">${byKey.has(node.g.group_id) ? itemChk(byKey.get(node.g.group_id), 0) : ""}<div class="vn-members">${node.kids.map((k) => row(k, 1)).join("")}</div></div>`;
+    return `<div class="vn-tree-group vn-tree-loose"><div class="vn-tree-vendor">그룹 없음 · ${escHtml(node.name)}</div><div class="vn-members">${node.sets.map((k) => row(k, 1)).join("")}</div></div>`;
   }).join("") || "<span class='note'>없음</span>";
   let savedList = [];
   try { savedList = (await fetchJSON("/api/venn-saved")).filter((x) => String(x.seg).toUpperCase() === VN.seg.toUpperCase()); } catch (e) { /* none */ }
@@ -7553,6 +7568,7 @@ async function showVennPage() {
     <p class="note">고른 프라이머 세트·그룹이 <b>실제 검증을 통과시킨 유전체</b>를 겹쳐 봅니다: 합집합(하나라도 잡음), 교집합(모두 잡음), 영역별 단독·겹침, 그리고 어느 것도 못 잡는 유전체(차집합). 그룹은 교차 결합으로 통과한 유전체까지 포함합니다. ${pdScopeBadge(d.host_scope && d.host_scope.scope)} 숙주 기준을 따릅니다.</p>
     <div class="seg-tab-row">${allSegs.map((x) => `<button class="seg-tab ${x === VN.seg ? "active" : ""}" data-vnseg="${x}">${x}</button>`).join("")}</div>
     <div class="card">
+      <div class="vn-selector-head"><b>비교할 세트·그룹을 고르세요</b> <span class="note">고른 순서대로 색이 정해집니다 · 지금 ${VN.selected.size}개 선택</span></div>
       <div class="vn-selector">${selectorHtml}</div>
       <div class="vn-saved" style="margin-top:8px;"><b class="note">저장한 선택</b> ${savedList.length ? savedList.map((x) => `<span class="vn-saved-chip"><a href="#" class="vn-load" data-id="${x.id}" title="${escHtml(x.keys.length)}개 · ${escHtml(x.created || "")}${x.lineage && x.lineage !== "ALL" ? " · " + escHtml(x.lineage) : ""}">${escHtml(x.name)}</a><button type="button" class="vn-del vn-write" data-id="${x.id}" title="삭제">&times;</button></span>`).join("") : "<span class='note'>아직 없음 — 아래 \"선택 저장\"으로 지금 고른 조합을 이름 붙여 남깁니다</span>"}</div>
       <div class="table-toolbar" style="margin-top:8px;gap:12px;">
