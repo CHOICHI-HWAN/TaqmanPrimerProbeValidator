@@ -1,6 +1,6 @@
 # TaqMan Primer/Probe Validator — LASV edition
 
-![License](https://img.shields.io/badge/license-MIT-blue) ![Snakemake](https://img.shields.io/badge/snakemake-%E2%89%A59.27-brightgreen) ![Platform](https://img.shields.io/badge/platform-linux--64-lightgrey)
+![License](https://img.shields.io/badge/license-GPL--3.0--or--later-blue) ![Snakemake](https://img.shields.io/badge/snakemake-%E2%89%A59.27-brightgreen) ![Platform](https://img.shields.io/badge/platform-linux--64-lightgrey)
 
 [한국어 README](README.ko.md)  ·  Nipah edition: branch [`nipah`](https://github.com/CHOICHI-HWAN/TaqmanPrimerProbeValidator/tree/nipah)
 
@@ -93,7 +93,7 @@ Detailed documentation (pipeline steps, settings, dashboard features, directory 
 
 ### Current version
 
-Code: **v0.22.8**   ·   Tested on Ubuntu 24.04, x86_64
+Code: **v0.23.0**   ·   Tested on Ubuntu 24.04, x86_64
 
 ### Requirements
 
@@ -234,7 +234,7 @@ and `tests/test_no_sequences_in_repo.py` checks automatically and fails if a seq
 
 ## Third-party software, data and limitations
 
-**Licence.** This project's MIT licence covers the code written for it. It does not apply to the software and data below. Details: [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
+**Licence.** This project's GPL-3.0-or-later licence covers the code written for it. It does not apply to the software and data below. Details: [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
 
 - **MFEprimer** is independent third-party software and is not included. Its official site gives no redistribution terms, so each user downloads it from <https://www.mfeprimer.com/> and uses it under the developers' terms.
 - **Genome data** are downloaded at run time and are not stored in this repository. LASV genomes and metadata come from Nextstrain (data.nextstrain.org, GenBank-derived). Nextstrain notes that some records are included with the data providers' permission before publication, so being public does not mean unrestricted reuse or redistribution: acknowledge the original sequence submitters (the `authors` column) and cite Nextstrain when you publish results, and check the terms before redistributing the downloaded sequences or metadata.
@@ -252,11 +252,11 @@ There is no publication for this tool yet. Please cite the software as below, **
   author  = {Choi, Chihwan},
   title   = {TaqMan Primer/Probe Validator},
   year    = {2026},
-  version = {0.22.8},
+  version = {0.23.0},
   url     = {https://github.com/CHOICHI-HWAN/TaqmanPrimerProbeValidator}
 }
 ```
 
 **Tools it builds on:** **MFEprimer-3.0** (Wang K, et al. *Nucleic Acids Res.* 2019, doi:10.1093/nar/gkz351), MAFFT (Katoh & Standley 2013), pixy (Korunes & Samuk 2021), Snakemake (Mölder et al. 2021), Nextstrain (Hadfield et al. 2018).
 
-Third-party licences: [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) · [CHANGELOG.md](CHANGELOG.md) · MIT licence, © 2026 Chihwan Choi.
+Third-party licences: [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) · [CHANGELOG.md](CHANGELOG.md) · [GPL-3.0-or-later](LICENSE)

@@ -1,6 +1,6 @@
 # TaqMan Primer/Probe Validator — LASV 에디션
 
-![License](https://img.shields.io/badge/license-MIT-blue) ![Snakemake](https://img.shields.io/badge/snakemake-%E2%89%A59.27-brightgreen) ![Platform](https://img.shields.io/badge/platform-linux--64-lightgrey)
+![License](https://img.shields.io/badge/license-GPL--3.0--or--later-blue) ![Snakemake](https://img.shields.io/badge/snakemake-%E2%89%A59.27-brightgreen) ![Platform](https://img.shields.io/badge/platform-linux--64-lightgrey)
 
 [English README](README.md)  ·  Nipah 에디션: [`nipah`](https://github.com/CHOICHI-HWAN/TaqmanPrimerProbeValidator/tree/nipah) 브랜치
 
@@ -94,7 +94,7 @@ LASV 에디션은 두 분절(S, L)을 다루며, 유전체와 메타데이터는
 
 ### 현재 버전
 
-코드: **v0.22.8**   ·   Ubuntu 24.04, x86_64에서 테스트
+코드: **v0.23.0**   ·   Ubuntu 24.04, x86_64에서 테스트
 
 ### 필요한 것
 
@@ -235,7 +235,7 @@ python3 webapp/server.py --host 0.0.0.0 --port 8765
 
 ## 서드파티 소프트웨어·데이터와 한계
 
-**라이선스.** 이 프로젝트의 MIT 라이선스는 이 프로젝트를 위해 작성한 코드에만 적용되며, 아래 소프트웨어와 데이터에는 적용되지 않습니다. 자세한 내용: [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
+**라이선스.** 이 프로젝트의 GPL-3.0-or-later 라이선스는 이 프로젝트를 위해 작성한 코드에만 적용되며, 아래 소프트웨어와 데이터에는 적용되지 않습니다. 자세한 내용: [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
 
 - **MFEprimer**는 독립적인 서드파티 소프트웨어이며 포함하지 않았습니다. 공식 사이트가 재배포 조건을 밝히지 않으므로 각자 <https://www.mfeprimer.com/> 에서 받아 개발자의 조건에 따라 사용하세요.
 - **유전체 데이터**는 실행할 때 내려받으며 이 저장소에 저장하지 않습니다. LASV 유전체와 메타데이터는 Nextstrain(data.nextstrain.org, GenBank 유래)에서 받습니다. Nextstrain은 일부 기록을 발표 전 제공자의 허락하에 포함했다고 밝히므로, 공개되어 있다는 것이 제한 없는 재사용·재배포를 뜻하지는 않습니다. 결과를 발표할 때는 원 서열 제출자(`authors` 열)를 밝히고 Nextstrain을 인용하며, 내려받은 서열·메타데이터를 재배포하기 전에는 조건을 확인하세요.
@@ -253,11 +253,11 @@ python3 webapp/server.py --host 0.0.0.0 --port 8765
   author  = {Choi, Chihwan},
   title   = {TaqMan Primer/Probe Validator},
   year    = {2026},
-  version = {0.22.8},
+  version = {0.23.0},
   url     = {https://github.com/CHOICHI-HWAN/TaqmanPrimerProbeValidator}
 }
 ```
 
 **바탕이 된 도구:** **MFEprimer-3.0** (Wang K, et al. *Nucleic Acids Res.* 2019, doi:10.1093/nar/gkz351), MAFFT (Katoh & Standley 2013), pixy (Korunes & Samuk 2021), Snakemake (Mölder et al. 2021), Nextstrain (Hadfield et al. 2018).
 
-서드파티 라이선스: [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) · [CHANGELOG.md](CHANGELOG.md) · MIT 라이선스, © 2026 Chihwan Choi.
+서드파티 라이선스: [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) · [CHANGELOG.md](CHANGELOG.md) · [GPL-3.0-or-later](LICENSE)

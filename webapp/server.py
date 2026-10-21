@@ -2634,7 +2634,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_json(json.loads(f.read_text(encoding="utf-8")) if f.exists() else {"phases": [], "open": []})
 
         if path == "/api/profile":
-            return self._send_json(get_profile())
+            try:
+                version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+            except OSError:
+                version = ""
+            return self._send_json(dict(get_profile(), version=version))        # the footer shows the VERSION file, not a typed-in number
 
         if path == "/api/diversity":
             return self._send_json(load_diversity())

@@ -366,7 +366,7 @@ curl -L -o webapp/static/vendor/peartree.bundle.min.js \
 ## License / Copyright
 
 Copyright (c) 2026 Chihwan Choi (c.mario8609@gmail.com). Licensed under the
-[MIT License](../LICENSE) (open source) — see the `LICENSE` file for the full text.
+[GNU GPL v3 or later](../LICENSE) (open source) — see the `LICENSE` file for the full text.
 
 This covers the pipeline code (`scripts/`, `webapp/`, `Snakefile`, etc.) only. Actual
 primer/probe sequences and analysis results are confidential and are never committed to
