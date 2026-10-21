@@ -1608,6 +1608,25 @@ def load_pipelines():
     return [{"id": p["id"], "name": p.get("short") or p["name"], "port": p["port"], "current": p.get("path") == here} for p in items]
 
 
+def _venn_saved_path():
+    return ROOT / "config" / "venn_saved.json"
+
+
+def load_venn_saved():
+    """Named selections of the Venn page ([{id, name, seg, keys, lineage, created}]), shared by everyone who uses this dashboard."""
+    try:
+        data = json.loads(_venn_saved_path().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    return data if isinstance(data, list) else []
+
+
+def _write_venn_saved(items):
+    tmp = _venn_saved_path().with_suffix(".tmp")
+    tmp.write_text(json.dumps(items, ensure_ascii=False, indent=1), encoding="utf-8")
+    tmp.replace(_venn_saved_path())
+
+
 def load_venn(seg):
     """Everything the coverage-Venn page needs for one segment, in the active host scope: the population (accession, lineage, country)
     and, per primer set and per group, the genomes it validates (a group counts its cross-binding genomes too, like the overview)."""
@@ -2599,6 +2618,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_json(load_overview())
         if path == "/api/final-results":
             return self._send_json(load_final_results())
+        if path == "/api/venn-saved":
+            return self._send_json(load_venn_saved())
         if path == "/api/pipelines":
             return self._send_json(load_pipelines())
         m = re.match(r"^/api/venn/(\w+)$", path)
@@ -2957,6 +2978,26 @@ class Handler(BaseHTTPRequestHandler):
             return self._handle_generate_report()
         if self.path == "/api/groups":
             return self._handle_create_group()
+        if self.path == "/api/venn-saved":
+            try:
+                body = self._read_json_body()
+            except json.JSONDecodeError:
+                return self._send_json({"error": "invalid JSON"}, 400)
+            name = str(body.get("name", "")).strip()[:80]
+            keys = [k for k in (body.get("keys") or []) if isinstance(k, str) and re.fullmatch(r"[A-Za-z0-9_\-]+", k)][:12]
+            seg = str(body.get("seg", "")).lower()
+            if not name or not keys or seg not in seg_keys():
+                return self._send_json({"error": "이름과 한 개 이상의 세트·그룹이 필요합니다."}, 400)
+            items = [x for x in load_venn_saved() if not (x.get("name") == name and x.get("seg") == seg)]    # same name = replace
+            item = {"id": uuid.uuid4().hex[:8], "name": name, "seg": seg, "keys": keys, "lineage": str(body.get("lineage", "ALL"))[:40],
+                    "created": time.strftime("%Y-%m-%d %H:%M")}
+            items.append(item)
+            _write_venn_saved(items)
+            return self._send_json(item)
+        m = re.match(r"^/api/venn-saved/([0-9a-f]{8})/delete$", self.path)
+        if m:
+            _write_venn_saved([x for x in load_venn_saved() if x.get("id") != m.group(1)])
+            return self._send_json({"ok": True})
         m = re.match(r"^/api/set-parent/([A-Za-z0-9_\-]+)$", self.path)
         if m:
             try:

@@ -1134,3 +1134,19 @@ a.pipe-pill:hover { border-color: var(--accent); color: var(--accent); }
 .variant-list .set-item.variant { margin: 3px 0; border-style: solid; background: color-mix(in srgb, var(--card) 70%, transparent); }
 .variant-list .set-item.variant::before { content: ""; position: absolute; left: -12px; top: 50%; width: 10px; border-top: 2px solid var(--accent); }
 .variant-list .set-item.variant { position: relative; }
+
+/* ---- Venn page: group > set picker, named colours, saved selections ---- */
+.vn-selector { display: flex; flex-wrap: wrap; gap: 6px 22px; align-items: flex-start; max-height: 300px; overflow: auto; }
+.vn-tree-group { display: flex; flex-direction: column; min-width: 230px; padding: 4px 8px; border-left: 2px solid var(--border); }
+.vn-tree-vendor { font-size: var(--fs-2xs); font-weight: 700; color: var(--muted); margin-bottom: 2px; }
+.vn-pick { display: flex; align-items: center; gap: 5px; padding: 1px 0; font-size: var(--fs-sm); cursor: pointer; }
+.vn-dot { width: 11px; height: 11px; border-radius: 50%; border: 1.5px solid var(--border); display: inline-block; flex: none; }
+.vn-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0 0 8px; }
+.vn-chip { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-sm); }
+.vn-chip i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+.vn-saved { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.vn-saved-chip { display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: var(--r-pill); padding: 0 4px 0 10px; font-size: var(--fs-sm); }
+.vn-saved-chip a { text-decoration: none; color: var(--fg); }
+.vn-saved-chip a:hover { color: var(--accent); }
+.vn-del { border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 15px; padding: 0 6px; }
+.vn-del:hover { color: var(--bad); }
