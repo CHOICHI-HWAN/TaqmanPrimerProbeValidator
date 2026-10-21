@@ -1150,3 +1150,27 @@ a.pipe-pill:hover { border-color: var(--accent); color: var(--accent); }
 .vn-saved-chip a:hover { color: var(--accent); }
 .vn-del { border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 15px; padding: 0 6px; }
 .vn-del:hover { color: var(--bad); }
+
+/* ---- sidebar: fold only the menu buttons, keep the group / set list ---- */
+.menu-toggle-btn { width: 100%; margin: 4px 0; padding: 4px 10px; border: 1px dashed var(--border); border-radius: var(--r-md); background: transparent; color: var(--muted); font-size: var(--fs-xs); font-weight: 700; cursor: pointer; text-align: left; }
+.menu-toggle-btn:hover { border-color: var(--accent); color: var(--accent); }
+.sidebar-menu[hidden] { display: none; }
+
+/* ---- Venn picker v2: roomy cards, tinted selection ---- */
+.vn-selector { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; max-height: none; overflow: visible; margin-top: 8px; }
+.vn-selector-head { font-size: var(--fs-md); }
+.vn-tree-group { display: flex; flex-direction: column; min-width: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-lg); background: color-mix(in srgb, var(--card) 85%, transparent); box-shadow: var(--shadow-sm, 0 1px 2px rgba(16,24,40,.06)); border-left: 0; }
+.vn-tree-group:hover { border-color: var(--accent); }
+.vn-tree-loose { background: transparent; border-style: dashed; }
+.vn-tree-vendor { font-size: var(--fs-xs); font-weight: 700; color: var(--muted); letter-spacing: .02em; margin-bottom: 4px; }
+.vn-members { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; padding-left: 6px; border-left: 2px solid var(--border); }
+.vn-pick { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: var(--r-md); font-size: var(--fs-md); cursor: pointer; border: 1px solid transparent; transition: background .12s, border-color .12s; }
+.vn-pick:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.vn-pick.on { background: color-mix(in srgb, var(--c) 16%, transparent); border-color: color-mix(in srgb, var(--c) 55%, transparent); font-weight: 600; }
+.vn-pick-group { font-weight: 700; font-size: 15px; padding: 7px 8px; }
+.vn-pick input { width: 16px; height: 16px; flex: none; accent-color: var(--accent); }
+.vn-dot { width: 14px; height: 14px; }
+.vn-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.vn-count { flex: none; font-size: var(--fs-xs); font-weight: 700; padding: 1px 8px; border-radius: var(--r-pill); background: color-mix(in srgb, var(--muted) 16%, transparent); color: var(--muted); }
+.vn-pick.on .vn-count { background: color-mix(in srgb, var(--c) 28%, transparent); color: var(--fg); }
+.vn-selector { max-height: 62vh; overflow: auto; resize: vertical; padding: 2px 6px 2px 2px; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); }

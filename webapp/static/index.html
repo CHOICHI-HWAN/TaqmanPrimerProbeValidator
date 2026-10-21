@@ -38,6 +38,8 @@
       <div id="activeJobsBanner" class="active-jobs-banner" hidden></div>
       <div id="hostScopeBox" class="host-scope-box" hidden></div>
       <button id="overviewBtn" class="btn btn-secondary btn-block">전체 대시보드</button>
+      <button type="button" id="menuToggleBtn" class="menu-toggle-btn" title="위쪽 메뉴 버튼만 접고 아래 프라이머 그룹·세트 목록을 넓게 봅니다">&#9776; 메뉴 접기 &#9652;</button>
+      <div id="sidebarMenu" class="sidebar-menu">
       <button id="addSetBtn" class="btn btn-primary btn-block">+ 새 프라이머 세트 분석</button>
       <details class="menu-group" data-menu="analyze" open>
         <summary>🔬 분석 · 검증</summary>
@@ -70,6 +72,7 @@
       <div class="pipeline-btn-row">
         <button id="fetchDataBtn" class="btn btn-secondary" title="Nextstrain에서 최신 서열/메타데이터를 새로 받고 mfeprimer 인덱스를 다시 만듭니다">데이터 업데이트</button>
         <button id="rerunBtn" class="btn btn-secondary" title="현재 데이터로 전체 세트 분석을 처음부터 다시 계산합니다">분석 다시하기</button>
+      </div>
       </div>
       <div id="pipelineStatus" class="pipeline-status" hidden></div>
       <button id="groupModeBtn" class="btn btn-secondary btn-block">+ 그룹 만들기 (여러 세트 묶기)</button>
