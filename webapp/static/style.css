@@ -1128,3 +1128,9 @@ a.pipe-pill:hover { border-color: var(--accent); color: var(--accent); }
 .app.sidebar-collapsed .sidebar-edge-btn { left: 0; }
 .app.sidebar-collapsed .sidebar-open-btn { display: none; }          /* the edge handle already opens it */
 @media (max-width: 760px) { .sidebar-edge-btn { display: none; } }
+
+/* sub-level under a set: always shown, with a connector so the parent/child relation reads at a glance */
+.variant-list { position: relative; margin: 0 0 6px 14px; padding-left: 10px; border-left: 2px solid var(--accent); }
+.variant-list .set-item.variant { margin: 3px 0; border-style: solid; background: color-mix(in srgb, var(--card) 70%, transparent); }
+.variant-list .set-item.variant::before { content: ""; position: absolute; left: -12px; top: 50%; width: 10px; border-top: 2px solid var(--accent); }
+.variant-list .set-item.variant { position: relative; }

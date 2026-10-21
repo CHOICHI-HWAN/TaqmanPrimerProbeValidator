@@ -5,6 +5,11 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.22.4] - 2026-10-21
+
+### Changed
+- **사이드바의 하위 세트가 기본으로 펼쳐져 보입니다**: 이름이 `<부모 이름>-숫자`인 하위 세트(변이)는 "접힘 배지" 뒤에 숨기지 않고 부모 세트 바로 아래에 연결선과 함께 항상 보이며, "▾ 하위 n" 배지로 접고 펼칩니다(접은 상태는 기억됨).
+
 ## [0.22.3] - 2026-10-21
 
 ### Fixed

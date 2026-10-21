@@ -598,15 +598,15 @@ function escHtml(s) {
 // A set is shown under ONE group -- the smallest group that contains it, so an "ALL" group does not repeat every set -- and sets that
 // belong to no group are listed by vendor. A variant ("<parent name>-<n>", see set_parents) is folded into its parent's row.
 state.treeClosed = new Set();            // keys "g:<group id>" of groups the user folded
-state.treeOpenVariants = new Set();      // keys "v:<set id>" of parents whose variants are unfolded
+state.treeClosedVariants = new Set();    // keys "v:<set id>" of parents whose variants the user folded (they are shown under their parent by default)
 try {
   state.treeClosed = new Set(JSON.parse(localStorage.getItem("lasv_tree_closed") || "[]"));
-  state.treeOpenVariants = new Set(JSON.parse(localStorage.getItem("lasv_tree_open_variants") || "[]"));
+  state.treeClosedVariants = new Set(JSON.parse(localStorage.getItem("lasv_tree_closed_variants") || "[]"));
 } catch (e) { /* private mode */ }
 function saveTreeState() {
   try {
     localStorage.setItem("lasv_tree_closed", JSON.stringify([...state.treeClosed]));
-    localStorage.setItem("lasv_tree_open_variants", JSON.stringify([...state.treeOpenVariants]));
+    localStorage.setItem("lasv_tree_closed_variants", JSON.stringify([...state.treeClosedVariants]));
   } catch (e) { /* ignore */ }
 }
 function vendorLabel(source) {
@@ -710,11 +710,11 @@ function renderSidebar() {
     const oxHtml = s.standard?.ok ? `<span class="ox ox-o">O</span>` : `<span class="ox ox-x">X</span>`;
     const checked = state.selectedForGroup.has(s.set_id);
     const nVar = en.variants ? en.variants.length : 0;
-    const open = searching || state.treeOpenVariants.has("v:" + s.set_id);
+    const open = searching || !state.treeClosedVariants.has("v:" + s.set_id);
     const dup = s.duplicate_of
       ? `<span class="dup-badge" title="F/R/Probe 서열이 ${escHtml(s.duplicate_of)}와 같습니다 (이름만 다른 중복 등록)">= ${escHtml(s.duplicate_of)}</span>`
       : (s.duplicate_ids && s.duplicate_ids.length ? `<span class="dup-badge" title="같은 서열의 다른 이름: ${escHtml(s.duplicate_ids.join(", "))}">동일 서열 +${s.duplicate_ids.length}</span>` : "");
-    const varBadge = nVar ? `<span class="variant-badge" data-toggle="${escHtml(s.set_id)}" title="이 세트에서 변형한 세트 ${nVar}개 — 눌러서 펼치기/접기">${open ? "▾" : "▸"} +${nVar} 변이</span>` : "";
+    const varBadge = nVar ? `<span class="variant-badge" data-toggle="${escHtml(s.set_id)}" title="이 세트 아래의 하위 세트(변이) ${nVar}개 — 눌러서 접기/펼치기">${open ? "▾" : "▸"} 하위 ${nVar}</span>` : "";
     const nm = s.display_name || s.set_id;
     const shortName = level === 2 && parentName && nm.startsWith(parentName) ? "↳ " + nm.slice(parentName.length) + ` <span class="note">${escHtml(nm)}</span>` : escHtml(nm);
     item.innerHTML = `
@@ -737,7 +737,7 @@ function renderSidebar() {
     if (vb) vb.addEventListener("click", (e) => {
       e.stopPropagation();
       const k = "v:" + s.set_id;
-      if (state.treeOpenVariants.has(k)) state.treeOpenVariants.delete(k); else state.treeOpenVariants.add(k);
+      if (state.treeClosedVariants.has(k)) state.treeClosedVariants.delete(k); else state.treeClosedVariants.add(k);
       saveTreeState(); renderSidebar();
     });
     if (level < 2) makeDraggable(item, s.set_id, "set", containerKey, idsInOrder);
