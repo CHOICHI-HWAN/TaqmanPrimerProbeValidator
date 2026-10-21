@@ -5,6 +5,11 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.22.5] - 2026-10-21
+
+### Changed
+- **프라이머 입력/관리: "분석진행"을 끄고 저장하면 그 세트의 결과가 바로 삭제되고 숨겨집니다**: 해당 세트의 결과 폴더(`output/primers/<ID>/`), Probe 설계 기록, 요약 표(`summary.tsv` 등 6개)의 행, 사용자 최종 결과 표시를 지우고 사이드바·개요·그룹에서 바로 사라집니다. 저장 메시지에 지운 세트가 표시되며, 서열은 입력 표에 남아 있어 다시 체크하고 분석하면 복구됩니다. 이미 꺼져 있는데 결과가 남은 세트도 다음 저장 때 같이 정리됩니다. 이전에는 결과 파일이 남아 요약 표와 화면이 어긋날 수 있었습니다. `tests/test_purge_inactive_sets.py`.
+
 ## [0.22.4] - 2026-10-21
 
 ### Changed
