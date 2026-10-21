@@ -5,6 +5,14 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-10-21
+
+### Changed
+- **라이선스를 MIT에서 GPL-3.0-or-later(GNU GPL v3 이상)로 변경했습니다.** `LICENSE`에 GPL-3.0 전문과 저작권 고지(CHIHWAN CHOI)를 넣고, README(영·한)의 배지와 라이선스 문단, `CITATION.cff`(`license`), `THIRD_PARTY_LICENSES.md`, `docs/PIPELINE.md`, 대시보드 사이드바 하단 표기를 바꿨습니다. 0.22.8까지 MIT로 공개된 버전을 이미 받아 간 사본은 그 라이선스를 그대로 유지합니다. 함께 쓰는 도구(varVAMP GPL-3.0, PrimerHunter GPL, MFEprimer 등)와 GPL-3.0은 호환되며, 포함된 MIT 코드(PearTree, Bootswatch 등)는 원래 라이선스를 유지합니다.
+
+### Fixed
+- **LASV와 NiV의 버전 표기가 서로 달랐던 문제**: NiV 대시보드의 사이드바 하단이 `v0.21.0`으로 고정 문구였습니다. 이제 하단 버전은 `VERSION` 파일 값을 서버(`/api/profile`의 `version`)에서 받아 표시하고, `tests/test_version_consistency.py`가 `VERSION`, `CITATION.cff`, `webapp/package.json`, README, 사이드바 문구의 버전이 모두 같은지 검사합니다.
+
 ## [0.22.8] - 2026-10-21
 
 ### Fixed

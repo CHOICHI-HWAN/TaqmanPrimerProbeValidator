@@ -6332,6 +6332,8 @@ async function loadProfile() {
     PROFILE = await fetchJSON("/api/profile");
     ALL_LASV_KEY = PROFILE.population.pooled_label;
     document.title = `${PROFILE.short_name} Primer/Probe Validation`;
+    const fv = document.getElementById("footerVersion");
+    if (fv && PROFILE.version) fv.textContent = PROFILE.version;
     const h1 = document.querySelector(".sidebar-header h1");
     if (h1) h1.textContent = `${PROFILE.short_name} Primer/Probe`;
   } catch { /* keep the defaults */ }
