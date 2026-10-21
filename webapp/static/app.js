@@ -7601,7 +7601,7 @@ function vnDiagram(c) {
     ${shapes}${labels}
     <g class="vn-region-label" data-mask="0" style="cursor:pointer;"><title>어느 세트도 못 잡는 유전체</title>
       <rect x="${W - 150}" y="${H - 52}" width="138" height="40" rx="8" fill="var(--bad)" fill-opacity=".14" stroke="var(--bad)"/>
-      <text x="${W - 81}" y="${H - 34}" text-anchor="middle" font-size="12" fill="currentColor">못 잡음 (차집합)</text>
+      <text x="${W - 81}" y="${H - 34}" text-anchor="middle" font-size="12" fill="currentColor">못 잡음 (여집합)</text>
       <text x="${W - 81}" y="${H - 18}" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">${none} (${nonePct}%)</text></g>
   </svg>`;
 }
@@ -7654,7 +7654,7 @@ function vnDraw(view) {
       <div class="card" style="padding:8px 14px;"><div class="note">대상 유전체</div><b style="font-size:20px;">${c.n}</b></div>
       <div class="card" style="padding:8px 14px;"><div class="note">합집합 (하나라도 잡음)</div><b style="font-size:20px;">${c.union}</b> <span class="note">${pct(c.union)}%</span></div>
       <div class="card" style="padding:8px 14px;"><div class="note">교집합 (모두가 잡음)</div><b style="font-size:20px;">${c.inter}</b> <span class="note">${pct(c.inter)}%</span></div>
-      <div class="card" style="padding:8px 14px;cursor:pointer;border-color:var(--bad);" id="vnNoneTile"><div class="note">못 잡음 (차집합)</div><b style="font-size:20px;color:var(--bad);">${c.none}</b> <span class="note">${pct(c.none)}%</span></div></div>` : "";
+      <div class="card" style="padding:8px 14px;cursor:pointer;border-color:var(--bad);" id="vnNoneTile"><div class="note">못 잡음 (여집합)</div><b style="font-size:20px;color:var(--bad);">${c.none}</b> <span class="note">${pct(c.none)}%</span></div></div>` : "";
   const diagram = c.sel.length === 0 ? "<p class='note'>위에서 비교할 프라이머 세트·그룹을 고르세요.</p>"
     : c.sel.length > 4 ? "<p class='note'>5개 이상 고르면 벤 다이어그램 대신 아래 \"겹침 조합 표\"로 보여 줍니다 (4개 이하로 줄이면 그림이 나옵니다).</p>" : vnDiagram(c);
   view.querySelector("#vnBody").innerHTML = `${tiles}
@@ -7700,7 +7700,7 @@ async function showVennPage() {
   let savedList = [];
   try { savedList = (await fetchJSON("/api/venn-saved")).filter((x) => String(x.seg).toUpperCase() === VN.seg.toUpperCase()); } catch (e) { /* none */ }
   view.innerHTML = `<h2>🔵 커버리지 벤 다이어그램</h2>
-    <p class="note">고른 프라이머 세트·그룹이 <b>실제 검증을 통과시킨 유전체</b>를 겹쳐 봅니다: 합집합(하나라도 잡음), 교집합(모두 잡음), 영역별 단독·겹침, 그리고 어느 것도 못 잡는 유전체(차집합). 그룹은 교차 결합으로 통과한 유전체까지 포함합니다. ${pdScopeBadge(d.host_scope && d.host_scope.scope)} 숙주 기준을 따릅니다.</p>
+    <p class="note">고른 프라이머 세트·그룹이 <b>실제 검증을 통과시킨 유전체</b>를 겹쳐 봅니다: 합집합(하나라도 잡음), 교집합(모두 잡음), 영역별 단독·겹침, 그리고 어느 것도 못 잡는 유전체(여집합 = 대상 전체 − 합집합). 그룹은 교차 결합으로 통과한 유전체까지 포함합니다. ${pdScopeBadge(d.host_scope && d.host_scope.scope)} 숙주 기준을 따릅니다.</p>
     <div class="seg-tab-row">${allSegs.map((x) => `<button class="seg-tab ${x === VN.seg ? "active" : ""}" data-vnseg="${x}">${x}</button>`).join("")}</div>
     <div class="card">
       <div class="vn-selector-head"><b>비교할 세트·그룹을 고르세요</b> <span class="note">고른 순서대로 색이 정해집니다 · 지금 ${VN.selected.size}개 선택</span></div>

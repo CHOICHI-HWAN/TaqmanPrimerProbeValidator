@@ -5,6 +5,11 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.22.8] - 2026-10-21
+
+### Fixed
+- **용어**: 벤 다이어그램의 "못 잡음"(대상 전체에서 합집합을 뺀 나머지)은 차집합이 아니라 **여집합**(전체집합 − 합집합)입니다. 화면의 "못 잡음 (여집합)"과 설명, CHANGELOG의 표기를 바로잡았습니다.
+
 ## [0.22.7] - 2026-10-21
 
 ### Changed
@@ -74,7 +79,7 @@ All notable changes to this project are documented here. Format follows
 - **사이드바 접기**: 사이드바 머리글의 « 버튼(또는 Ctrl+B)으로 옆으로 접고, 왼쪽 위 » 버튼으로 다시 펼칩니다. 선택은 이 브라우저에 기억됩니다.
 - **상세 창(모달) 도구**: 게놈 결합 상세 등 상세 창에 📋 복사(텍스트), 📷 화면 저장(PNG, 스크롤 밖 부분까지 전체), 🖼 이미지 복사, ⇔ 맞춤, ━ 최소화(왼쪽 아래로 접힘, 여러 개 나란히), ⛶ 최대화를 추가했습니다. 내용이 창보다 넓으면 창을 먼저 넓히고(화면 폭까지) 그래도 넘치면 축소해서 맞춥니다(⇔ 맞춤으로 끌 수 있음). 외부 라이브러리 없이 브라우저가 직접 그립니다(`domToPngBlob`).
 - **사용자 최종 결과**: 세트·그룹 상세 화면에서 채택 / 보류 / 탈락 / 미정과 한 줄 메모를 직접 표시하고, 개요의 세트·조합 표에 "최종 결과" 열로 보여 줍니다. `config/final_results.json`에 저장되며 파이프라인 계산에는 쓰이지 않습니다. API: `GET /api/final-results`, `POST /api/final-results/<ID>`.
-- **🔵 커버리지 벤 다이어그램** 페이지(사이드바): 프라이머 세트와 그룹(교차 결합 포함)을 골라 실제 검증을 통과한 유전체를 벤 다이어그램으로 겹쳐 봅니다(그림은 4개까지, 더 고르면 표). 합집합·교집합·영역별 단독/겹침 개수와 비율, 어느 것도 못 잡는 유전체(차집합)를 보여 주고, 다이어그램의 영역이나 표 행을 누르면 그 유전체 목록(accession·리니지·나라)을 복사/CSV로 내려받을 수 있습니다. 범위를 "전체" 또는 리니지 하나로 바꿀 수 있고, 아래 "리니지별 커버리지" 표(세트별·합집합·교집합·못 잡음)에서 리니지 이름이나 못 잡음 수를 누르면 그 리니지로 이동합니다. 숙주 기준을 따릅니다. API: `GET /api/venn/<segment>`.
+- **🔵 커버리지 벤 다이어그램** 페이지(사이드바): 프라이머 세트와 그룹(교차 결합 포함)을 골라 실제 검증을 통과한 유전체를 벤 다이어그램으로 겹쳐 봅니다(그림은 4개까지, 더 고르면 표). 합집합·교집합·영역별 단독/겹침 개수와 비율, 어느 것도 못 잡는 유전체(여집합)를 보여 주고, 다이어그램의 영역이나 표 행을 누르면 그 유전체 목록(accession·리니지·나라)을 복사/CSV로 내려받을 수 있습니다. 범위를 "전체" 또는 리니지 하나로 바꿀 수 있고, 아래 "리니지별 커버리지" 표(세트별·합집합·교집합·못 잡음)에서 리니지 이름이나 못 잡음 수를 누르면 그 리니지로 이동합니다. 숙주 기준을 따릅니다. API: `GET /api/venn/<segment>`.
 - **PrimerHunter 연동**: 재설계 페이지의 "도구"에서 PrimerHunter 1.0.2(UConn, GPL; `tools/primerhunter/`에 소스를 받아 빌드, 출처·SHA256은 그곳 README)를 고를 수 있습니다. PrimerHunter가 매우 느려서(리니지당 약 10분 이상) 리니지에서 가장 다양한 대표 게놈 N개(기본 25)로 설계하고, 소스 서열 위치 구간을 나눠 병렬로 실행하며(`scripts/redesign_primerhunter.py`), 같은 입력이면 이전 결과를 재사용합니다. PrimerHunter는 프라이머만 설계하므로 쌍마다 이 도구의 Probe 설계기(자체 규칙+Primer3, IUPAC)로 Probe를 붙이고(프라이머보다 높은 Tm이 불가능하면 조건을 완화하고 표시) 리니지 전체로 실제 검증합니다. 옵션: 대표 표본 수, 최소 커버리지, 최소 Tm. 결과는 `output/redesign/<segment>/<scope>/primerhunter/`.
 - **Probe 설계 수정**: 정렬 consensus에 gap(`-`)이 있으면 Primer3가 거부하던 오류를 고쳤습니다(gap을 N으로 바꿔 전달).
 - **🛠 리니지별 재설계 (varVAMP)** 페이지(사이드바): 리니지(클레이드)마다 그 리니지의 전체 게놈(숙주 기준 적용)을 MAFFT로 정렬하고 `varvamp qpcr`로 degenerate F/R 프라이머 + TaqMan Probe를 새로 설계합니다(consensus 임계값을 0.9부터 0.6까지 낮춰 가며 시도, 리니지당 설계 수·IUPAC 수·최소 게놈 수 조절, 전체(pan) 설계도 선택). 설계마다 이 파이프라인의 실제 검증(`live_analyze.analyze_set`)을 돌려 "이 리니지 Validated", 전체 Validated와 통과한 리니지, Probe 일치, 표준물질을 보여주고 "MSA 보기" 모달을 제공합니다. 결과는 `output/redesign/<segment>/<scope>/`에만 저장되고 이 페이지에서만 보입니다. `scripts/redesign_varvamp.py`, API: `POST /api/redesign`, `GET /api/redesign/<seg>/run|msa`. `varvamp==1.3.2`를 `environment.yml`에 추가했습니다.
