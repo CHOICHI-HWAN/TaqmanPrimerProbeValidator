@@ -4695,7 +4695,7 @@ function renderPrimersPage() {
     <div class="note">
       엑셀처럼 셀을 클릭해 바로 입력하세요 — <b>Enter/↓/↑</b>로 위아래 이동, <b>Tab</b>으로 옆 칸 이동,
       엑셀/구글시트에서 복사한 영역을 <b>붙여넣기(Ctrl/Cmd+V)</b>하면 여러 행·열이 한 번에 채워집니다.
-      <b>분석진행</b> 체크를 해제한 행은 파이프라인 분석에서 완전히 제외됩니다(결과·대시보드에도 안 나타남).
+      <b>분석진행</b> 체크를 해제한 행은 파이프라인 분석에서 완전히 제외됩니다. <b>저장하는 순간 그 세트의 기존 결과(결과 폴더, 요약 표의 행, Probe 설계 기록)가 삭제되고 대시보드에서 숨겨집니다</b>(서열은 이 표에 남으므로 다시 체크하고 분석하면 복구됩니다).
       저장 후 실제 분석에 반영하려면 사이드바의 "분석 다시하기"를 눌러주세요.
     </div>
     <div class="primers-toolbar">
@@ -4875,8 +4875,13 @@ async function savePrimersManifest() {
   }
   primersState.errorsByRow = {};
   renderPrimersPage();
-  $("#primersSaveStatus").textContent = "저장됨. 반영하려면 \"분석 다시하기\"를 눌러주세요.";
-  loadSets();
+  const purged = data.purged || [];
+  $("#primersSaveStatus").textContent = purged.length
+    ? `저장됨. 분석진행이 꺼진 ${purged.length}개 세트의 결과를 삭제했습니다 (${purged.map((x) => x.id).join(", ")}). 나머지는 "분석 다시하기"로 반영하세요.`
+    : "저장됨. 반영하려면 \"분석 다시하기\"를 눌러주세요.";
+  await Promise.all([loadSets(), loadGroups()]);                // a switched-off set disappears from the sidebar right away
+  if (purged.length && !state.activeId) { /* overview/other pages keep their own refresh */ }
+  if (state.activeType === "set" && purged.some((x) => x.id === state.activeId)) { state.activeId = null; state.activeType = null; renderSidebar(); }
 }
 
 $("#primersBtn").addEventListener("click", showPrimersPage);

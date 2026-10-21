@@ -1531,6 +1531,55 @@ def _final_results_path():
     return ROOT / "config" / "final_results.json"
 
 
+_PURGE_SUMMARIES = ("summary.tsv", "summary_by_lineage.tsv", "gene_summary.tsv", "engine_concordance.tsv", "standard_summary.tsv",
+                    "standard_matches.tsv")
+
+
+def purge_set_results(set_ids):
+    """Deletes what the pipeline and the dashboard computed for sets whose "분석진행" is off: output/primers/<id>/, the probe-design folder and
+    the set's rows in the summary tables (the Parameters-independent results can be recomputed by switching the set back on and re-running).
+    The primer sequences stay in config/primers.tsv. -> [{"id", "dirs", "rows"}] for the sets that actually had something to delete."""
+    report = []
+    ids = {i for i in set_ids if re.fullmatch(r"[A-Za-z0-9_\-]+", i or "")}
+    if not ids:
+        return report
+    removed = {i: {"dirs": 0, "rows": 0} for i in ids}
+    for i in ids:
+        for d in (ROOT / "output" / "primers" / i, ROOT / "output" / "probe_design" / i):
+            if d.is_dir():
+                shutil.rmtree(d)
+                removed[i]["dirs"] += 1
+    for name in _PURGE_SUMMARIES:
+        f = ROOT / "output" / "summary" / name
+        if not f.exists():
+            continue
+        lines = f.read_text(encoding="utf-8").split("\n")
+        head = lines[0].split("\t") if lines and lines[0] else []
+        if "set_id" not in head:
+            continue
+        col = head.index("set_id")
+        keep, changed = [], False
+        for ln in lines:
+            parts = ln.split("\t")
+            if ln and ln is not lines[0] and len(parts) > col and parts[col] in ids:
+                removed[parts[col]]["rows"] += 1
+                changed = True
+                continue
+            keep.append(ln)
+        if changed:
+            tmp = f.with_suffix(".tmp")
+            tmp.write_text("\n".join(keep), encoding="utf-8")
+            tmp.replace(f)
+    fr = load_final_results()                                   # the user's own marks and parent links of a removed set go too
+    for i in ids:
+        if i in fr:
+            save_final_result(i, "", "")
+    for i, v in removed.items():
+        if v["dirs"] or v["rows"]:
+            report.append({"id": i, **v})
+    return report
+
+
 def load_final_results():
     """The user's own final call per primer set / group: {id: {"verdict": adopt|hold|reject, "note": str, "updated": "YYYY-MM-DD HH:MM"}}.
     Purely a label the people using the dashboard set; nothing in the pipeline reads it."""
@@ -3026,7 +3075,10 @@ class Handler(BaseHTTPRequestHandler):
                     or r["reverse_primer"].strip() or r["probe"].strip()]
             saved = write_primers_manifest(ROOT / "config" / "primers.tsv", rows)
             sync_pipeline_inputs()
-            return self._send_json({"ok": True, "rows": saved})
+            # a set whose "분석진행" is off is gone from the dashboard at once: its results are deleted right here
+            off = [r["primer_id"] for r in saved if r.get("primer_id") and str(r.get("proceed", "")).strip().lower() not in ("true", "1", "yes", "y")]
+            purged = purge_set_results(off)
+            return self._send_json({"ok": True, "rows": saved, "purged": purged})
         m = re.match(r"^/api/(?:sets|groups)/([^/]+)/note$", self.path)
         if m:
             return self._handle_save_note(m.group(1))
