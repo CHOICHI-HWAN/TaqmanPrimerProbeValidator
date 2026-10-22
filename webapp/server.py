@@ -2995,6 +2995,11 @@ class Handler(BaseHTTPRequestHandler):
             items = [x for x in load_venn_saved() if not (x.get("name") == name and x.get("seg") == seg)]    # same name = replace
             item = {"id": uuid.uuid4().hex[:8], "name": name, "seg": seg, "keys": keys, "lineage": str(body.get("lineage", "ALL"))[:40],
                     "created": time.strftime("%Y-%m-%d %H:%M")}
+            snap = body.get("snapshot")                       # the results as they were when saved (ids per item + the population), for comparing later
+            if isinstance(snap, dict) and len(json.dumps(snap)) <= 300_000:
+                item["snapshot"] = {"scope": str(snap.get("scope", ""))[:20], "pop": [str(x)[:40] for x in (snap.get("pop") or [])][:5000],
+                                    "items": {k: {"name": str(v.get("name", ""))[:120], "ids": [str(x)[:40] for x in (v.get("ids") or [])][:5000]}
+                                              for k, v in (snap.get("items") or {}).items() if isinstance(v, dict) and re.fullmatch(r"[A-Za-z0-9_\-]+", k)}}
             items.append(item)
             _write_venn_saved(items)
             return self._send_json(item)

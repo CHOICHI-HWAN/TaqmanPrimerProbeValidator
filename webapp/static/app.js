@@ -7530,7 +7530,187 @@ function vnDraw(view) {
       <div class="card"><h4 style="margin:0 0 6px;">겹침 조합 표</h4>${c.sel.length ? vnRegionTable(c) : ""}</div></div>
     <div id="vnList">${vnRegionList(c)}</div>
     <h3 style="margin:18px 0 6px;">리니지별 커버리지 <span class="note">(선택한 세트의 실제 검증 통과 기준 · 리니지 이름을 누르면 위 다이어그램이 그 리니지만 보여 줍니다)</span></h3>
-    ${c.sel.length ? vnLineageTable(c) : ""}`;
+    ${c.sel.length ? vnLineageTable(c) : ""}
+    ${vnCurveHtml(c)}`;
+}
+
+// ---- compare two Venn combinations ("current selection", a saved one as it was when saved, or a saved one on today's data) ----
+// Each side is the UNION of its sets/groups (the panel's coverage); both sides are counted on the genomes they have in common.
+// ---- cumulative coverage curves (ROC-style): add the selected sets/groups one by one, best first, and draw how each lineage's coverage rises ----
+const VN_LIN_COLORS = ["#4C78A8", "#F58518", "#54A24B", "#E45756", "#B279A2", "#72B7B2", "#9D755D", "#EECA3B", "#FF9DA6", "#79706E"];
+
+function vnCurveData(c) {
+  const d = VN.data, items = c.sel.map((x) => ({ name: x.name, ids: new Set(x.ids) }));
+  const lins = [...new Set(d.genomes.map((g) => g[1]))].sort((a, b) => a.localeCompare(b));
+  const total = { ALL: d.genomes.length }, linOf = new Map(d.genomes.map((g) => [g[0], g[1]]));
+  lins.forEach((L) => { total[L] = d.genomes.filter((g) => g[1] === L).length; });
+  const covered = new Set(), steps = [{ label: "0", gain: 0, cov: Object.fromEntries(["ALL", ...lins].map((k) => [k, 0])) }];
+  const left = items.slice();
+  while (left.length) {
+    let bi = 0, bg = -1;
+    left.forEach((it, i) => { let g = 0; it.ids.forEach((id) => { if (!covered.has(id)) g += 1; }); if (g > bg) { bg = g; bi = i; } });
+    const [pick] = left.splice(bi, 1);
+    pick.ids.forEach((id) => covered.add(id));
+    const cov = { ALL: covered.size };
+    lins.forEach((L) => { cov[L] = 0; });
+    covered.forEach((id) => { const L = linOf.get(id); if (L in cov) cov[L] += 1; });
+    steps.push({ label: pick.name, gain: bg, cov });
+  }
+  return { lins, total, steps };
+}
+
+// monotone cubic path through the points (no overshoot between samples), so the curve reads like a ROC curve
+function vnSmoothPath(pts) {
+  const n = pts.length;
+  if (n < 3) return pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
+  const dx = [], m = [], t = [];
+  for (let i = 0; i < n - 1; i++) { dx[i] = pts[i + 1][0] - pts[i][0]; m[i] = (pts[i + 1][1] - pts[i][1]) / dx[i]; }
+  t[0] = m[0]; t[n - 1] = m[n - 2];
+  for (let i = 1; i < n - 1; i++) t[i] = m[i - 1] * m[i] <= 0 ? 0 : (m[i - 1] + m[i]) / 2;
+  for (let i = 0; i < n - 1; i++) {
+    if (m[i] === 0) { t[i] = 0; t[i + 1] = 0; continue; }
+    const a = t[i] / m[i], b = t[i + 1] / m[i], s = a * a + b * b;
+    if (s > 9) { const k = 3 / Math.sqrt(s); t[i] = k * a * m[i]; t[i + 1] = k * b * m[i]; }
+  }
+  let path = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+  for (let i = 0; i < n - 1; i++) {
+    const h = dx[i] / 3;
+    path += ` C${(pts[i][0] + h).toFixed(1)},${(pts[i][1] + t[i] * h).toFixed(1)} ${(pts[i + 1][0] - h).toFixed(1)},${(pts[i + 1][1] - t[i + 1] * h).toFixed(1)} ${pts[i + 1][0].toFixed(1)},${pts[i + 1][1].toFixed(1)}`;
+  }
+  return path;
+}
+
+function vnCurveSvg(data) {
+  const { lins, total, steps } = data, W = 760, H = 400, L = 54, R = 120, T = 16, B = 96, k = steps.length - 1;
+  const X = (i) => L + (k ? (i / k) * (W - L - R) : 0), Y = (p) => T + (1 - p / 100) * (H - T - B);
+  const series = [{ key: "ALL", name: "전체", color: "var(--fg)", w: 3.2 }, ...lins.filter((l) => total[l] >= 3).map((l, i) => ({ key: l, name: l, color: VN_LIN_COLORS[i % VN_LIN_COLORS.length], w: 2.2 }))];
+  const grid = [0, 25, 50, 75, 100].map((p) => `<line x1="${L}" x2="${W - R}" y1="${Y(p)}" y2="${Y(p)}" stroke="var(--border)" stroke-dasharray="${p % 50 ? "2 4" : "0"}"/><text x="${L - 8}" y="${Y(p) + 4}" text-anchor="end" font-size="11" fill="currentColor" opacity=".75">${p}%</text>`).join("");
+  const xl = steps.map((s, i) => `<line x1="${X(i)}" x2="${X(i)}" y1="${H - B}" y2="${H - B + 5}" stroke="currentColor" opacity=".5"/>
+    <text transform="translate(${X(i)},${H - B + 14}) rotate(${k > 1 ? 32 : 0})" text-anchor="${k > 1 ? "start" : "middle"}" font-size="11" fill="currentColor">${i ? "+ " : ""}${escHtml(s.label.length > 22 ? s.label.slice(0, 21) + "…" : s.label)}</text>`).join("");
+  const diag = `<line x1="${X(0)}" y1="${Y(0)}" x2="${X(k)}" y2="${Y(100)}" stroke="currentColor" opacity=".35" stroke-dasharray="6 5"/>`;
+  const lines = series.map((s) => {
+    const pts = steps.map((st, i) => [X(i), Y(100 * st.cov[s.key] / (total[s.key] || 1))]);
+    const dots = steps.map((st, i) => `<circle cx="${pts[i][0]}" cy="${pts[i][1]}" r="${s.key === "ALL" ? 4.2 : 3.2}" fill="${s.color}" stroke="var(--bg)" stroke-width="1.2"><title>${escHtml(s.name)}: ${i ? `"${escHtml(st.label)}"까지 ${i}개 추가` : "추가 전"} → ${st.cov[s.key]} / ${total[s.key]} (${(100 * st.cov[s.key] / (total[s.key] || 1)).toFixed(1)}%)</title></circle>`).join("");
+    return `<path d="${vnSmoothPath(pts)}" fill="none" stroke="${s.color}" stroke-width="${s.w}" stroke-linecap="round"/>${dots}`;
+  }).join("");
+  const legend = series.map((s) => `<span class="vn-chip"><i style="background:${s.color};${s.key === "ALL" ? "border:1px solid var(--bg);" : ""}"></i>${escHtml(s.name)} <span class="note">n=${total[s.key]}</span></span>`).join("");
+  return `<div class="vn-legend">${legend}<span class="vn-chip"><span style="display:inline-block;width:22px;border-top:2px dashed currentColor;opacity:.4;"></span> 같은 속도로 늘 때의 기준선</span></div>
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:820px;height:auto;display:block;color:var(--fg);">
+      <rect x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="none" stroke="var(--border)"/>${grid}${diag}${lines}${xl}
+      <text x="${(L + W - R) / 2}" y="${H - 6}" text-anchor="middle" font-size="12" fill="currentColor">세트·그룹을 하나씩 더할 때 (새로 가장 많이 잡는 순서)</text>
+      <text transform="translate(14,${(T + H - B) / 2}) rotate(-90)" text-anchor="middle" font-size="12" fill="currentColor">리니지 안에서의 커버리지</text></svg>`;
+}
+
+function vnCurveHtml(c) {
+  if (!c.sel.length) return "";
+  const data = vnCurveData(c), steps = data.steps;
+  const order = steps.slice(1).map((s, i) => `<li><b>${escHtml(s.label)}</b> <span class="note">+${s.gain}개 새로 잡음 → 전체 ${(100 * s.cov.ALL / (data.total.ALL || 1)).toFixed(1)}%</span></li>`).join("");
+  return `<h3 style="margin:18px 0 6px;">리니지별 누적 커버리지 곡선 <span class="note">(ROC 곡선처럼: 위로 빨리 올라갈수록 적은 수의 세트로 많이 잡습니다)</span></h3>
+    <div class="card vn-curve-card">${vnCurveSvg(data)}
+      <details style="margin-top:8px;"><summary class="note">추가 순서 보기</summary><ol style="margin:6px 0 0 18px;">${order}</ol></details></div>`;
+}
+
+function vnCmpSource(val, savedList) {
+  const d = VN.data, genomeInfo = new Map(d.genomes.map((g) => [g[0], g]));
+  const byKey = new Map(d.items.map((it) => [it.key, it]));
+  const live = (keys) => keys.map((k) => byKey.get(k)).filter(Boolean).map((it) => ({ name: it.name, ids: new Set(it.ids) }));
+  const everyone = () => new Set(d.genomes.map((g) => g[0]));
+  let label, items, pop, lineage = "ALL", note = "";
+  if (val === "cur") {
+    label = "현재 선택"; items = live([...VN.selected]); pop = everyone(); lineage = VN.lineage;
+  } else {
+    const [id, mode] = val.split("|"), rec = savedList.find((x) => x.id === id);
+    if (!rec) return null;
+    lineage = rec.lineage || "ALL";
+    if (mode === "snap" && rec.snapshot) {
+      label = `${rec.name} (저장 당시 ${rec.created || ""})`;
+      items = Object.values(rec.snapshot.items).map((v) => ({ name: v.name, ids: new Set(v.ids) })); pop = new Set(rec.snapshot.pop);
+      note = rec.snapshot.scope ? `저장 당시 숙주 기준: ${PD_SCOPE_LABEL[rec.snapshot.scope] || rec.snapshot.scope}` : "";
+    } else {
+      label = `${rec.name} (현재 데이터)`; items = live(rec.keys); pop = everyone();
+    }
+  }
+  if (lineage !== "ALL") pop = new Set([...pop].filter((id) => (genomeInfo.get(id) || [])[1] === lineage));
+  const union = new Set();
+  items.forEach((it) => it.ids.forEach((id) => { if (pop.has(id)) union.add(id); }));
+  return { label: lineage === "ALL" ? label : `${label} · ${lineage}`, items, pop, union, note };
+}
+
+function vnCmpCompute(A, B) {
+  const info = new Map(VN.data.genomes.map((g) => [g[0], g]));
+  const recs = [...A.pop].filter((id) => B.pop.has(id)).map((id) => ({
+    id, lin: (info.get(id) || [])[1] || "NA", country: (info.get(id) || [])[2] || "", m: (A.union.has(id) ? 1 : 0) | (B.union.has(id) ? 2 : 0) }));
+  const byMask = new Map();
+  recs.forEach((r) => { if (!byMask.has(r.m)) byMask.set(r.m, []); byMask.get(r.m).push(r); });
+  const cnt = (m) => (byMask.get(m) || []).length;
+  return { sel: [{ name: A.label, ids: [...A.union] }, { name: B.label, ids: [...B.union] }], byMask, n: recs.length, recs, none: cnt(0), full: 3,
+    aOnly: cnt(1), bOnly: cnt(2), both: cnt(3), aTotal: cnt(1) + cnt(3), bTotal: cnt(2) + cnt(3), aPop: A.pop.size, bPop: B.pop.size };
+}
+
+function vnCmpHtml(c, A, B) {
+  const pct = (v, n) => (n ? (100 * v / n).toFixed(1) : "0.0");
+  const delta = c.bTotal - c.aTotal, dp = (100 * delta / (c.n || 1));
+  const tile = (label, body, extra = "") => `<div class="card" style="padding:8px 14px;${extra}"><div class="note">${label}</div>${body}</div>`;
+  const tiles = `<div style="display:flex;gap:14px;flex-wrap:wrap;margin:10px 0;">
+    ${tile("공통 대상 유전체", `<b style="font-size:20px;">${c.n}</b> <span class="note">A ${c.aPop} · B ${c.bPop}</span>`)}
+    ${tile(`<i class="vn-cmp-sw" style="background:${VN_COLORS[0]}"></i>A 커버리지`, `<b style="font-size:20px;">${c.aTotal}</b> <span class="note">${pct(c.aTotal, c.n)}%</span>`)}
+    ${tile(`<i class="vn-cmp-sw" style="background:${VN_COLORS[1]}"></i>B 커버리지`, `<b style="font-size:20px;">${c.bTotal}</b> <span class="note">${pct(c.bTotal, c.n)}%</span>`)}
+    ${tile("B − A", `<b style="font-size:20px;color:${delta > 0 ? "var(--ok)" : delta < 0 ? "var(--bad)" : "inherit"};">${delta > 0 ? "+" : ""}${delta}</b> <span class="note">${delta > 0 ? "+" : ""}${dp.toFixed(1)}%p</span>`)}
+    ${tile("B만 추가로 잡음", `<b style="font-size:20px;color:var(--ok);">${c.bOnly}</b>`)}
+    ${tile("A만 잡음 (B가 놓침)", `<b style="font-size:20px;color:var(--bad);">${c.aOnly}</b>`)}
+    ${tile("둘 다 못 잡음 (여집합)", `<b style="font-size:20px;">${c.none}</b> <span class="note">${pct(c.none, c.n)}%</span>`)}</div>`;
+  const diagram = vnDiagram(c).replace('id="vnSvg"', 'id="vnCmpSvg"').replace(/vn-region-label/g, "vn-cmp-label");
+  const table = vnRegionTable(c).replace(/vn-region-row/g, "vn-cmp-row");
+  const lins = [...new Set(c.recs.map((r) => r.lin))].sort((a, b) => a.localeCompare(b));
+  const rows = lins.map((L) => {
+    const rs = c.recs.filter((r) => r.lin === L), n = rs.length, a = rs.filter((r) => r.m & 1).length, b = rs.filter((r) => r.m & 2).length;
+    const ao = rs.filter((r) => r.m === 1).length, bo = rs.filter((r) => r.m === 2).length, no = rs.filter((r) => r.m === 0).length, dd = b - a;
+    return `<tr><td>${escHtml(L)}</td><td>${n}</td><td>${a} <span class="note">${pct(a, n)}%</span></td><td>${b} <span class="note">${pct(b, n)}%</span></td>
+      <td style="font-weight:700;color:${dd > 0 ? "var(--ok)" : dd < 0 ? "var(--bad)" : "inherit"};">${dd > 0 ? "+" : ""}${dd} <span class="note">(${dd > 0 ? "+" : ""}${(100 * dd / (n || 1)).toFixed(1)}%p)</span></td>
+      <td>${ao}</td><td>${bo}</td><td>${no}</td></tr>`;
+  }).join("");
+  const lineageTable = `<div style="overflow:auto;"><table class="mini-reference-table"><tr><th>${escHtml((PROFILE.lineage && PROFILE.lineage.label) || "Lineage")}</th><th>유전체</th>
+    <th style="border-bottom:3px solid ${VN_COLORS[0]};">A 커버리지</th><th style="border-bottom:3px solid ${VN_COLORS[1]};">B 커버리지</th><th>B − A</th><th>A만</th><th>B만</th><th>둘 다 못 잡음</th></tr>${rows}</table></div>`;
+  const notes = [A.note && `A: ${A.note}`, B.note && `B: ${B.note}`].filter(Boolean).join(" · ");
+  return `<div class="vn-legend"><span class="vn-chip"><i style="background:${VN_COLORS[0]}"></i><b>A</b> ${escHtml(A.label)} <span class="note">(${A.items.length}개 묶음 · 합집합)</span></span>
+      <span class="vn-chip"><i style="background:${VN_COLORS[1]}"></i><b>B</b> ${escHtml(B.label)} <span class="note">(${B.items.length}개 묶음 · 합집합)</span></span></div>
+    ${notes ? `<p class="note">${escHtml(notes)}</p>` : ""}${c.n < Math.max(c.aPop, c.bPop) ? `<p class="note">두 쪽의 대상 유전체가 달라서(범위·시점 차이) 공통인 ${c.n}개로만 비교했습니다.</p>` : ""}
+    ${tiles}
+    <div style="display:grid;grid-template-columns:minmax(300px,1.2fr) minmax(280px,1fr);gap:16px;align-items:start;">
+      <div class="card">${diagram}</div><div class="card"><h4 style="margin:0 0 6px;">영역별 유전체</h4>${table}</div></div>
+    <div id="vnCmpList">${VN.cmpRegion === null || VN.cmpRegion === undefined ? "<p class='note'>다이어그램의 숫자나 표의 행을 누르면 그 영역의 유전체 목록이 나옵니다 (\"B만\" = 새로 잡힌 것, \"A만\" = 놓치게 된 것).</p>" : vnCmpListHtml(c)}</div>
+    <h4 style="margin:14px 0 6px;">${escHtml((PROFILE.lineage && PROFILE.lineage.label) || "Lineage")}별 비교</h4>${lineageTable}`;
+}
+
+function vnCmpListHtml(c) {
+  const arr = (c.byMask.get(VN.cmpRegion) || []).slice().sort((a, b) => a.lin.localeCompare(b.lin) || a.id.localeCompare(b.id));
+  return `<div class="card" style="margin:10px 0;"><h4 style="margin:0;">${escHtml(vnRegionName(VN.cmpRegion, c.sel))} <span class="note">· ${arr.length}개</span></h4>
+    <div style="margin:6px 0;"><button type="button" class="btn btn-secondary" id="vnCmpCopy">&#128203; accession 복사</button></div>
+    <div style="max-height:280px;overflow:auto;"><table class="mini-reference-table"><tr><th>Accession</th><th>Lineage</th><th>나라</th></tr>
+    ${arr.slice(0, 400).map((r) => `<tr><td class="mono">${escHtml(r.id)}</td><td>${escHtml(r.lin)}</td><td>${escHtml(r.country || "—")}</td></tr>`).join("")}</table>${arr.length > 400 ? "<p class='note'>처음 400개만 표시합니다. 복사에는 전부 들어갑니다.</p>" : ""}</div></div>`;
+}
+
+function vnCmpWire(root, savedList) {
+  const selA = root.querySelector("#vnCmpA"), selB = root.querySelector("#vnCmpB"), body = root.querySelector("#vnCmpBody");
+  let last = null;
+  const draw = () => {
+    const A = vnCmpSource(selA.value, savedList), B = vnCmpSource(selB.value, savedList);
+    if (!A || !B) { body.innerHTML = "<p class='note'>비교할 쪽을 고르세요.</p>"; return; }
+    if (!A.items.length || !B.items.length) { body.innerHTML = "<p class='note'>선택이 비어 있거나 저장된 세트·그룹이 지금은 없어서 비교할 수 없습니다.</p>"; return; }
+    last = vnCmpCompute(A, B);
+    body.innerHTML = vnCmpHtml(last, A, B);
+  };
+  selA.addEventListener("change", () => { VN.cmpRegion = null; draw(); });
+  selB.addEventListener("change", () => { VN.cmpRegion = null; draw(); });
+  body.addEventListener("click", (e) => {
+    const reg = e.target.closest(".vn-cmp-label, .vn-cmp-row");
+    if (reg && last) { VN.cmpRegion = Number(reg.dataset.mask); draw(); body.querySelector("#vnCmpList").scrollIntoView({ behavior: "smooth", block: "nearest" }); return; }
+    if (e.target.closest("#vnCmpCopy") && last) {
+      const ids = (last.byMask.get(VN.cmpRegion) || []).map((r) => r.id);
+      copyTextToClipboard(ids.join("\n")).then(() => uiAlert(`${ids.length}개 accession을 복사했습니다.`)).catch(() => uiAlert("복사하지 못했습니다."));
+    }
+  });
+  draw();
 }
 
 async function showVennPage() {
@@ -7566,6 +7746,9 @@ async function showVennPage() {
   }).join("") || "<span class='note'>없음</span>";
   let savedList = [];
   try { savedList = (await fetchJSON("/api/venn-saved")).filter((x) => String(x.seg).toUpperCase() === VN.seg.toUpperCase()); } catch (e) { /* none */ }
+  const cmpOpts = [`<option value="cur">현재 선택 (${VN.selected.size}개)</option>`].concat(savedList.flatMap((x) => [
+    x.snapshot ? `<option value="${x.id}|snap">💾 ${escHtml(x.name)} — 저장 당시 (${escHtml(x.created || "")})</option>` : "",
+    `<option value="${x.id}|now">💾 ${escHtml(x.name)} — 현재 데이터</option>`])).join("");
   view.innerHTML = `<h2>🔵 커버리지 벤 다이어그램</h2>
     <p class="note">고른 프라이머 세트·그룹이 <b>실제 검증을 통과시킨 유전체</b>를 겹쳐 봅니다: 합집합(하나라도 잡음), 교집합(모두 잡음), 영역별 단독·겹침, 그리고 어느 것도 못 잡는 유전체(여집합 = 대상 전체 − 합집합). 그룹은 교차 결합으로 통과한 유전체까지 포함합니다. ${pdScopeBadge(d.host_scope && d.host_scope.scope)} 숙주 기준을 따릅니다.</p>
     <div class="seg-tab-row">${allSegs.map((x) => `<button class="seg-tab ${x === VN.seg ? "active" : ""}" data-vnseg="${x}">${x}</button>`).join("")}</div>
@@ -7579,7 +7762,14 @@ async function showVennPage() {
         <button type="button" class="btn btn-secondary vn-write" id="vnSave" title="지금 고른 세트·그룹과 범위(리니지)를 이름을 붙여 저장합니다 (이 대시보드를 쓰는 모두에게 보입니다)">&#128190; 선택 저장</button>
         <button type="button" class="btn btn-secondary" id="vnPng" title="벤 다이어그램(범례 포함)을 PNG 이미지로 저장합니다">&#128247; 그림 저장</button>
         <span class="note">그림은 4개까지, 더 고르면 표로 보여 줍니다</span></div></div>
-    <div id="vnBody"></div>`;
+    <div id="vnBody"></div>
+    <div class="card vn-write" id="vnCompare" style="margin-top:18px;">
+      <h3 style="margin:0 0 4px;">&#128256; 벤 다이어그램 비교</h3>
+      <p class="note" style="margin:0 0 8px;">두 조합(세트·그룹 묶음)이 잡는 유전체를 비교합니다. 각 조합은 묶음의 <b>합집합</b>(그 패널이 잡는 유전체)입니다. "저장 당시"와 "현재 데이터"를 같은 조합에 골라 두면 <b>재분석 전후의 변화</b>를 볼 수 있습니다.</p>
+      <div class="table-toolbar" style="gap:12px;flex-wrap:wrap;">
+        <label class="note"><b style="color:${VN_COLORS[0]};">A</b> <select id="vnCmpA">${cmpOpts}</select></label>
+        <label class="note"><b style="color:${VN_COLORS[1]};">B</b> <select id="vnCmpB">${cmpOpts}</select></label></div>
+      <div id="vnCmpBody"></div></div>`;
   const redraw = () => vnDraw(view);
   view._vnRedraw = redraw;
   view.querySelectorAll("[data-vnseg]").forEach((b) => b.addEventListener("click", () => { VN.seg = b.dataset.vnseg; VN.selected = null; showVennPage(); }));
@@ -7595,7 +7785,9 @@ async function showVennPage() {
     const name = await uiPrompt("이 선택의 이름 (같은 이름이 있으면 덮어씁니다)", names.slice(0, 3).join(" + "), { title: "벤 다이어그램 선택 저장" });
     if (!name || !name.trim()) return;
     try {
-      await fetchJSON("/api/venn-saved", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim(), seg: VN.seg.toLowerCase(), keys: [...VN.selected], lineage: VN.lineage }) });
+      await fetchJSON("/api/venn-saved", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim(), seg: VN.seg.toLowerCase(), keys: [...VN.selected], lineage: VN.lineage,
+          snapshot: { scope: (d.host_scope || {}).scope || "", pop: d.genomes.map((g) => g[0]),
+            items: Object.fromEntries([...VN.selected].map((k) => byKey.get(k)).filter(Boolean).map((it) => [it.key, { name: it.name, ids: it.ids }])) } }) });
       showVennPage();
     } catch (e) { uiAlert("저장하지 못했습니다: " + e.message); }
   });
@@ -7616,6 +7808,14 @@ async function showVennPage() {
     if (!(await uiConfirm("이 저장한 선택을 삭제할까요?", { title: "삭제", okLabel: "삭제" }))) return;
     try { await fetchJSON(`/api/venn-saved/${b.dataset.id}/delete`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); showVennPage(); } catch (e) { uiAlert(e.message); }
   }));
+  {                                                              // comparison panel: A = the newest saved combination as it was (else the current one), B = the current selection
+    const root = view.querySelector("#vnCompare"), sA = root.querySelector("#vnCmpA"), sB = root.querySelector("#vnCmpB");
+    const withSnap = savedList.filter((x) => x.snapshot);
+    sA.value = withSnap.length ? `${withSnap[withSnap.length - 1].id}|snap` : "cur";
+    sB.value = withSnap.length ? `${withSnap[withSnap.length - 1].id}|now` : "cur";
+    VN.cmpRegion = null;
+    vnCmpWire(root, savedList);
+  }
   if (!view._vnWired) {                                         // the page element is reused: wire its delegated handlers only once
   view._vnWired = true;
   view.addEventListener("click", (e) => {
