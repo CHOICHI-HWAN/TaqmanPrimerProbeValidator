@@ -67,7 +67,7 @@ Detailed documentation (pipeline steps, settings, dashboard features, directory 
 
 ### Current version
 
-Code: **v0.24.2 (Nipah edition)**   ·   Tested on Ubuntu 24.04, x86_64
+Code: **v0.25.0 (Nipah edition)**   ·   Tested on Ubuntu 24.04, x86_64
 
 ### Requirements
 
@@ -228,7 +228,7 @@ There is no publication for this tool yet. Please cite the software as below, **
   author  = {Choi, Chihwan},
   title   = {TaqMan Primer/Probe Validator (Nipah edition)},
   year    = {2026},
-  version = {0.24.2},
+  version = {0.25.0},
   url     = {https://github.com/CHOICHI-HWAN/TaqmanPrimerProbeValidator/tree/nipah}
 }
 ```

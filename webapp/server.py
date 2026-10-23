@@ -2914,6 +2914,49 @@ class Handler(BaseHTTPRequestHandler):
             detail["population_ids"] = load_population_ids(detail.get("segment", ""))
             return self._send_json(detail)
 
+        if path == "/api/engine-check":                       # Go probe engine vs. the Python answer key (scripts/engine_check.py)
+            import engine_check  # noqa: PLC0415
+            go = engine_check.find_go()
+            exe = engine_check.ensure_built()
+            ver = ""
+            selftest = []
+            if exe:
+                try:
+                    r = subprocess.run([exe, "-selftest"], capture_output=True, text=True, timeout=30)
+                    selftest = [ln for ln in r.stdout.splitlines() if ln.strip()]
+                except (OSError, subprocess.SubprocessError):
+                    pass
+            if go:
+                try:
+                    ver = subprocess.run([go, "version"], capture_output=True, text=True, timeout=15).stdout.strip()
+                except (OSError, subprocess.SubprocessError):
+                    pass
+            sets = []
+            for st in load_builtin_sets():
+                f = ROOT / "output" / "primers" / st["set_id"] / "msa" / "msa.json"
+                if f.exists():
+                    sets.append({"set_id": st["set_id"], "name": st.get("display_name") or st["set_id"], "segment": st.get("segment")})
+            return self._send_json({"engine_built": bool(exe), "go": ver, "selftest": selftest, "sets": sets})
+
+        m = re.match(r"^/api/engine-check/([^/]+)$", path)
+        if m:
+            if not _PD_ID_RE.fullmatch(m.group(1)):
+                return self._send_json({"error": "bad id"}, 400)
+            import engine_check  # noqa: PLC0415
+            import probe_designer  # noqa: PLC0415
+            f = ROOT / "output" / "primers" / m.group(1) / "msa" / "msa.json"
+            if not f.exists():
+                return self._send_json({"error": "이 세트의 MSA가 없습니다. 먼저 분석을 실행하세요."}, 404)
+            try:
+                msa = json.loads(f.read_text(encoding="utf-8"))
+                if not msa.get("f_col") or not msa.get("r_col"):
+                    return self._send_json({"error": "이 세트의 정렬에 F/R 구간이 없습니다."}, 400)
+                top = max(1, min(60, int((qs.get("top") or ["10"])[0])))
+                iup = max(0, min(4, int((qs.get("max_iupac") or ["2"])[0])))
+                return self._send_json(engine_check.compare(msa, top=top, max_iupac=iup, label=m.group(1)))
+            except (ValueError, RuntimeError, KeyError) as exc:
+                return self._send_json({"error": str(exc)}, 500)
+
         if path == "/api/jobs/active":
             # Polled by every connected browser (not just the one that clicked a button) so
             # anyone looking at the dashboard from a different machine can see that a job is

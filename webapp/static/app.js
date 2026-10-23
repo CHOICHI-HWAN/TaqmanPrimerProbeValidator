@@ -457,8 +457,8 @@ function organizeSetDetail(detail) {
     const sect = el(isDesign ? "details" : "section", "detail-sect");
     sect.id = "sect-" + r[0];
     if (isDesign) {
-      sect.innerHTML = `<summary class="sect-title">${r[1]} <span class="note">(펼쳐서 사용 — 새 Probe 후보 설계·검증)</span></summary>`;
-      try { sect.open = localStorage.getItem("lasv_sect_design_open") === "1"; } catch (e) { /* ignore */ }
+      sect.innerHTML = `<summary class="sect-title">${r[1]} <span class="note">(새 Probe 후보 설계·검증 — 위 "Probe 설계" 탭으로 바로 이동)</span></summary>`;
+      try { sect.open = localStorage.getItem("lasv_sect_design_open") !== "0"; } catch (e) { /* ignore */ }
       sect.addEventListener("toggle", () => { try { localStorage.setItem("lasv_sect_design_open", sect.open ? "1" : "0"); } catch (e) { /* ignore */ } });
     } else {
       sect.innerHTML = `<h2 class="sect-title">${r[1]}</h2>`;
@@ -2326,7 +2326,7 @@ function renderLineageBreakdownCompact(setData) {
   }).join("");
 }
 
-const MAIN_VIEW_IDS = ["overview", "detail", "addForm", "paramsView", "changelogView", "guideView", "diversityView", "geneConsView", "redesignView", "vennView", "metadataView", "primersView", "litView", "standardsView", "metaTableView", "stdMgrView", "requirementsView"];
+const MAIN_VIEW_IDS = ["engineView", "overview", "detail", "addForm", "paramsView", "changelogView", "guideView", "diversityView", "geneConsView", "redesignView", "vennView", "metadataView", "primersView", "litView", "standardsView", "metaTableView", "stdMgrView", "requirementsView"];
 function showMainView(id) {
   for (const v of MAIN_VIEW_IDS) $(`#${v}`).hidden = (v !== id);
   navRecord(id);
@@ -2339,7 +2339,8 @@ const NAV_VIEW_BTN = { overview: "overviewBtn", addForm: "addSetBtn", paramsView
   diversityView: "diversityBtn", geneConsView: "geneConsBtn", redesignView: "redesignBtn", vennView: "vennBtn", metadataView: "metadataBtn",
   primersView: "primersBtn", litView: "litBtn", standardsView: "standardsBtn", metaTableView: "metaTableBtn", stdMgrView: "stdMgrBtn", requirementsView: "reportBtn" };
 NAV_VIEW_BTN.requirementsView = "requirementsBtn";
-const NAV_TITLE = { overview: "전체 대시보드", addForm: "새 프라이머 세트 분석", paramsView: "분석 파라미터", changelogView: "변경 이력", guideView: "파이프라인 개요 / 가이드",
+NAV_VIEW_BTN.engineView = "engineBtn";
+const NAV_TITLE = { engineView: "엔진 검증 (Go)", overview: "전체 대시보드", addForm: "새 프라이머 세트 분석", paramsView: "분석 파라미터", changelogView: "변경 이력", guideView: "파이프라인 개요 / 가이드",
   diversityView: "리니지별 유전체 다양성", geneConsView: "유전자 보존영역", redesignView: "리니지별 재설계", vennView: "커버리지 벤 다이어그램", metadataView: "메타데이터 / 지도",
   primersView: "프라이머 입력 / 관리", litView: "문헌 프라이머", standardsView: "표준물질 대표성", metaTableView: "메타데이터 표", stdMgrView: "표준물질 입력 / 관리", requirementsView: "요구사항 기록" };
 function navTitle(d) {
@@ -9640,3 +9641,70 @@ async function litAddToAnalysis(i) {
 }
 
 $("#litBtn").addEventListener("click", () => showLiteraturePage());
+
+
+// ---------------- 엔진 검증: Go Probe 설계 엔진 vs 파이썬(정답지) ----------------
+const ENG = { sets: [], results: {} };
+async function showEngineCheckPage() {
+  state.activeId = null; state.activeType = null;
+  renderSidebar();
+  showMainView("engineView");
+  const view = $("#engineView");
+  view.innerHTML = "<p class='note'>불러오는 중...</p>";
+  let st;
+  try { st = await fetchJSON("/api/engine-check"); } catch (e) { view.innerHTML = `<p class="note">불러오기 실패: ${escHtml(e.message)}</p>`; return; }
+  ENG.sets = st.sets || [];
+  const selftest = (st.selftest || []).map((l) => `<div class="mono ${l.startsWith("PASS") ? "" : "bad"}" style="font-size:12px;">${escHtml(l)}</div>`).join("") || "<span class='note'>없음</span>";
+  view.innerHTML = `
+    <h2>🧪 엔진 검증 <span class="note">Probe 설계: Go 엔진 ↔ 파이썬(정답지)</span></h2>
+    <div class="note" style="margin-bottom:10px;">같은 정렬(MSA)과 같은 조건을 두 엔진에 넣고, 후보 서열·가닥·위치·IUPAC 수·Tm/GC·커버리지·순서가 한 글자도 다르지 않은지 비교합니다. 규칙 기반 후보(own)만 비교하며 Primer3와 MFEprimer 검증은 파이썬에 남아 있습니다. 파이썬 결과가 정답입니다.</div>
+    <div class="card" style="margin-bottom:14px;"><h3>Go 엔진 상태</h3>
+      <div>${st.engine_built ? "✅ 엔진 준비됨" : "⚠️ 엔진을 빌드하지 못했습니다 (Go 설치 필요)"} <span class="note">${escHtml(st.go || "")}</span></div>
+      <div style="margin-top:6px;"><b>자체 단위 검사</b> <span class="note">(파이썬이 계산한 값과 비트 단위로 비교)</span>${selftest}</div></div>
+    <div class="card" style="margin-bottom:14px;"><h3>실제 세트로 비교</h3>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;">
+        <label class="note">세트 <select id="engSet">${ENG.sets.map((s) => `<option value="${escHtml(s.set_id)}">${escHtml(s.name)} (${escHtml(s.set_id)})</option>`).join("")}</select></label>
+        <label class="note">후보 수 <input id="engTop" type="number" min="1" max="60" value="10" style="width:60px;"></label>
+        <label class="note">IUPAC 최대 <input id="engIupac" type="number" min="0" max="4" value="2" style="width:50px;"></label>
+        <button id="engRun" class="btn btn-primary">선택한 세트 비교</button>
+        <button id="engAll" class="btn btn-secondary" title="모든 세트를 IUPAC 0·2·4 조건으로 차례로 비교합니다">모든 세트 일괄 비교</button>
+      </div>
+      <div id="engOut" style="margin-top:12px;"></div></div>`;
+  const out = view.querySelector("#engOut");
+  const one = async (id, top, iup) => fetchJSON(`/api/engine-check/${encodeURIComponent(id)}?top=${top}&max_iupac=${iup}`);
+  view.querySelector("#engRun").addEventListener("click", async (e) => {
+    const id = view.querySelector("#engSet").value;
+    e.currentTarget.disabled = true; out.innerHTML = "<p class='note'>두 엔진을 실행하는 중...</p>";
+    try { const r = await one(id, view.querySelector("#engTop").value, view.querySelector("#engIupac").value); out.innerHTML = engineResultHtml(r); }
+    catch (err) { out.innerHTML = `<p class="note bad">실패: ${escHtml(err.message)}</p>`; }
+    e.currentTarget.disabled = false;
+  });
+  view.querySelector("#engAll").addEventListener("click", async (e) => {
+    const btn = e.currentTarget; btn.disabled = true;
+    const rows = []; let bad = 0, py = 0, go = 0;
+    const draw = (running) => { out.innerHTML = `<table class="data-table"><thead><tr><th>세트</th><th>IUPAC</th><th>후보</th><th>결과</th><th>Python 초</th><th>Go 초</th></tr></thead><tbody>${rows.join("")}</tbody></table>
+      <p class="note" style="margin-top:8px;">${running ? "⏳ 진행 중... " : ""}${rows.length}건 · 불일치 ${bad}건 · 합계 Python ${py.toFixed(1)}초 / Go ${go.toFixed(1)}초</p>`; };
+    const tid = "engine-all";
+    let n = 0; const total = ENG.sets.length * 3;
+    for (const s of ENG.sets) for (const [iup, top] of [[0, 10], [2, 10], [4, 30]]) {
+      toast(`엔진 일괄 비교 ${++n}/${total}`, { type: "run", id: tid });
+      try {
+        const r = await one(s.set_id, top, iup);
+        const ok = r.ok; if (!ok) bad++; py += r.python_sec; go += r.go_sec;
+        rows.push(`<tr><td>${escHtml(s.set_id)}</td><td>${iup}</td><td>${r.n_candidates}</td><td>${ok ? "✅ 동일" : "❌ " + escHtml(r.checks.filter((c) => !c.ok).map((c) => c.name).slice(0, 3).join(", "))}</td><td>${r.python_sec}</td><td>${r.go_sec}</td></tr>`);
+      } catch (err) { bad++; rows.push(`<tr><td>${escHtml(s.set_id)}</td><td>${iup}</td><td></td><td>❌ ${escHtml(err.message)}</td><td></td><td></td></tr>`); }
+      draw(true);
+    }
+    draw(false);
+    toast(bad ? `엔진 비교: 불일치 ${bad}건` : `엔진 비교: ${rows.length}건 모두 동일`, { type: bad ? "err" : "ok", id: tid });
+    btn.disabled = false;
+  });
+}
+function engineResultHtml(r) {
+  const head = r.ok ? `<div class="assessment-verdict ok">✅ 두 엔진의 결과가 완전히 같습니다</div>` : `<div class="assessment-verdict bad">❌ 다른 항목이 있습니다</div>`;
+  const sp = r.go_sec ? (r.python_sec / r.go_sec) : 0;
+  const rows = r.checks.map((c) => `<tr><td>${escHtml(c.name)}</td><td>${c.ok ? "✅" : "❌"}</td><td class="mono" style="font-size:12px;">${c.ok ? (typeof c.python === "string" ? escHtml(c.python) : "") : escHtml(JSON.stringify(c.python)) + "<br>↔ " + escHtml(JSON.stringify(c.go))}</td></tr>`).join("");
+  return `${head}<div class="note" style="margin:6px 0;">유전체 ${r.n_rows}개 · 검사한 후보 ${r.n_candidates}개 · Python <b>${r.python_sec}초</b> · Go <b>${r.go_sec}초</b>${sp ? ` (Go가 ${sp >= 1 ? sp.toFixed(1) + "배 빠름" : (1 / sp).toFixed(1) + "배 느림"})` : ""}</div>
+    <table class="data-table"><thead><tr><th>항목</th><th></th><th>값 / 차이</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+$("#engineBtn").addEventListener("click", showEngineCheckPage);

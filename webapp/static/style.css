@@ -1193,3 +1193,5 @@ a.pipe-pill:hover { border-color: var(--accent); color: var(--accent); }
 .summary-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; margin-bottom: 20px; }
 .summary-split > .card { margin-bottom: 0 !important; }
 @media (max-width: 1100px) { .summary-split { grid-template-columns: minmax(0, 1fr); } }
+
+.detail-sect > summary.sect-title { cursor: pointer; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--r-md, 10px); background: color-mix(in srgb, var(--accent, #3b82f6) 8%, transparent); font-weight: 700; margin-bottom: 10px; }
