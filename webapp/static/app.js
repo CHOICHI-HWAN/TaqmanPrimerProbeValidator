@@ -2632,7 +2632,8 @@ function renderDetail(setData) {
     <div class="card msa-card" style="margin-bottom:20px;">
       <div class="msa-card-header">
         <h3 style="margin:0;">전체 게놈 정렬 (F / Probe / R 결합을 한번에 보기)</h3>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;"><button id="msaSnapBtn" class="btn btn-secondary btn-fullscreen" title="현재 필터가 적용된 정렬 전체(잘리는 부분 없이)를 PNG 이미지로 저장합니다. 컬럼을 선택해 두었으면 그 구간만 저장합니다.">&#128247; 이미지 저장</button>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;"><button id="msaExportBtn" class="btn btn-secondary btn-fullscreen" title="FASTA로 내보내서 SeaLion(전문 정렬 뷰어)에서 열기">&#128190; SeaLion용 FASTA</button>
+        <button id="msaSnapBtn" class="btn btn-secondary btn-fullscreen" title="현재 필터가 적용된 정렬 전체(잘리는 부분 없이)를 PNG 이미지로 저장합니다. 컬럼을 선택해 두었으면 그 구간만 저장합니다.">&#128247; 이미지 저장</button>
         <button id="msaCopyImgBtn" class="btn btn-secondary btn-fullscreen" title="같은 이미지를 클립보드로 복사합니다 (HTTPS 또는 localhost에서만 가능, 아니면 저장됩니다)">&#128203; 이미지 복사</button>
         <button id="msaCopyTxtBtn" class="btn btn-secondary btn-fullscreen" title="정렬을 텍스트(accession | lineage | country 탭 서열)로 클립보드에 복사합니다. 컬럼을 선택해 두었으면 그 구간만 복사합니다.">&#128203; 텍스트 복사</button>
         <button id="msaFullscreenBtn" class="btn btn-secondary btn-fullscreen" title="전체화면">&#9974; 전체화면</button></div>
