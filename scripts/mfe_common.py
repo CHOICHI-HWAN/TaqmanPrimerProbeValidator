@@ -600,9 +600,76 @@ def terminal_match_ok(query: str, target: str, is_fp: bool, n: int) -> bool:
     return iupac_mismatch_count(q, t) == 0
 
 
+# ---- optional Go engine for the whole-genome scan (config `scan_engine: python|go`, env SCAN_ENGINE overrides) ------------------
+# The scans are results-identical in both engines (go/scan is compared with the Python code on every set, see scripts/engine_check.py).
+# "go" works through a cache: prefetch_sites() runs go/scan once for all oligos x genomes of a step, and _oligo_sites() then answers from
+# it. Anything not prefetched -- or any failure of the Go binary -- simply runs the Python code, so "go" can never change a result.
+_ROOT = Path(__file__).resolve().parent.parent
+_SITE_CACHE = {}
+SCAN_ENGINES = ("python", "go")
+
+
+def scan_engine(pipeline_root=None) -> str:
+    name = (os.environ.get("SCAN_ENGINE") or read_config_str(pipeline_root or _ROOT, "scan_engine") or "python").strip().lower()
+    return name if name in SCAN_ENGINES else "python"
+
+
+def _go_scan_bin(pipeline_root=None):
+    root = Path(pipeline_root or _ROOT)
+    gdir = root / "go" / "scan"
+    exe = gdir / "scan"
+    src = max((p.stat().st_mtime for p in gdir.glob("*.go")), default=0)
+    if exe.exists() and exe.stat().st_mtime >= src:
+        return str(exe)
+    go = shutil.which("go") or next((str(p) for p in (Path.home() / ".local/go/bin/go", Path("/usr/local/go/bin/go")) if p.exists()), None)
+    if go and gdir.exists():
+        r = subprocess.run([go, "build", "-o", str(exe), "."], cwd=gdir, capture_output=True, text=True, timeout=300)
+        if r.returncode == 0:
+            return str(exe)
+    return str(exe) if exe.exists() else None
+
+
+def clear_site_cache():
+    _SITE_CACHE.clear()
+
+
+def prefetch_sites(oligos, genome_seqs, pipeline_root=None) -> bool:
+    """With the Go engine selected: find the sites of every (oligo, max_mm) in every genome in one parallel pass and keep them for
+    _oligo_sites(). `oligos` = [(oligo_seq, max_mm)], `genome_seqs` = sequences. Returns True when the cache was filled."""
+    import json as _json
+    if scan_engine(pipeline_root) != "go":
+        return False
+    uniq_oligos = list(dict.fromkeys((o.upper(), int(mm)) for o, mm in oligos if o))
+    genomes = list(dict.fromkeys(g.upper() for g in genome_seqs if g))
+    if not uniq_oligos or not genomes:
+        return False
+    exe = _go_scan_bin(pipeline_root)
+    if not exe:
+        print("[warn] scan_engine=go but go/scan is not built and Go is not installed -- using the Python scan", file=sys.stderr)
+        return False
+    req = {"mode": "multi", "oligos": [{"seq": o, "max_mm": mm} for o, mm in uniq_oligos],
+           "genomes": [{"id": str(i), "seq": g} for i, g in enumerate(genomes)]}
+    try:
+        r = subprocess.run([exe], input=_json.dumps(req), capture_output=True, text=True, timeout=3600)
+        if r.returncode:
+            raise RuntimeError(r.stderr.strip() or f"rc={r.returncode}")
+        results = _json.loads(r.stdout)["results"]
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError, KeyError) as exc:
+        print(f"[warn] go/scan failed ({exc}) -- using the Python scan", file=sys.stderr)
+        return False
+    for gi, res in enumerate(results):
+        for k, (o, mm) in enumerate(uniq_oligos):
+            _SITE_CACHE[(o, genomes[gi], mm)] = [(s["start"], s["end"], s["strand"], s["mm"]) for s in res["multi"][k]]
+    return True
+
+
 def _oligo_sites(oligo: str, genome: str, max_mm: int):
     """Every window of `genome` where `oligo` (IUPAC) has <= max_mm mismatches, on both strands:
     [(start0, end0_exclusive, strand, mismatches)]. Pure Python with an early exit per window."""
+    if _SITE_CACHE:
+        hit = _SITE_CACHE.get((oligo, genome, max_mm))
+        if hit is not None:
+            return list(hit)
     sites = []
     n = len(genome)
     for strand, q in (("+", oligo), ("-", reverse_complement(oligo))):

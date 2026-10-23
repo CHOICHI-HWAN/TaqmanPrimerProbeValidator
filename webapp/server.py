@@ -631,11 +631,24 @@ def tail_log_lines(log_path: Path, n: int = 400) -> str:
     return "\n".join(lines[-n:])
 
 
+_TSV_CACHE = {}
+
+
 def read_tsv(path: Path):
+    """Rows of a TSV as dicts. Parsed once per file version (path + mtime + size); every caller gets its own copies, so the callers that
+    edit the rows in place (e.g. coercing numbers) cannot affect each other."""
     if not path.exists():
         return []
-    with open(path, newline="", encoding="utf-8") as fh:
-        return list(csv.DictReader(fh, delimiter="\t"))
+    st = path.stat()
+    key = str(path)
+    hit = _TSV_CACHE.get(key)
+    if hit is None or hit[0] != (st.st_mtime_ns, st.st_size):
+        with open(path, newline="", encoding="utf-8") as fh:
+            rows = list(csv.DictReader(fh, delimiter="\t"))
+        if len(_TSV_CACHE) > 300:
+            _TSV_CACHE.clear()
+        hit = _TSV_CACHE[key] = ((st.st_mtime_ns, st.st_size), rows)
+    return [dict(r) for r in hit[1]]
 
 
 def load_manifest():
@@ -786,29 +799,43 @@ def _config_yaml_path():
     return ROOT / "config" / "config.yaml"
 
 
-def load_params():
-    from mfe_common import check_mfeprimer, find_mfeprimer, read_config_str  # noqa: PLC0415
-    text = _config_yaml_path().read_text(encoding="utf-8")
-    out = {}
-    for key, caster in PARAM_KEYS.items():
-        m = re.search(rf"^{re.escape(key)}:\s*([^\s#]+)", text, re.MULTILINE)
-        out[key] = caster(m.group(1)) if m else PARAM_DEFAULTS[key]
-    # mfeprimer: the configured path (may be empty = auto-discover) and what actually resolves right now
-    out["mfeprimer_bin"] = read_config_str(ROOT, "mfeprimer_bin")
+_TOOLS_CACHE = {}
+
+
+def _resolve_tools_status():
+    from mfe_common import check_mfeprimer, find_mfeprimer, find_mafft, read_config_str  # noqa: PLC0415
     try:
         used = find_mfeprimer("", ROOT)
     except SystemExit:
         used = ""
-    out["mfeprimer_status"] = check_mfeprimer(used)
-    from mfe_common import find_mafft  # noqa: PLC0415
 
     def resolved(finder):
         try:
             return finder()
         except SystemExit:                                # the finders exit when nothing is found
             return ""
-    out["tools"] = {"env_prefix": read_config_str(ROOT, "env_prefix"),
-                    "snakemake": resolved(find_snakemake), "mafft": resolved(find_mafft)}
+    return {"mfeprimer_status": check_mfeprimer(used),
+            "tools": {"env_prefix": read_config_str(ROOT, "env_prefix"),
+                      "snakemake": resolved(find_snakemake), "mafft": resolved(find_mafft)}}
+
+
+def load_params():
+    from mfe_common import read_config_str  # noqa: PLC0415
+    text = _config_yaml_path().read_text(encoding="utf-8")
+    out = {}
+    for key, caster in PARAM_KEYS.items():
+        m = re.search(rf"^{re.escape(key)}:\s*([^\s#]+)", text, re.MULTILINE)
+        out[key] = caster(m.group(1)) if m else PARAM_DEFAULTS[key]
+    # mfeprimer: the configured path (may be empty = auto-discover) and what actually resolves right now. Resolving runs
+    # `mfeprimer --version` and looks for tools on disk, so it is kept for a while per config-file version (every group card
+    # and the overview call load_params()).
+    stamp = (_config_yaml_path().stat().st_mtime_ns, time.time() // 30)
+    if _TOOLS_CACHE.get("stamp") != stamp:
+        _TOOLS_CACHE["stamp"] = stamp
+        _TOOLS_CACHE["val"] = _resolve_tools_status()
+    out["mfeprimer_bin"] = read_config_str(ROOT, "mfeprimer_bin")
+    out.update(_TOOLS_CACHE["val"])
+    out["scan_engine"] = read_config_str(ROOT, "scan_engine") if read_config_str(ROOT, "scan_engine") in ("python", "go") else "python"
     return out
 
 
@@ -832,6 +859,11 @@ def save_params(values):
             if not chk["ok"]:
                 raise ValueError(f"mfeprimer 경로: {chk['error']}")
         text = _set_config_str(text, "mfeprimer_bin", mfe)
+    if "scan_engine" in values:                          # whole-genome scan engine: python (default) or go (go/scan, same results)
+        eng = str(values["scan_engine"] or "python").strip().lower()
+        if eng not in ("python", "go"):
+            raise ValueError("scan_engine은 python 또는 go 여야 합니다.")
+        text = _set_config_str(text, "scan_engine", eng)
     for key, caster in PARAM_KEYS.items():
         if key not in values:
             continue
@@ -1146,6 +1178,9 @@ def _group_segment(group_id):
     return None
 
 
+_CROSS_IDS = {}
+
+
 def group_cross_ids(group_id):
     """Genomes passed by some cross-binding pairing of the group's oligos (set 1's F + set 2's R + a probe of either set:
     F/R mismatch <= 1 with intact 3' ends, probe perfect) -- invisible to the plain union of each set's own result."""
@@ -1154,6 +1189,9 @@ def group_cross_ids(group_id):
     params = load_params()                                     # the same pass rule as the set results (primer_mismatch_pass, probe_mismatch)
     pass_mm, probe_mm = params["primer_mismatch_pass"], params["probe_mismatch"]
     if path.exists():
+        ck = (str(path), path.stat().st_mtime_ns, pass_mm, probe_mm)
+        if ck in _CROSS_IDS:
+            return set(_CROSS_IDS[ck])
         for r in read_tsv(path):
             try:
                 f, rr, p = int(r["f_mismatch"]), int(r["r_mismatch"]), int(r["p_mismatch"])
@@ -1161,6 +1199,9 @@ def group_cross_ids(group_id):
                 continue
             if f <= pass_mm and rr <= pass_mm and p <= probe_mm and r.get("f_3p_ok", "") != "0" and r.get("r_3p_ok", "") != "0":
                 ids.add(r["genome_id"])
+        if len(_CROSS_IDS) > 200:
+            _CROSS_IDS.clear()
+        _CROSS_IDS[ck] = frozenset(ids)
     return ids
 
 

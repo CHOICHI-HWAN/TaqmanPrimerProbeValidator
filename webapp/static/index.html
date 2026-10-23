@@ -87,7 +87,7 @@
       </div>
       <input id="searchBox" class="search-box" type="text" placeholder="세트 검색 (이름, 벤더)...">
       <div id="setList" class="set-list"></div>
-      <div class="sidebar-footer">&copy; 2026 Chihwan Choi &middot; GPL-3.0 &middot; v<span id="footerVersion">0.26.0</span><br><button id="skinToggleBtn" class="skin-toggle" title="화면 스타일 전환 (Vaadin Lumo / 기본)">스타일: Lumo</button></div>
+      <div class="sidebar-footer">&copy; 2026 Chihwan Choi &middot; GPL-3.0 &middot; v<span id="footerVersion">0.27.0</span><br><button id="skinToggleBtn" class="skin-toggle" title="화면 스타일 전환 (Vaadin Lumo / 기본)">스타일: Lumo</button></div>
     </aside>
 
     <main class="main">
@@ -140,6 +140,9 @@
           </label>
           <label>mfeprimer CPU 코어 수
             <input id="pMfeprimerCpu" type="number" step="1" min="1" max="256">
+          </label>
+          <label title="MFEprimer 없이 전체 유전체를 훑는 검색(F/R 쌍·Probe)을 어떤 엔진으로 돌릴지. 두 엔진의 결과는 같습니다(엔진 검증 메뉴에서 확인). go는 약 12배 빠르며 go/scan 실행 파일이 필요합니다(없으면 자동으로 python).">전체 유전체 스캔 엔진
+            <select id="pScanEngine"><option value="python">python (기본)</option><option value="go">go (빠름, 실험)</option></select>
           </label>
         </div>
         <h3 style="margin:18px 0 6px;">실행 도구</h3>

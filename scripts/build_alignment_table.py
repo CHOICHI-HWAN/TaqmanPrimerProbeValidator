@@ -16,7 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from mfe_common import (  # noqa: E402
     find_mfeprimer, write_oligo_fasta, load_primers_manifest, parse_spec_best,
-    read_fasta_ids, read_fasta_seqs, direct_best_match, direct_best_fr_match, scan_fr, choose_fr, scan_probe, choose_probe,
+    read_fasta_ids, read_fasta_seqs, prefetch_sites, clear_site_cache, direct_best_match, direct_best_fr_match, scan_fr, choose_fr, scan_probe, choose_probe,
 )
 
 # A probe missing from mfeprimer's own `search -m 8` results despite the amplicon (from F/R)
@@ -144,6 +144,7 @@ def main():
                           "f_mismatch", "p_mismatch", "r_mismatch", "f_3p_ok", "r_3p_ok",
                           "amplicon_start", "amplicon_end", "probe_start", "probe_end", "amplicon_seq",
                           "f_tm", "f_dg", "p_tm", "p_dg", "r_tm", "r_dg", "fr_source"])
+        prefetch_sites([(row["F_seq"], 2), (row["R_seq"], 2), (row["P_seq"], PROBE_FALLBACK_MAX_MISMATCH)], db_seqs.values())   # config scan_engine: go
         for gid in all_ids:
             # Run BOTH engines on every genome and keep the better pair: mfeprimer finds sites through a 3' k-mer
             # seed and can miss a primer's true best site; scan_fr() checks every window of the genome.

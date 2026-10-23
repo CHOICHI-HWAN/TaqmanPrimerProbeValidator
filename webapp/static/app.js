@@ -4243,6 +4243,7 @@ async function showParamsPage() {
     $("#pProbeMismatch").value = p.probe_mismatch;
     $("#pThreePrime").value = p.three_prime_consecutive_match;
     $("#pMfeprimerCpu").value = p.mfeprimer_cpu;
+    $("#pScanEngine").value = p.scan_engine || "python";
     $("#pMfeprimerBin").value = p.mfeprimer_bin || "";
     showMfeprimerStatus(p.mfeprimer_status, !p.mfeprimer_bin);
     const t = p.tools || {};
@@ -4281,6 +4282,7 @@ $("#saveParamsBtn").addEventListener("click", async () => {
       probe_mismatch: Number($("#pProbeMismatch").value),
       three_prime_consecutive_match: Number($("#pThreePrime").value),
       mfeprimer_cpu: Number($("#pMfeprimerCpu").value),
+      scan_engine: $("#pScanEngine").value,
       mfeprimer_bin: $("#pMfeprimerBin").value.trim(),
     };
     const res = await fetch("/api/params", {

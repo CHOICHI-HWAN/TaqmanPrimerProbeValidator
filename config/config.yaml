@@ -16,6 +16,11 @@ probe_mismatch: 0
 # final reconciliation: validated = (primer matched at this mismatch) AND (probe matched at probe_mismatch)
 primer_mismatch_pass: 1
 
+# engine of the whole-genome primer/probe scans that run next to mfeprimer: "python" (default) or "go" (go/scan, about 12x faster
+# for the scan itself; the results are identical -- see the 엔진 검증 page). "go" needs go/scan built (setup: install Go once);
+# without it the Python scan is used automatically. Also editable on the web app's parameter page.
+scan_engine: "python"
+
 primers_manifest: "config/primers.tsv"
 groups_manifest: "config/set_groups.tsv"
 standards_manifest: "config/standards.tsv"

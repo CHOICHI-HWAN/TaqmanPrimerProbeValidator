@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from mfe_common import (  # noqa: E402
     find_mfeprimer, write_oligo_fasta, load_primers_manifest, iupac_mismatch_count,
     reverse_complement, run_primer_search, ensure_index, read_fasta_seqs,
-    _oligo_sites, terminal_match_ok, scan_probe, choose_probe,
+    _oligo_sites, prefetch_sites, terminal_match_ok, scan_probe, choose_probe,
 )
 from build_alignment_table import probe_wide_search  # noqa: E402
 
@@ -185,6 +185,7 @@ def compute_group_combo_table(*, db_fasta: Path, metadata_path: Path, rows_by_se
     for chrom, combos in combos_by_chrom.items():
         for c in combos:
             merged[(chrom, c["f_oligo_id"], c["r_oligo_id"])] = c
+    prefetch_sites([(info["seq"], 2) for info in fr_oligos.values()] + [(rows_by_set[s]["P_seq"], 8) for s in rows_by_set], db_seqs.values())   # config scan_engine: go
     for chrom, seq in db_seqs.items():
         for (a, b), c in scan_combos(fr_oligos, seq, three_prime_n).items():
             prev = merged.get((chrom, a, b))

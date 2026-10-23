@@ -5,6 +5,7 @@
 //	{"mode":"fr",    "f":"..","r":"..","three_prime_n":0,"max_mm":2,"max_size":2000,"genomes":[{"id":"x","seq":".."}]}
 //	{"mode":"probe", "probe":"..","max_mm":8,"genomes":[{"id":"x","seq":"..","amp_start":null|int,"amp_end":null|int}]}
 //	{"mode":"sites", "oligo":"..","max_mm":2,"genomes":[...]}      (raw sites; used by the checks)
+//	{"mode":"multi", "oligos":[{"seq":"..","max_mm":2},...],"genomes":[...]}  (raw sites of several oligos in one pass)
 //
 // `scan -selftest` runs the built-in unit checks.
 package main
@@ -236,26 +237,33 @@ type Genome struct {
 }
 
 type Request struct {
-	Mode        string   `json:"mode"`
-	F           string   `json:"f"`
-	R           string   `json:"r"`
-	Probe       string   `json:"probe"`
-	Oligo       string   `json:"oligo"`
-	ThreePrimeN int      `json:"three_prime_n"`
-	MaxMM       int      `json:"max_mm"`
-	MaxSize     int      `json:"max_size"`
-	Genomes     []Genome `json:"genomes"`
+	Mode        string     `json:"mode"`
+	F           string     `json:"f"`
+	R           string     `json:"r"`
+	Probe       string     `json:"probe"`
+	Oligo       string     `json:"oligo"`
+	ThreePrimeN int        `json:"three_prime_n"`
+	MaxMM       int        `json:"max_mm"`
+	MaxSize     int        `json:"max_size"`
+	Oligos      []OligoReq `json:"oligos"` // mode "multi": several oligos over the same genomes in one pass
+	Genomes     []Genome   `json:"genomes"`
+}
+
+type OligoReq struct {
+	Seq   string `json:"seq"`
+	MaxMM int    `json:"max_mm"`
 }
 
 type Result struct {
-	ID    string `json:"id"`
-	Hit   any    `json:"hit"`
-	Sites []Site `json:"sites,omitempty"`
+	ID    string   `json:"id"`
+	Hit   any      `json:"hit"`
+	Sites []Site   `json:"sites,omitempty"`
+	Multi [][]Site `json:"multi,omitempty"`
 }
 
 func run(req Request) ([]Result, error) {
 	switch req.Mode {
-	case "fr", "probe", "sites":
+	case "fr", "probe", "sites", "multi":
 	default:
 		return nil, fmt.Errorf("unknown mode %q", req.Mode)
 	}
@@ -281,6 +289,15 @@ func run(req Request) ([]Result, error) {
 					}
 				case "sites":
 					res.Sites = oligoSites(up(req.Oligo), up(g.Seq), req.MaxMM)
+				case "multi":
+					gs := up(g.Seq)
+					res.Multi = make([][]Site, len(req.Oligos))
+					for k, o := range req.Oligos {
+						res.Multi[k] = oligoSites(up(o.Seq), gs, o.MaxMM)
+						if res.Multi[k] == nil {
+							res.Multi[k] = []Site{}
+						}
+					}
 				}
 				out[i] = res
 			}

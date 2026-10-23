@@ -5,6 +5,15 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-10-23
+
+### Added
+- **스캔 엔진 전환 파라미터 `scan_engine: python | go`** (`config/config.yaml`, 분석 파라미터 화면의 "전체 유전체 스캔 엔진", 환경 변수 `SCAN_ENGINE`이 우선). 기본은 python. `go`로 두면 세트 분석(`live_analyze`)·분석 표(`build_alignment_table`)·그룹 교차 결합(`group_cross_binding`)의 전체 유전체 스캔을 `go/scan`이 한 번에 병렬로 처리하고, 이후 파이썬 코드는 그 결과를 그대로 씁니다. Go가 없거나 실패하면 자동으로 파이썬으로 계산하므로 결과가 달라질 수 없습니다. 실제 세트 분석 전체(유전체 660개 + 요약)가 두 엔진에서 동일했습니다. 스캔 자체는 약 12배 빠르지만 분석 전체는 MFEprimer가 대부분이라 전체 시간은 67초 → 65초 정도입니다.
+- 테스트: `tests/test_scan_engine_switch.py`(전환·캐시·폴백), `tests/test_response_caches.py`.
+
+### Changed
+- **화면이 빨라졌습니다(서버 캐시)**: TSV 파싱 결과, 세트별 통과 집계, 그룹 교차 결합 유전체, `load_params()`의 도구 확인(`mfeprimer --version` 서브프로세스)을 파일 수정시각·설정 기준으로 캐시합니다. 파일이 바뀌면 다음 요청에서 바로 반영됩니다. 전체 대시보드 1.4초 → 0.10초, 벤 다이어그램 0.76초 → 0.06초.
+
 ## [0.26.0] - 2026-10-23
 
 ### Added
