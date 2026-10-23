@@ -5,6 +5,13 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-10-23
+
+### Added
+- **Go 전체 유전체 스캔 엔진(실험)**: `go/scan/`에 `mfe_common`의 `_oligo_sites`·`scan_fr`·`scan_probe`(MFEprimer 없이 전체 유전체를 훑는 브루트포스 검색)를 Go로 옮겼습니다. 유전체를 병렬로 스캔하고 입력 순서대로 답합니다. 실제 36개 세트의 모든 유전체(F/R 쌍 검색, Probe 검색, IUPAC Probe, 불일치 0개)에서 파이썬과 차이 0건이고, 속도는 합계 164.6초 → 13.8초(약 12배)입니다. 아직 파이프라인 단계에는 연결하지 않았고 검증 도구로만 있습니다(기본은 파이썬).
+- `🧪 엔진 검증`에 "전체 유전체 스캔" 종류와 일괄 비교, `GET /api/engine-check/<세트>?kind=scan`, `scripts/engine_check.py --scan`, 합성 데이터 테스트(`tests/test_engine_check.py`).
+- `docs/GO_PORT_CANDIDATES.md`: 측정 기반 Go 포팅 후보 순위.
+
 ## [0.25.0] - 2026-10-23
 
 ### Added

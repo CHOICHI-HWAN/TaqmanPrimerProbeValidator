@@ -29,16 +29,18 @@ def find_go():
     return shutil.which("go") or next((str(p) for p in (Path.home() / ".local/go/bin/go", Path("/usr/local/go/bin/go")) if p.exists()), None)
 
 
-def ensure_built():
-    """Path of the compiled engine (built on demand when Go is installed), or None."""
-    src = max(p.stat().st_mtime for p in GO_DIR.glob("*.go")) if GO_DIR.exists() else 0
-    if GO_BIN.exists() and GO_BIN.stat().st_mtime >= src:
-        return str(GO_BIN)
+def ensure_built(name="probedesign"):
+    """Path of the compiled Go engine `go/<name>` (built on demand when Go is installed), or None."""
+    gdir = ROOT / "go" / name
+    exe = gdir / name if name != "scan" else gdir / "scan"
+    src = max((p.stat().st_mtime for p in gdir.glob("*.go")), default=0)
+    if exe.exists() and exe.stat().st_mtime >= src:
+        return str(exe)
     go = find_go()
-    if not go or not GO_DIR.exists():
-        return str(GO_BIN) if GO_BIN.exists() else None
-    r = subprocess.run([go, "build", "-o", str(GO_BIN), "."], cwd=GO_DIR, capture_output=True, text=True, timeout=300)
-    return str(GO_BIN) if r.returncode == 0 else None
+    if not go or not gdir.exists():
+        return str(exe) if exe.exists() else None
+    r = subprocess.run([go, "build", "-o", str(exe), "."], cwd=gdir, capture_output=True, text=True, timeout=300)
+    return str(exe) if r.returncode == 0 else None
 
 
 def run_go(msa, params):
@@ -83,13 +85,82 @@ def compare(msa, top=10, min_len=18, max_len=30, max_iupac=2, gc_range=(30.0, 80
             "n_rows": py["n_rows"], "n_candidates": py["n_total"] + py["n_rejected"], "params": {k: params[k] for k in ("top", "min_len", "max_len", "max_iupac")}}
 
 
+# ---- whole-genome scan engine (go/scan vs mfe_common._oligo_sites / scan_fr / scan_probe) ----
+def _scan_go(req):
+    exe = ensure_built("scan")
+    if not exe:
+        raise RuntimeError("Go scan engine not available (install Go or build go/scan)")
+    t = time.perf_counter()
+    r = subprocess.run([exe], input=json.dumps(req), capture_output=True, text=True, timeout=1800)
+    dt = time.perf_counter() - t
+    if r.returncode:
+        raise RuntimeError("Go scan engine failed: " + (r.stderr.strip() or f"rc={r.returncode}"))
+    return json.loads(r.stdout)["results"], dt
+
+
+def _load_set_genomes(msa, limit=None):
+    """(genome id -> sequence) of the population this set was analysed on: the filtered fasta that holds its alignment rows."""
+    import mfe_common as mc
+    ids = [r["genome_id"] for r in msa["rows"]]
+    for seg in ("s", "l"):
+        f = ROOT / "data" / "filtered" / f"{seg}_filtered.fasta"
+        if f.exists():
+            seqs = mc.read_fasta_seqs(f)
+            if ids and ids[0] in seqs:
+                return {i: seqs[i] for i in (ids[:limit] if limit else ids) if i in seqs}
+    raise RuntimeError("population fasta of this set not found under data/filtered")
+
+
+def _scan_oligos(msa):
+    import mfe_common as mc
+    cons = msa["consensus"]
+    seg = lambda c: cons[c[0]:c[1] + 1].replace("-", "")
+    f, r = seg(msa["f_col"]), mc.reverse_complement(seg(msa["r_col"]))
+    p = seg(msa["p_col"]) if msa.get("p_col") else cons[len(cons) // 2 - 12:len(cons) // 2 + 12].replace("-", "")
+    return f, r, p
+
+
+def compare_scan(msa, three_prime_n=1, max_mm_fr=2, max_mm_probe=8, limit=None, label=""):
+    """Same genomes, same oligos through mfe_common.scan_fr / scan_probe and through go/scan; every genome must agree."""
+    import mfe_common as mc
+    genomes = _load_set_genomes(msa, limit)
+    f, r, p = _scan_oligos(msa)
+    # a degenerate copy of the probe exercises the IUPAC path too
+    p_deg = p[:5] + "R" + p[6:12] + "Y" + p[13:] if len(p) > 14 else p
+    checks, py_total, go_total = [], 0.0, 0.0
+
+    def one(name, py_fn, req, key):
+        nonlocal py_total, go_total
+        t = time.perf_counter()
+        py = {gid: py_fn(gid, seq) for gid, seq in genomes.items()}
+        py_total += time.perf_counter() - t
+        res, dt = _scan_go(dict(req, genomes=[{"id": g, "seq": s, **({"amp_start": None, "amp_end": None})} for g, s in genomes.items()]))
+        go_total += dt
+        go = {x["id"]: x.get("hit") for x in res}
+        bad = [g for g in genomes if json.loads(json.dumps(py[g])) != go.get(g)]
+        hits = sum(1 for v in py.values() if v)
+        checks.append({"name": name, "ok": not bad, "python": f"{hits}/{len(genomes)} genomes with a hit", "go": ("identical" if not bad else f"{len(bad)} differ, e.g. {bad[0]}: py={py[bad[0]]} go={go.get(bad[0])}")})
+
+    one("F/R pair search (scan_fr)", lambda g, s: mc.scan_fr(f, r, s, three_prime_n, max_mm_fr),
+        {"mode": "fr", "f": f, "r": r, "three_prime_n": three_prime_n, "max_mm": max_mm_fr, "max_size": 2000}, "fr")
+    one("probe search (scan_probe)", lambda g, s: mc.scan_probe(p, s, None, None, max_mm_probe),
+        {"mode": "probe", "probe": p, "max_mm": max_mm_probe}, "probe")
+    one("probe with IUPAC codes", lambda g, s: mc.scan_probe(p_deg, s, None, None, max_mm_probe),
+        {"mode": "probe", "probe": p_deg, "max_mm": max_mm_probe}, "probe")
+    one("F/R search, 0 mismatches", lambda g, s: mc.scan_fr(f, r, s, 0, 0),
+        {"mode": "fr", "f": f, "r": r, "three_prime_n": 0, "max_mm": 0, "max_size": 2000}, "fr")
+    return {"label": label, "ok": all(c["ok"] for c in checks), "checks": checks, "python_sec": round(py_total, 3), "go_sec": round(go_total, 3),
+            "n_rows": len(genomes), "n_candidates": len(genomes) * len(checks), "kind": "scan"}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("set_id")
+    ap.add_argument("--scan", action="store_true", help="compare the whole-genome scan engine instead of probe design")
     ap.add_argument("--top", type=int, default=10)
     ap.add_argument("--max-iupac", type=int, default=2)
     a = ap.parse_args()
-    res = compare(pd.load_msa(a.set_id), top=a.top, max_iupac=a.max_iupac, label=a.set_id)
+    res = compare_scan(pd.load_msa(a.set_id), label=a.set_id) if a.scan else compare(pd.load_msa(a.set_id), top=a.top, max_iupac=a.max_iupac, label=a.set_id)
     for c in res["checks"]:
         print("PASS" if c["ok"] else "FAIL", c["name"], "" if c["ok"] else f"python={c['python']} go={c['go']}")
     print(f"python {res['python_sec']}s  go {res['go_sec']}s  -> {'IDENTICAL' if res['ok'] else 'DIFFERENT'}")

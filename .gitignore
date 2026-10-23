@@ -49,3 +49,4 @@ tools/primerhunter/PrimerHunter/
 
 # compiled Go probe engine (built on demand by scripts/engine_check.py)
 go/probedesign/probedesign
+go/scan/scan
