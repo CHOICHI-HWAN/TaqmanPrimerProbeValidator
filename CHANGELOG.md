@@ -5,6 +5,11 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.27.1] - 2026-10-23
+
+### Fixed
+- **세트 상세 MSA 카드에 "SeaLion용 FASTA" 버튼이 없던 문제**: 처음 그려지는 헤더에 버튼이 빠져 있었고, 필터를 바꿔 헤더가 다시 그려질 때만 나타났습니다. 처음 헤더에도 넣었고, 두 헤더가 같은 버튼(FASTA·이미지 저장·이미지 복사·텍스트 복사·전체화면)을 갖는지 `tests/test_msa_buttons.py`가 확인합니다.
+
 ## [0.27.0] - 2026-10-23
 
 ### Added
