@@ -541,6 +541,55 @@ function openDetailModal({ title, subtitle, html, compact }) {
   return { close, overlay, fit };
 }
 
+// ---------------- toasts (작업 진행/완료 알림) ----------------
+// toast(msg, {type: "info"|"run"|"ok"|"err", id, ttl}) -- same id updates the existing toast in place; "run" is sticky with a spinner.
+function toast(msg, opts = {}) {
+  let box = document.getElementById("toastBox");
+  if (!box) { box = document.createElement("div"); box.id = "toastBox"; box.setAttribute("aria-live", "polite"); document.body.appendChild(box); }
+  const type = opts.type || "info", id = opts.id || "t" + Math.random().toString(36).slice(2);
+  let el = [...box.children].find((x) => x.dataset.id === id);
+  if (!el) {
+    el = document.createElement("div"); el.dataset.id = id;
+    el.innerHTML = '<span class="toast-ic"></span><span class="toast-msg"></span><button class="toast-x" type="button" aria-label="닫기">×</button>';
+    el.querySelector(".toast-x").addEventListener("click", () => toastClear(id));
+    box.appendChild(el);
+  }
+  el.className = `toast toast-${type}`;
+  el.querySelector(".toast-ic").textContent = type === "ok" ? "✓" : type === "err" ? "!" : type === "run" ? "" : "i";
+  el.querySelector(".toast-msg").textContent = msg;
+  clearTimeout(el._t);
+  const ttl = opts.ttl ?? (type === "run" ? 0 : type === "err" ? 12000 : 4500);
+  if (ttl) el._t = setTimeout(() => toastClear(id), ttl);
+  return id;
+}
+function toastClear(id) {
+  const el = [...(document.getElementById("toastBox")?.children || [])].find((x) => x.dataset.id === id);
+  if (el) { clearTimeout(el._t); el.classList.add("out"); setTimeout(() => el.remove(), 200); }
+}
+// Shows a running toast for a job poll loop; call progress(job) each tick and done(ok, msg) at the end.
+function jobToast(label) {
+  const id = "job-" + label + "-" + Date.now();
+  toast(`${label} 시작...`, { type: "run", id });
+  return {
+    progress: (j) => toast(`${label}: ${j.progress || "실행 중"}${j.elapsed_sec != null ? ` (${fmtElapsedShort(j.elapsed_sec)})` : ""}`, { type: "run", id }),
+    done: (ok, msg) => toast(msg || (ok ? `${label} 완료` : `${label} 실패`), { type: ok ? "ok" : "err", id }),
+  };
+}
+function fmtElapsedShort(s) { s = Math.round(Number(s) || 0); return s >= 60 ? `${Math.floor(s / 60)}분 ${s % 60}초` : `${s}초`; }
+// Jobs started elsewhere (another computer) show up as one toast too.
+(function watchActiveJobs() {
+  const KIND = { redesign: "재설계", report: "리포트 생성", pipeline: "파이프라인", analyze: "분석" };
+  let busyLocal = 0;
+  const tick = async () => {
+    try {
+      const jobs = await fetchJSON("/api/jobs/active");
+      if (Array.isArray(jobs) && jobs.length) toast("서버에서 실행 중: " + jobs.map((j) => `${KIND[j.kind] || j.kind || "작업"}${j.progress ? " – " + j.progress : ""}`).join(" · "), { type: "run", id: "active-jobs" });
+      else toastClear("active-jobs");
+    } catch (e) { /* offline */ }
+  };
+  setTimeout(() => { tick(); setInterval(tick, 8000); }, 3000);
+})();
+
 function uiAlert(message, opts = {}) {
   return uiDialog({ title: opts.title || "알림", message,
     buttons: [{ label: "확인", primary: true, cancel: true, value: () => undefined }] });
@@ -1578,12 +1627,14 @@ async function initProbeDesign(detail, setData) {
           tm_above_min: Number(detail.querySelector("#probeDesignTmMin").value), tm_above_max: Number(detail.querySelector("#probeDesignTmMax").value),
           probe_mismatch: Number(detail.querySelector("#probeDesignMm").value) || 0 }) });
       if (error) throw new Error(error);
+      const jt = jobToast("Probe 최적 탐색");
       for (;;) {
         const j = await fetchJSON(`/api/jobs/${job_id}`);
-        if (!document.body.contains(bestBox)) return;
-        if (j.status === "running") { bestBox.querySelector(".probe-best-status")?.remove();
+        if (!document.body.contains(bestBox)) { jt.done(j.status !== "error"); return; }
+        if (j.status === "running") { jt.progress(j); bestBox.querySelector(".probe-best-status")?.remove();
           bestBox.insertAdjacentHTML("afterbegin", `<p class="note probe-best-status">⏳ ${escHtml(j.progress || "")} (${j.elapsed_sec ?? 0}초)</p>`); await new Promise((r) => setTimeout(r, 2000)); continue; }
         if (j.status === "error") uiAlert("최적 탐색에 실패했습니다: " + (j.error || ""));
+        jt.done(j.status !== "error");
         break;
       }
       await Promise.all([loadBest(), loadValidations()]);
@@ -1601,11 +1652,13 @@ async function initProbeDesign(detail, setData) {
         const { job_id, error } = await fetchJSON(`/api/sets/${id}/probe-design/validate`, {
           method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ seq: vb.dataset.seq, host: state.hostScope }) });
         if (error) throw new Error(error);
+        const jt = jobToast("Probe 검증");
         for (;;) {
           const j = await fetchJSON(`/api/jobs/${job_id}`);
-          if (!document.body.contains(valBox)) return;
-          if (j.status === "running") { running.text = j.progress || ""; rerender(); await new Promise((r) => setTimeout(r, 1500)); continue; }
+          if (!document.body.contains(valBox)) { jt.done(j.status !== "error"); return; }
+          if (j.status === "running") { jt.progress(j); running.text = j.progress || ""; rerender(); await new Promise((r) => setTimeout(r, 1500)); continue; }
           if (j.status === "error") uiAlert("검증에 실패했습니다: " + (j.error || ""));
+          jt.done(j.status !== "error");
           break;
         }
       } catch (err) { uiAlert("검증을 시작하지 못했습니다: " + err.message); }
@@ -1618,13 +1671,14 @@ async function initProbeDesign(detail, setData) {
   });
   btn.addEventListener("click", async () => {
     btn.disabled = true; const orig = btn.innerHTML; btn.textContent = "설계·검증 중...";
+    toast("Probe 설계·검증 중...", { type: "run", id: "probe-design" });
     try {
       const r = await fetchJSON(`/api/sets/${id}/probe-design`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ top: Number(detail.querySelector("#probeDesignTop").value) || 10, max_iupac: Number(detail.querySelector("#probeDesignIupac").value), method: detail.querySelector("#probeDesignMethod").value, host: state.hostScope, tm_above_min: Number(detail.querySelector("#probeDesignTmMin").value), tm_above_max: Number(detail.querySelector("#probeDesignTmMax").value), probe_mismatch: Number(detail.querySelector("#probeDesignMm").value) || 0 }),
       });
-      if (r.error) uiAlert(r.error); else show(r);
-    } catch (e) { uiAlert("Probe 설계에 실패했습니다: " + e.message); }
+      if (r.error) { uiAlert(r.error); toast("Probe 설계 실패", { type: "err", id: "probe-design" }); } else { show(r); toast("Probe 설계 완료", { type: "ok", id: "probe-design" }); }
+    } catch (e) { uiAlert("Probe 설계에 실패했습니다: " + e.message); toast("Probe 설계 실패", { type: "err", id: "probe-design" }); }
     btn.disabled = false; btn.innerHTML = orig;
   });
 }
@@ -4787,6 +4841,7 @@ async function savePrimersManifest() {
     return;
   }
   $("#primersSaveStatus").textContent = "저장 중...";
+  toast("프라이머 표 저장 중...", { type: "run", id: "primers-save" });
   let res, data;
   try {
     res = await fetch("/api/primers/manifest", {
@@ -4796,6 +4851,7 @@ async function savePrimersManifest() {
     data = await res.json();
   } catch (e) {
     $("#primersSaveStatus").textContent = `저장 실패: ${e.message}`;
+    toast("저장 실패: " + e.message, { type: "err", id: "primers-save" });
     return;
   }
   if (!res.ok) {
@@ -4806,8 +4862,10 @@ async function savePrimersManifest() {
     }
     renderPrimersPage();
     $("#primersSaveStatus").textContent = `저장 실패: 입력값을 확인하세요 (${(data.errors || []).length}건)`;
+    toast(`저장 실패: 입력값을 확인하세요 (${(data.errors || []).length}건)`, { type: "err", id: "primers-save" });
     return;
   }
+  toast("프라이머 표를 저장했습니다.", { type: "ok", id: "primers-save" });
   primersState.rows = data.rows;
   primersState.savedIds = new Map(data.rows.filter((r) => r.primer_id).map((r) => [r.primer_id, r.primer_name]));
   if (!primersState.rows.length || primersState.rows[primersState.rows.length - 1].primer_name) {
@@ -7198,11 +7256,13 @@ async function showRedesignPage() {
   });
   const poll = async (jobId) => {
     RD.running = true; runBtn.disabled = true;
+    const jt = jobToast("재설계");
     for (;;) {
       let j;
       try { j = await fetchJSON(`/api/jobs/${jobId}`); } catch (e) { break; }
-      if (!document.body.contains(results)) { RD.running = false; return; }
-      if (j.status !== "running") { if (j.status === "error") uiAlert("재설계에 실패했습니다: " + (j.error || "")); break; }
+      if (!document.body.contains(results)) { RD.running = false; jt.done(j.status !== "error"); return; }
+      if (j.status !== "running") { if (j.status === "error") uiAlert("재설계에 실패했습니다: " + (j.error || "")); jt.done(j.status === "done"); break; }
+      jt.progress(j);
       statusEl.textContent = `⏳ ${j.progress || ""} (${j.elapsed_sec ?? 0}초)`;
       try { results.innerHTML = renderRedesignResults(await fetchJSON(`/api/redesign/${RD.seg.toLowerCase()}/run?engine=${RD.engine}`), RD.seg); } catch (e) { /* keep the last view */ }
       await new Promise((r) => setTimeout(r, 3000));
@@ -7788,6 +7848,7 @@ async function showVennPage() {
       await fetchJSON("/api/venn-saved", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name.trim(), seg: VN.seg.toLowerCase(), keys: [...VN.selected], lineage: VN.lineage,
           snapshot: { scope: (d.host_scope || {}).scope || "", pop: d.genomes.map((g) => g[0]),
             items: Object.fromEntries([...VN.selected].map((k) => byKey.get(k)).filter(Boolean).map((it) => [it.key, { name: it.name, ids: it.ids }])) } }) });
+      toast("Venn 조합을 저장했습니다.", { type: "ok" });
       showVennPage();
     } catch (e) { uiAlert("저장하지 못했습니다: " + e.message); }
   });
@@ -8664,17 +8725,21 @@ async function showMetadataPage() {
 $("#metadataBtn").addEventListener("click", showMetadataPage);
 
 async function pollJob(jobId) {
+  const jt = jobToast("세트 분석");
   while (true) {
     const job = await fetchJSON(`/api/jobs/${jobId}`);
     if (job.status === "running") {
+      jt.progress(job);
       $("#fStatus").textContent = job.progress || "분석 중...";
       await new Promise((r) => setTimeout(r, 1200));
       continue;
     }
     if (job.status === "error") {
       $("#fStatus").textContent = `오류: ${job.error}`;
+      jt.done(false, "세트 분석 실패: " + (job.error || ""));
       return null;
     }
+    jt.done(true);
     return job.set_id;
   }
 }
@@ -8983,6 +9048,7 @@ async function pollPipelineJob(jobId, label) {
   const statusEl = $("#pipelineStatus");
   statusEl.hidden = false;
   let finalStatus = "error";
+  const jt = jobToast(label);
   while (true) {
     let job;
     try {
@@ -8990,12 +9056,14 @@ async function pollPipelineJob(jobId, label) {
     } catch (e) {
       statusEl.className = "pipeline-status error";
       statusEl.textContent = `${label}: 상태 확인 실패 (${e.message})`;
+      jt.done(false, `${label}: 상태 확인 실패`);
       updatePipelineModal(label, `상태 확인 실패: ${e.message}`, $("#pipelineModalLog").textContent);
       break;
     }
     if (job.status === "running") {
       statusEl.className = "pipeline-status running";
       statusEl.textContent = `${label} 실행 중... ${job.progress || ""} (${fmtElapsed(job.elapsed_sec)} 경과)`;
+      jt.progress(job);
       updatePipelineModal(label, `실행 중... ${job.progress || ""} (${fmtElapsed(job.elapsed_sec)} 경과)`, job.log_tail);
       await new Promise((r) => setTimeout(r, 1500));
       continue;
@@ -9004,10 +9072,12 @@ async function pollPipelineJob(jobId, label) {
     if (job.status === "error") {
       statusEl.className = "pipeline-status error";
       statusEl.textContent = `${label} 실패 (returncode=${job.returncode}). 로그: ${job.log_path || ""}`;
+      jt.done(false);
       updatePipelineModal(label, `실패 (returncode=${job.returncode})`, job.log_tail);
     } else {
       statusEl.className = "pipeline-status done";
       statusEl.textContent = `${label} 완료.`;
+      jt.done(true);
       updatePipelineModal(label, "완료", job.log_tail);
       await loadSets();
       if (state.activeId) {
@@ -9085,6 +9155,7 @@ async function checkFreshnessOnStartup() {
 // ---------------- report PDF generation ----------------
 
 async function pollReportJob(jobId) {
+  const jt = jobToast("종합 리포트 PDF");
   while (true) {
     let job;
     try {
@@ -9095,13 +9166,16 @@ async function pollReportJob(jobId) {
     }
     if (job.status === "running") {
       updatePipelineModal("종합 리포트 PDF 생성", `생성 중... ${job.progress || ""} (${fmtElapsed(job.elapsed_sec)} 경과)`, job.log_tail);
+      jt.progress(job);
       await new Promise((r) => setTimeout(r, 1200));
       continue;
     }
     if (job.status === "error") {
       updatePipelineModal("종합 리포트 PDF 생성", `실패 (returncode=${job.returncode})`, job.log_tail);
+      jt.done(false);
     } else {
       updatePipelineModal("종합 리포트 PDF 생성", "완료!", job.log_tail);
+      jt.done(true);
       const sub = $("#pipelineModalSub");
       if (sub && !sub.querySelector("a")) {
         sub.appendChild(document.createTextNode(" "));

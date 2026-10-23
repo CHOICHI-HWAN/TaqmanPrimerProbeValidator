@@ -138,7 +138,8 @@ if (typeof document !== "undefined") {
   btn.addEventListener("click", () => step("클릭됨"), true);          // registered first: proves the click reaches the button
   step("스크립트 로드됨");
 
-  const setLabel = (t) => { btn.title = t && !/Firebase 업로드$/.test(t) ? t : BTN_TITLE; btn.classList.toggle("busy", !!t && !/Firebase 업로드$/.test(t)); };
+  const T = (m, o) => { try { if (typeof toast === "function") toast(m, Object.assign({ id: "fb-upload" }, o)); } catch (e) { /* no toast */ } };
+  const setLabel = (t) => { if (t && /^(업로드 \d|로그인 중|수집)/.test(t)) T("Firebase: " + t, { type: "run" }); btn.title = t && !/Firebase 업로드$/.test(t) ? t : BTN_TITLE; btn.classList.toggle("busy", !!t && !/Firebase 업로드$/.test(t)); };
   const say = (t, bad) => { msg.textContent = t; msg.style.borderColor = bad ? "#e5484d" : "#94a3b8"; msg.hidden = !t; };
   let sdk = null, busy = false;
 
@@ -201,11 +202,13 @@ if (typeof document !== "undefined") {
         if (!confirm(`${sdk.auth.currentUser.email} 계정으로 현재 분석 결과(분석 제외, 결과만)를 Firebase에 올립니다.\n허가된 계정만 열람할 수 있습니다. 계속할까요?`)) { setLabel("☁ Firebase 업로드"); return; }
         const n = await upload(cfg);
         setLabel("☁ Firebase 업로드");
+        T(`Firebase 업로드 완료: ${n}개 파일`, { type: "ok" });
         say(`업로드 완료: ${n}개 파일. https://primervalidator.web.app/${cfg.project}/ 에서 확인하세요.`, false);
       }).catch((e) => {
         if (stuck) clearTimeout(stuck);
         console.error("Firebase upload failed", e);
         setLabel("☁ Firebase 업로드");
+        T("Firebase 업로드 실패", { type: "err" });
         say("업로드 실패: " + explainError(e), true);
       }).finally(() => { busy = false; btn.disabled = false; });
     };
