@@ -3,6 +3,10 @@
 2026-10-23 기준, 이 서버의 실제 데이터(S 662개·L 366개 유전체, 세트 36개)로 잰 값입니다. 원칙: **같은 입력에 파이썬과 비트 단위로 같은 결과**를
 내는지 `🧪 엔진 검증`으로 먼저 확인하고, 그 뒤에 속도를 봅니다. 파이썬 결과가 정답지입니다.
 
+## 실제 파이프라인에서 얻은 결과 (0.27.0)
+
+`scan_engine: go`로 세트 분석 전체(유전체 660개)를 돌리면 결과·요약이 파이썬과 **완전히 같고**, 스캔 단계만 약 12배 빨라집니다. 그러나 분석 전체는 MFEprimer가 시간의 대부분이라 **67.4초 → 64.6초(약 4%)** 입니다. 지금 데이터 크기에서는 Go의 이득이 체감되지 않습니다. 반면 서버 캐시는 전체 대시보드 1.4초 → 0.10초로 훨씬 컸습니다. 그래서 `scan_engine` 기본값은 python으로 두고, 유전체가 크게 늘거나 그룹이 커질 때 go로 바꿉니다.
+
 ## 이미 끝난 것
 
 | 대상 | 상태 | 결과 |
@@ -15,7 +19,7 @@
 
 | 순위 | 대상 | 측정(파이썬) | 기대 | 포팅 난이도 | 판단 |
 | --- | --- | --- | --- | --- | --- |
-| 1 | **`mfe_common._oligo_sites` / `scan_fr` / `scan_probe` / `direct_best_match`** (전체 유전체 브루트포스 스캔; `build_alignment_table`, `live_analyze`, `group_cross_binding`, `run_refgenome_binding`이 호출) | 올리고 1개·L 유전체 366개에 **1.05초**, 세트 분석 1건에 수 초. 그룹은 구성 세트 수만큼 곱해짐 | 유전체 단위 병렬 + 바이트 비교로 10~50배 | 낮음 (순수 함수, 입력=서열·IUPAC, 출력=위치·불일치) | **1순위.** 정확도 비교가 쉽고 호출처가 많음 |
+| 1 (완료, 0.26~0.27) | **`mfe_common._oligo_sites` / `scan_fr` / `scan_probe` / `direct_best_match`** (전체 유전체 브루트포스 스캔; `build_alignment_table`, `live_analyze`, `group_cross_binding`, `run_refgenome_binding`이 호출) | 올리고 1개·L 유전체 366개에 **1.05초**, 세트 분석 1건에 수 초. 그룹은 구성 세트 수만큼 곱해짐 | 유전체 단위 병렬 + 바이트 비교로 10~50배 | 낮음 (순수 함수, 입력=서열·IUPAC, 출력=위치·불일치) | **1순위.** 정확도 비교가 쉽고 호출처가 많음 |
 | 2 | **`group_cross_binding.scan_combos` / `compute_group_combo_table`** | 구성 세트 수의 제곱으로 늘어나는 F×R 조합 | 1번과 같이 이득 | 중간 (1번 위에 얹음) | 1번 다음 |
 | 3 | `build_diversity_vcf.build_vcf_rows` / `sample_qc` | L 크기 합성 데이터 **0.29초** | 작음 | 낮음 | 지금은 불필요. 유전체가 수천 개로 늘면 재검토 |
 | 4 | `msa_common` 의 dotify·방해 유전체 탐지, `standard_representativeness` 의 VCF 읽기 | 미측정(MAFFT가 지배) | 작음 | 중간 | 보류 |

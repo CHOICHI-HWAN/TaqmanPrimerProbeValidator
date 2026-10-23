@@ -27,6 +27,14 @@ def requested_scope():
     return getattr(_REQ, "scope", None)
 
 
+_SUMMARIES = {}
+
+
+def _stamp(p):
+    p = Path(p)
+    return p.stat().st_mtime_ns if p.exists() else None
+
+
 def _cached(path, extra, loader):
     """loader(path) result, re-read only when the file changes."""
     p = Path(path)
@@ -92,18 +100,30 @@ class View:
         s = H.summarize(ids, rows_by_id, self.mm, self.pm, probe_inside_amplicon)
         return {k: v for k, v in s.items() if not k.startswith("_")}
 
-    def set_summary(self, set_id, seg, scope=None):
+    def _set_numbers(self, set_id, seg, scope):
+        """H.summarize() of a set's mismatch table inside `scope`, kept until the table, the population/host files or the pass rule change
+        (the overview, the Venn page and every group card ask for the same numbers again and again)."""
         path = self.root / "output" / "primers" / set_id / "alignment" / "mismatch_table.tsv"
-        rows = _cached(path, None, lambda p: {r["genome_id"]: r for r in _read_tsv(p)})
-        return self.summary_from_rows(seg, rows, scope)
+        scope = scope or self.scope(seg)
+        sp = lambda *a: self.root.joinpath(*a)  # noqa: E731
+        key = (str(path), _stamp(path), seg.lower(), scope, self.mm, self.pm, repr(self.columns),
+               _stamp(sp("data", "filtered", f"{seg.lower()}_filtered_metadata.tsv")), _stamp(sp("data", "raw", f"{seg.lower()}_metadata.tsv")))
+        hit = _SUMMARIES.get(key)
+        if hit is None:
+            rows = _cached(path, None, lambda p: {r["genome_id"]: r for r in _read_tsv(p)})
+            hit = H.summarize(sorted(self.ids(seg, scope)), rows, self.mm, self.pm, probe_inside_amplicon)
+            if len(_SUMMARIES) > 600:
+                _SUMMARIES.clear()
+            _SUMMARIES[key] = hit
+        return hit
+
+    def set_summary(self, set_id, seg, scope=None):
+        return {k: v for k, v in self._set_numbers(set_id, seg, scope).items() if not k.startswith("_")}
 
     def set_validated_ids(self, set_id, seg, scope=None):
         """The genomes a set validates, recounted from its mismatch table with the CURRENT parameters inside `scope` -- exactly the rule
         behind the set card's number (set_summary), so a figure built from these ids can never disagree with the card."""
-        path = self.root / "output" / "primers" / set_id / "alignment" / "mismatch_table.tsv"
-        rows = _cached(path, None, lambda p: {r["genome_id"]: r for r in _read_tsv(p)})
-        ids = sorted(self.ids(seg, scope))
-        return set(H.summarize(ids, rows, self.mm, self.pm, probe_inside_amplicon)["_validated_ids"])
+        return set(self._set_numbers(set_id, seg, scope)["_validated_ids"])
 
     def lineage_of(self, seg):
         return _cached(self.root / "data" / "filtered" / f"{seg.lower()}_filtered_metadata.tsv", "lineage",

@@ -19,7 +19,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from mfe_common import (  # noqa: E402
     find_mfeprimer, ensure_index, write_oligo_fasta, run_primer_search, parse_spec_best,
-    read_fasta_ids, read_fasta_seqs, direct_best_match, direct_best_fr_match, scan_fr, choose_fr, scan_probe, choose_probe,
+    read_fasta_ids, read_fasta_seqs, direct_best_match, direct_best_fr_match, scan_fr, prefetch_sites, clear_site_cache, choose_fr, scan_probe, choose_probe,
 )
 from msa_common import build_msa  # noqa: E402
 from run_dimer_hairpin import (  # noqa: E402
@@ -203,6 +203,8 @@ def analyze_set(*, name, segment, f_id, f_seq, r_id, r_seq, p_id, p_seq, root: P
             for r in csv.DictReader(fh, delimiter="\t"):
                 db_meta[r["accession"]] = r
 
+    clear_site_cache()
+    prefetch_sites([(f_seq, 2), (r_seq, 2), (p_seq, PROBE_FALLBACK_MAX_MISMATCH)], db_seqs.values())      # config scan_engine: go
     genomes = []
     for gid in sorted(all_ids):
         fr, _src = choose_fr(fr_best.get(gid), scan_fr(f_seq, r_seq, db_seqs.get(gid, ""), three_prime_n=three_prime_n))
@@ -286,6 +288,7 @@ def analyze_set(*, name, segment, f_id, f_seq, r_id, r_seq, p_id, p_seq, root: P
                                        three_prime_n=three_prime_n, genome_seqs=std_db_seqs)
         std_probe_wide_out = out_dir / "standard_probe_wide.txt"
         std_p_best = probe_search_best(mfeprimer_bin, standard_fasta, p_id, p_seq, std_probe_wide_out, mismatch=8)
+        prefetch_sites([(f_seq, 2), (r_seq, 2), (p_seq, PROBE_FALLBACK_MAX_MISMATCH)], std_db_seqs.values())
         for gid in sorted(std_ids):
             fr, _src = choose_fr(std_fr_best.get(gid), scan_fr(f_seq, r_seq, std_db_seqs.get(gid, ""), three_prime_n=three_prime_n))
             p_hit = std_p_best.get(gid)
