@@ -9664,6 +9664,7 @@ async function showEngineCheckPage() {
     <div class="card" style="margin-bottom:14px;"><h3>실제 세트로 비교</h3>
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;">
         <label class="note">세트 <select id="engSet">${ENG.sets.map((s) => `<option value="${escHtml(s.set_id)}">${escHtml(s.name)} (${escHtml(s.set_id)})</option>`).join("")}</select></label>
+        <label class="note">종류 <select id="engKind"><option value="design">Probe 설계</option><option value="scan">전체 유전체 스캔 (F/R·Probe 검색)</option></select></label>
         <label class="note">후보 수 <input id="engTop" type="number" min="1" max="60" value="10" style="width:60px;"></label>
         <label class="note">IUPAC 최대 <input id="engIupac" type="number" min="0" max="4" value="2" style="width:50px;"></label>
         <button id="engRun" class="btn btn-primary">선택한 세트 비교</button>
@@ -9671,7 +9672,7 @@ async function showEngineCheckPage() {
       </div>
       <div id="engOut" style="margin-top:12px;"></div></div>`;
   const out = view.querySelector("#engOut");
-  const one = async (id, top, iup) => fetchJSON(`/api/engine-check/${encodeURIComponent(id)}?top=${top}&max_iupac=${iup}`);
+  const one = async (id, top, iup) => fetchJSON(`/api/engine-check/${encodeURIComponent(id)}?top=${top}&max_iupac=${iup}${view.querySelector("#engKind").value === "scan" ? "&kind=scan" : ""}`);
   view.querySelector("#engRun").addEventListener("click", async (e) => {
     const id = view.querySelector("#engSet").value;
     e.currentTarget.disabled = true; out.innerHTML = "<p class='note'>두 엔진을 실행하는 중...</p>";
@@ -9685,8 +9686,9 @@ async function showEngineCheckPage() {
     const draw = (running) => { out.innerHTML = `<table class="data-table"><thead><tr><th>세트</th><th>IUPAC</th><th>후보</th><th>결과</th><th>Python 초</th><th>Go 초</th></tr></thead><tbody>${rows.join("")}</tbody></table>
       <p class="note" style="margin-top:8px;">${running ? "⏳ 진행 중... " : ""}${rows.length}건 · 불일치 ${bad}건 · 합계 Python ${py.toFixed(1)}초 / Go ${go.toFixed(1)}초</p>`; };
     const tid = "engine-all";
-    let n = 0; const total = ENG.sets.length * 3;
-    for (const s of ENG.sets) for (const [iup, top] of [[0, 10], [2, 10], [4, 30]]) {
+    let n = 0; const total = ENG.sets.length * (view.querySelector("#engKind").value === "scan" ? 1 : 3);
+    const scanKind = view.querySelector("#engKind").value === "scan";
+    for (const s of ENG.sets) for (const [iup, top] of (scanKind ? [[2, 10]] : [[0, 10], [2, 10], [4, 30]])) {
       toast(`엔진 일괄 비교 ${++n}/${total}`, { type: "run", id: tid });
       try {
         const r = await one(s.set_id, top, iup);

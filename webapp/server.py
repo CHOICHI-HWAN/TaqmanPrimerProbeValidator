@@ -2936,7 +2936,14 @@ class Handler(BaseHTTPRequestHandler):
                 f = ROOT / "output" / "primers" / st["set_id"] / "msa" / "msa.json"
                 if f.exists():
                     sets.append({"set_id": st["set_id"], "name": st.get("display_name") or st["set_id"], "segment": st.get("segment")})
-            return self._send_json({"engine_built": bool(exe), "go": ver, "selftest": selftest, "sets": sets})
+            scan_exe = engine_check.ensure_built("scan")
+            if scan_exe:
+                try:
+                    r = subprocess.run([scan_exe, "-selftest"], capture_output=True, text=True, timeout=30)
+                    selftest += ["[scan] " + ln for ln in r.stdout.splitlines() if ln.strip()]
+                except (OSError, subprocess.SubprocessError):
+                    pass
+            return self._send_json({"engine_built": bool(exe), "scan_built": bool(scan_exe), "go": ver, "selftest": selftest, "sets": sets})
 
         m = re.match(r"^/api/engine-check/([^/]+)$", path)
         if m:
@@ -2953,6 +2960,8 @@ class Handler(BaseHTTPRequestHandler):
                     return self._send_json({"error": "이 세트의 정렬에 F/R 구간이 없습니다."}, 400)
                 top = max(1, min(60, int((qs.get("top") or ["10"])[0])))
                 iup = max(0, min(4, int((qs.get("max_iupac") or ["2"])[0])))
+                if (qs.get("kind") or [""])[0] == "scan":
+                    return self._send_json(engine_check.compare_scan(msa, label=m.group(1)))
                 return self._send_json(engine_check.compare(msa, top=top, max_iupac=iup, label=m.group(1)))
             except (ValueError, RuntimeError, KeyError) as exc:
                 return self._send_json({"error": str(exc)}, 500)
