@@ -1175,3 +1175,17 @@ a.pipe-pill:hover { border-color: var(--accent); color: var(--accent); }
 .vn-pick.on .vn-count { background: color-mix(in srgb, var(--c) 28%, transparent); color: var(--fg); }
 .vn-selector { max-height: 62vh; overflow: auto; resize: vertical; padding: 2px 6px 2px 2px; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); }
 .vn-cmp-sw { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
+
+/* toasts */
+#toastBox { position: fixed; right: 16px; bottom: 16px; z-index: 10000; display: flex; flex-direction: column; gap: 8px; max-width: min(420px, calc(100vw - 32px)); pointer-events: none; }
+.toast { pointer-events: auto; display: flex; align-items: flex-start; gap: 8px; padding: 9px 10px 9px 12px; border-radius: var(--r-md, 10px); background: var(--panel, #fff); color: var(--fg, #111); border: 1px solid var(--border, #d0d7de); border-left-width: 4px; box-shadow: 0 6px 20px rgba(0,0,0,.18); font-size: var(--fs-sm, 13px); animation: toast-in .18s ease-out; }
+.toast.out { opacity: 0; transform: translateY(6px); transition: all .2s; }
+.toast-msg { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.toast-ic { flex: none; width: 16px; height: 16px; line-height: 16px; text-align: center; font-weight: 700; border-radius: 50%; font-size: 11px; color: #fff; margin-top: 1px; }
+.toast-x { flex: none; border: 0; background: none; color: var(--muted, #666); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 2px; }
+.toast-info { border-left-color: #3b82f6; } .toast-info .toast-ic { background: #3b82f6; }
+.toast-ok { border-left-color: #16a34a; } .toast-ok .toast-ic { background: #16a34a; }
+.toast-err { border-left-color: #e5484d; } .toast-err .toast-ic { background: #e5484d; }
+.toast-run { border-left-color: #f59e0b; } .toast-run .toast-ic { border: 2px solid #f59e0b; border-top-color: transparent; background: none; box-sizing: border-box; animation: toast-spin .8s linear infinite; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
+@keyframes toast-spin { to { transform: rotate(360deg); } }
