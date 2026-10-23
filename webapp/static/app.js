@@ -2473,6 +2473,31 @@ function narrateSetAssessment(setData) {
   return { verdict, verdictClass, points };
 }
 
+// 요약(종합 평가) 오른쪽에 그리는 리니지별 누적 커버리지 곡선: 그룹은 구성 세트, 세트는 자기 자신 + 변이 세트를 하나씩 더할 때의 커버리지.
+function summaryWithCurve(assessmentHtml, seg, keys) {
+  if (!keys || keys.length < 2) return assessmentHtml;
+  setTimeout(mountCurveCards, 0);
+  return `<div class="summary-split">${assessmentHtml}<div class="card cov-curve-card" data-seg="${escHtml(String(seg).toLowerCase())}" data-keys="${escHtml(JSON.stringify(keys))}"><h3>리니지별 누적 커버리지 곡선</h3><p class="note">불러오는 중...</p></div></div>`;
+}
+async function mountCurveCards() {
+  for (const el of document.querySelectorAll(".cov-curve-card:not([data-done])")) {
+    el.dataset.done = "1";
+    try {
+      const keys = JSON.parse(el.dataset.keys);
+      const d = await fetchJSON(`/api/venn/${el.dataset.seg}`);
+      const byKey = new Map(d.items.map((it) => [it.key, it]));
+      const sel = keys.map((k) => byKey.get(k)).filter(Boolean);
+      if (sel.length < 2) { el.remove(); continue; }
+      const data = vnCurveDataFrom(d.genomes, sel);
+      const order = data.steps.slice(1).map((s) => `<li><b>${escHtml(s.label)}</b> <span class="note">+${s.gain}개 → 전체 ${(100 * s.cov.ALL / (data.total.ALL || 1)).toFixed(1)}%</span></li>`).join("");
+      const body = `${vnCurveSvg(data)}<details style="margin-top:6px;"><summary class="note">추가 순서</summary><ol style="margin:6px 0 0 18px;">${order}</ol></details>`;
+      el.innerHTML = `<h3 style="display:flex;justify-content:space-between;gap:6px;align-items:center;">리니지별 누적 커버리지 곡선 <button type="button" class="btn btn-secondary cov-curve-big" title="크게 보기">&#9974;</button></h3>
+        <div class="note" style="margin-bottom:4px;">위로 빨리 올라갈수록 적은 수의 세트로 많이 잡습니다 (세트 단독 통과 기준)</div>${body}`;
+      el.querySelector(".cov-curve-big").addEventListener("click", () => openDetailModal({ title: "리니지별 누적 커버리지 곡선", html: body }));
+    } catch (e) { el.remove(); }
+  }
+}
+
 function renderSetAssessment(setData) {
   const { verdict, verdictClass, points } = narrateSetAssessment(setData);
   return `
@@ -2512,7 +2537,7 @@ function renderDetail(setData) {
       ${gene.amplicon_start ? ` &middot; amplicon ${gene.chrom || ""}:${gene.amplicon_start}..${gene.amplicon_end} (${gene.amplicon_size}bp)` : ""}
     </div>
 
-    ${renderSetAssessment(setData)}
+    ${summaryWithCurve(renderSetAssessment(setData), setData.segment, (() => { const vs = state.sets.filter((x) => x.parent_id === setData.set_id).map((x) => x.set_id); return vs.length ? [setData.set_id, ...vs] : []; })())}
 
     <div class="card-grid">
       <div class="card">
@@ -3974,7 +3999,7 @@ function renderGroupDetail(g) {
     ${finalResultBoxHtml(g.group_id)}
     <div class="detail-sub">구성 세트: ${memberChips}</div>
 
-    ${renderSetAssessment(groupAssessmentInput(g))}
+    ${summaryWithCurve(renderSetAssessment(groupAssessmentInput(g)), g.segment, g.members)}
 
     <div class="card-grid">
       <div class="card">
@@ -7734,8 +7759,9 @@ function vnDraw(view) {
 // ---- cumulative coverage curves (ROC-style): add the selected sets/groups one by one, best first, and draw how each lineage's coverage rises ----
 const VN_LIN_COLORS = ["#4C78A8", "#F58518", "#54A24B", "#E45756", "#B279A2", "#72B7B2", "#9D755D", "#EECA3B", "#FF9DA6", "#79706E"];
 
-function vnCurveData(c) {
-  const d = VN.data, items = c.sel.map((x) => ({ name: x.name, ids: new Set(x.ids) }));
+function vnCurveData(c) { return vnCurveDataFrom(VN.data.genomes, c.sel); }
+function vnCurveDataFrom(genomes, sel) {
+  const d = { genomes }, items = sel.map((x) => ({ name: x.name, ids: new Set(x.ids) }));
   const lins = [...new Set(d.genomes.map((g) => g[1]))].sort((a, b) => a.localeCompare(b));
   const total = { ALL: d.genomes.length }, linOf = new Map(d.genomes.map((g) => [g[0], g[1]]));
   lins.forEach((L) => { total[L] = d.genomes.filter((g) => g[1] === L).length; });
