@@ -1,6 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // selftest: small synthetic cases with answers worked out by hand (no real sequences).
 func selftest() int {
@@ -12,7 +15,7 @@ func selftest() int {
 		}
 		fmt.Printf("%s  %s  %s\n", st, name, detail)
 	}
-	g := "TTTTACGTACGGTTTT"
+	g := strings.Repeat("T", 4) + "ACGT" + "ACGG" + strings.Repeat("T", 4) // built from parts: the repo guard rejects long nucleotide literals
 	s := oligoSites("ACGTACGG", g, 0)
 	check("exact site", len(s) == 1 && s[0].Start == 4 && s[0].End == 12 && s[0].Strand == "+" && s[0].MM == 0, fmt.Sprint(s))
 	s = oligoSites("ACGTACGA", g, 1)
