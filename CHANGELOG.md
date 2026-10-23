@@ -5,6 +5,17 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-10-23
+
+### Added
+- **Go Probe 설계 엔진(실험)**: `go/probedesign/`에 `scripts/probe_designer.py`의 규칙 기반(own) 후보 생성을 Go로 옮겼습니다(표준 라이브러리만 사용, 윈도우 길이별 병렬). 파이썬 결과를 정답지로 삼아 후보 서열·가닥·위치·IUPAC 수·Tm/GC·커버리지·순서가 같은지 비교합니다. 파이썬 3.12의 `sum()`(보정 합산)까지 똑같이 재현해 Tm이 비트 단위로 같습니다. 실제 36개 세트 × 3가지 조건(IUPAC 0·2·4) 108건에서 차이 0건, 합성 MSA 9건도 동일. Primer3·MFEprimer 단계는 파이썬에 그대로 있습니다.
+- **🛠 설계 › 🧪 엔진 검증 (Go)** 메뉴: Go 자체 단위 검사, 세트별 비교, 모든 세트 일괄 비교(진행 토스트)와 속도 비교. API: `GET /api/engine-check`, `GET /api/engine-check/<세트>`. 테스트: `tests/test_engine_check.py`(Go가 없으면 건너뜀), `scripts/engine_check.py`.
+
+### Fixed
+- **Probe 설계가 N이 많은 구간에서 끝나지 않던 문제**: 변형 수를 세기 전에 모두 펼쳐(4^n) 멈춘 것처럼 보였습니다. 64개를 넘으면 펼치지 않고 바로 제외합니다(결과는 같음).
+- **Probe 설계 오류 두 가지**: 프라이머 구간이 전부 gap인 세트의 `IndexError`, MSA 불일치 문자가 합의서열과 같을 때의 `KeyError`(10여 개 세트)를 고쳤습니다.
+- **Probe 설계 카드가 접혀 있어 안 보이던 문제**: 세트 상세에서 기본으로 펼치고 제목 줄을 눈에 띄게 했습니다.
+
 ## [0.24.2] - 2026-10-23
 
 ### Added

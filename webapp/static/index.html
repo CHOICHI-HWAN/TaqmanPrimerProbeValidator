@@ -51,6 +51,7 @@
         <summary>🛠 설계</summary>
         <button id="litBtn" class="btn btn-secondary btn-block">📚 문헌 프라이머</button>
         <button id="redesignBtn" class="btn btn-secondary btn-block" title="리니지(클레이드)별로 varVAMP로 프라이머·프로브를 새로 설계하고 실제 검증 결과를 봅니다">🛠 리니지별 재설계 (varVAMP)</button>
+        <button id="engineBtn" class="btn btn-secondary btn-block" title="Go로 만든 Probe 설계 엔진이 파이썬 결과(정답지)와 같은지 실제 세트로 검사합니다">🧪 엔진 검증 (Go)</button>
       </details>
       <details class="menu-group" data-menu="info">
         <summary>📊 데이터 · 정보</summary>
@@ -86,7 +87,7 @@
       </div>
       <input id="searchBox" class="search-box" type="text" placeholder="세트 검색 (이름, 벤더)...">
       <div id="setList" class="set-list"></div>
-      <div class="sidebar-footer">&copy; 2026 Chihwan Choi &middot; GPL-3.0 &middot; v<span id="footerVersion">0.24.2</span><br><button id="skinToggleBtn" class="skin-toggle" title="화면 스타일 전환 (Vaadin Lumo / 기본)">스타일: Lumo</button></div>
+      <div class="sidebar-footer">&copy; 2026 Chihwan Choi &middot; GPL-3.0 &middot; v<span id="footerVersion">0.25.0</span><br><button id="skinToggleBtn" class="skin-toggle" title="화면 스타일 전환 (Vaadin Lumo / 기본)">스타일: Lumo</button></div>
     </aside>
 
     <main class="main">
@@ -102,6 +103,7 @@
       <div id="diversityView" class="diversity-view" hidden></div>
       <div id="geneConsView" class="diversity-view" hidden></div>
       <div id="redesignView" class="diversity-view" hidden></div>
+      <div id="engineView" class="diversity-view" hidden></div>
       <div id="vennView" class="diversity-view" hidden></div>
 
       <div id="metadataView" class="metadata-view" hidden></div>

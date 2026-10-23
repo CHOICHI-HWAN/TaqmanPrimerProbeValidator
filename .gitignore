@@ -46,3 +46,6 @@ PUBLISHED_PRIMERS.md
 # third-party PrimerHunter source + build (see tools/primerhunter/README.md)
 tools/primerhunter/*.tar.gz
 tools/primerhunter/PrimerHunter/
+
+# compiled Go probe engine (built on demand by scripts/engine_check.py)
+go/probedesign/probedesign

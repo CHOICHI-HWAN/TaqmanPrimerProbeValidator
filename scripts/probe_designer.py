@@ -60,8 +60,16 @@ def longest_run(seq: str) -> int:
     return best
 
 
-def resolutions(seq: str) -> list:
-    """Every plain-ACGT oligo an IUPAC oligo stands for (2 per two-base code, so 2**k for k degenerate positions)."""
+def resolutions(seq: str, limit: int = 0) -> list:
+    """Every plain-ACGT oligo an IUPAC oligo stands for (2 per two-base code, so 2**k for k degenerate positions).
+    With `limit`, an oligo that would stand for more than `limit` of them gives [] without expanding them (a window full of N
+    would otherwise build 4**n strings)."""
+    if limit:
+        n = 1
+        for c in seq.upper():
+            n *= max(1, len(IUPAC.get(c, "")))
+            if n > limit:
+                return []
     outs = [""]
     for c in seq.upper():
         bases = IUPAC.get(c, "")
@@ -75,7 +83,7 @@ _CODE_OF = {frozenset(v): k for k, v in IUPAC.items() if len(v) == 2}     # {A,G
 def rule_problems(seq: str, tm_range, gc_range) -> list:
     """Why an oligo is not a usable TaqMan probe (empty list = usable). IUPAC positions are judged on every
     resolution: Tm and GC on their mean, the 5' G and run rules on the worst one."""
-    res = resolutions(seq)
+    res = resolutions(seq, 64)
     if not res or len(res) > 64:
         return ["non-ACGT"]
     why = []
@@ -103,7 +111,7 @@ def degenerate_window(window: str, row_mm: list, max_iupac: int):
         for m in left:
             if 0 < len(m) <= k:                           # a genome that could still be fully covered with the codes left
                 for pos, base in m.items():
-                    if base in "ACGT" and len(allowed[pos]) == 1 and window[pos] in "ACGT":
+                    if base in "ACGT" and base != window[pos] and len(allowed[pos]) == 1 and window[pos] in "ACGT":
                         score[(pos, base)] = score.get((pos, base), 0) + 1
         if not score:
             break
@@ -132,7 +140,10 @@ def design(set_id: str, min_len=18, max_len=30, tm_range=None, gc_range=(30.0, 8
     # A probe should melt above BOTH primers (so it is bound before they extend): the reference is the higher of the two.
     # Their Tm is taken from the consensus under their windows (plain ACGT, so IUPAC primers work) with the same model
     # as the candidates.
-    primer_tm = max(tm_nn(cons[c[0]:c[1] + 1].replace("-", "")) for c in (f_col, r_col))      # a consensus gap inside a primer window is skipped
+    primer_windows = [w for w in (cons[c[0]:c[1] + 1].replace("-", "") for c in (f_col, r_col)) if w]   # a consensus gap inside a primer window is skipped
+    if not primer_windows:
+        sys.exit("[error] the consensus has no bases under the F/R primer windows.")
+    primer_tm = max(tm_nn(w) for w in primer_windows)
     above = tm_above or PROBE_TM_ABOVE
     if tm_range is None:
         tm_range = (primer_tm + above[0], primer_tm + above[1])
