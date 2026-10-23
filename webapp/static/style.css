@@ -1189,3 +1189,7 @@ a.pipe-pill:hover { border-color: var(--accent); color: var(--accent); }
 .toast-run { border-left-color: #f59e0b; } .toast-run .toast-ic { border: 2px solid #f59e0b; border-top-color: transparent; background: none; box-sizing: border-box; animation: toast-spin .8s linear infinite; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
 @keyframes toast-spin { to { transform: rotate(360deg); } }
+
+.summary-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; margin-bottom: 20px; }
+.summary-split > .card { margin-bottom: 0 !important; }
+@media (max-width: 1100px) { .summary-split { grid-template-columns: minmax(0, 1fr); } }
