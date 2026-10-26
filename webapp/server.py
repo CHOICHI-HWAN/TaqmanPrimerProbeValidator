@@ -1701,6 +1701,31 @@ def load_venn(seg):
     return {"segment": seg.upper(), "host_scope": v.info(seg), "genomes": genomes, "items": items}
 
 
+def load_genome_meta(seg, acc):
+    """Everything the metadata says about one genome of the analysed population, for the genome window: the raw source columns
+    (when / where / host / lineage columns / authors ...), what the analysis used of them, its host class, and -- for a segmented virus --
+    the records of the same virus in the other segments (draft strain link)."""
+    v = scope_ctx()
+    raw = scope_view._cached(ROOT / "data" / "raw" / f"{seg}_metadata.tsv", "genome-meta",
+                             lambda p: {r["accession"]: r for r in scope_view._read_tsv(p) if r.get("accession")}).get(acc)
+    if raw is None:
+        return None
+    curated = scope_view._cached(ROOT / "data" / "filtered" / f"{seg}_filtered_metadata.tsv", "genome-meta",
+                                 lambda p: {r["accession"]: r for r in scope_view._read_tsv(p) if r.get("accession")}).get(acc)
+    out = {"accession": acc, "segment": seg, "raw": {k: (x or "") for k, x in raw.items()}, "analysed": curated is not None,
+           "analysis": {k: curated.get(k, "") for k in ("lineage", "date", "country", "region")} if curated else {},
+           "host_class": v.host_class(seg, acc), "linked": None}
+    link = strain_link_data()
+    if link:
+        for x in link["viruses"]:
+            if acc in x["acc"].get(seg, []):
+                lin = {sg: v.lineage_of(sg) for sg in link["segments"]}
+                out["linked"] = {"strain": x["name"], "status": x["status"], "records": {sg: [{"accession": a, "lineage": lin[sg].get(a, "NA")} for a in x["acc"][sg]]
+                                                                                      for sg in link["segments"] if x["acc"][sg]}}
+                break
+    return out
+
+
 def strain_link_data():
     """The draft strain link (see strain_link.py) for the analysed populations in the active host scope, or None for a one-segment virus."""
     segs = seg_keys()
@@ -2711,6 +2736,13 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_json(load_venn_saved())
         if path == "/api/pipelines":
             return self._send_json(load_pipelines())
+        m = re.match(r"^/api/genome-meta/(\w+)/([A-Za-z0-9_.\-]+)$", path)
+        if m:
+            seg = m.group(1).lower()
+            if seg not in seg_keys():
+                return self._send_json({"error": "bad segment"}, 400)
+            data = load_genome_meta(seg, m.group(2))
+            return self._send_json(data if data is not None else {"error": "메타데이터에 없는 유전체입니다."}, 200 if data is not None else 404)
         if path == "/api/venn/linked":
             data = load_venn_linked()
             return self._send_json(data if data is not None else {"error": "분절이 둘 이상인 바이러스만 지원합니다."}, 200 if data is not None else 404)
