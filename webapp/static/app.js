@@ -1917,20 +1917,45 @@ function genomeMetaHtml(g, d) {
       ${acc ? `<div class="gm-row"><span class="gm-k">링크</span><span class="gm-v"><a href="https://www.ncbi.nlm.nih.gov/nuccore/${encodeURIComponent(acc)}" target="_blank" rel="noopener">NCBI에서 열기</a></span></div>` : ""}</div>
     ${allRows ? `<details class="gm-all"><summary class="note">원본 메타데이터 전체 (${Object.keys(raw).filter((k) => String(raw[k]).trim()).length}개 열)</summary><table class="data-table"><tbody>${allRows}</tbody></table></details>` : ""}</div>`;
 }
+// One small line under the accession (when / where / lineage / host); clicking it opens the full metadata card.
+function genomeMetaLine(g, d) {
+  const raw = (d && d.raw) || {}, an = (d && d.analysis) || {};
+  const pick = (...ks) => { for (const k of ks) { const x = raw[k] ?? an[k] ?? g[k]; if (x !== undefined && String(x).trim() !== "") return String(x).trim(); } return ""; };
+  const when = gmDate(pick("date")) || "미상";
+  const where = [pick("country"), pick("region")].filter(Boolean).filter((x, i, a) => a.indexOf(x) === i).join(", ") || "미상";
+  const lin = an.lineage || g.lineage || "미상";
+  const host = pick("host"), cls = (d && d.host_class) || g.host_class || "";
+  const hostTxt = [host, cls ? (GM_HOST_LABEL[cls] || cls) : ""].filter(Boolean).join(" · ") || "미상";
+  return `<span class="gm-line" title="누르면 메타데이터를 자세히 봅니다"><b>언제</b> ${escHtml(when)} &nbsp;<b>어디서</b> ${escHtml(where)} &nbsp;<b>리니지</b> ${escHtml(lin)} &nbsp;<b>호스트</b> ${escHtml(hostTxt)} <span class="gm-caret">&#9662;</span></span>`;
+}
 function openGenomeModal(g, setData, labels, combo) {
   const status = comboRowStatus(g);
-  const meta = [g.lineage || "NA", g.country || "", combo || ""].filter(Boolean).map(escHtml).join(" · ");
   const seg = String((setData && setData.segment) || "").toLowerCase();
   const m = openDetailModal({
     title: `<span class="mono">${escHtml(g.genome_id)}</span> <span class="combo-status combo-status-${status.level}">${status.icon} ${status.label}</span>`,
-    subtitle: meta,
-    html: `<div id="gmMetaSlot">${genomeMetaHtml(g, null)}</div>${highlightAmplicon(g, setData, labels)}`,
+    subtitle: `${genomeMetaLine(g, null)}${combo ? ` <span class="note">· ${escHtml(combo)}</span>` : ""}`,
+    html: `<div id="gmMetaSlot" hidden>${genomeMetaHtml(g, null)}</div>${highlightAmplicon(g, setData, labels)}`,
   });
-  const slot = m.overlay.querySelector("#gmMetaSlot");
+  const slot = m.overlay.querySelector("#gmMetaSlot"), sub = m.overlay.querySelector(".modal-sub");
+  let data = null;
+  const refresh = () => {
+    if (!slot || !document.body.contains(slot)) return;
+    const open = !slot.hidden;
+    const line = sub.querySelector(".gm-line");
+    if (line) line.outerHTML = genomeMetaLine(g, data);
+    sub.querySelector(".gm-line").classList.toggle("open", open);
+    slot.innerHTML = genomeMetaHtml(g, data);
+    m.fit();
+  };
+  sub.addEventListener("click", (e) => {
+    if (!e.target.closest(".gm-line")) return;
+    slot.hidden = !slot.hidden;
+    sub.querySelector(".gm-line").classList.toggle("open", !slot.hidden);
+    m.fit();
+  });
   const key = `${seg}/${g.genome_id}`;
-  const show = (d) => { if (slot && document.body.contains(slot)) { slot.innerHTML = genomeMetaHtml(g, d); m.fit(); } };
-  if (seg && GM_CACHE.has(key)) show(GM_CACHE.get(key));
-  else if (seg) fetchJSON(`/api/genome-meta/${encodeURIComponent(seg)}/${encodeURIComponent(g.genome_id)}`).then((d) => { GM_CACHE.set(key, d); show(d); }).catch(() => { /* keep the basics from the row */ });
+  if (seg && GM_CACHE.has(key)) { data = GM_CACHE.get(key); refresh(); }
+  else if (seg) fetchJSON(`/api/genome-meta/${encodeURIComponent(seg)}/${encodeURIComponent(g.genome_id)}`).then((x) => { GM_CACHE.set(key, x); data = x; refresh(); }).catch(() => { /* keep the basics from the row */ });
   return m;
 }
 
