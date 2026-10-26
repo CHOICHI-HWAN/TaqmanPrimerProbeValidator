@@ -1207,3 +1207,9 @@ a.pipe-pill:hover { border-color: var(--accent); color: var(--accent); }
 .gm-v { min-width: 0; overflow-wrap: anywhere; }
 .gm-all { grid-column: 1 / -1; }
 .gm-all table { margin-top: 6px; }
+
+.gm-line { font-size: 11px; color: var(--muted); cursor: pointer; display: inline-block; line-height: 1.5; }
+.gm-line b { color: var(--fg); font-weight: 600; margin-right: 2px; }
+.gm-line:hover { text-decoration: underline dotted; }
+.gm-caret { display: inline-block; transition: transform .15s; }
+.gm-line.open .gm-caret { transform: rotate(180deg); }

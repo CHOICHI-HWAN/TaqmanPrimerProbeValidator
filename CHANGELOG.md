@@ -5,6 +5,11 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.29.1] - 2026-10-26
+
+### Changed
+- **유전체 창의 메타데이터를 한 줄로 줄임**: 계정번호 아래에 작은 글씨로 *언제 · 어디서 · 리니지 · 호스트*만 보여 주고, 그 줄을 누르면 자세한 메타데이터 카드가 펼쳐집니다(기본은 접힘). 창이 너무 커지던 문제를 해결합니다.
+
 ## [0.29.0] - 2026-10-26
 
 ### Added
