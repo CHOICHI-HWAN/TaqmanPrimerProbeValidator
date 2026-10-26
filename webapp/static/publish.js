@@ -66,6 +66,11 @@ export async function collect(project, get, progress = () => {}) {
       const d = await json(`venn/${seg}`, scope);
       if (d) await addJson(`venn/${seg}${sfx}`, d);
     }
+    if (Object.keys((data.profile || {}).segments || {}).length >= 2) {           // the segments together (draft strain link)
+      progress(`벤 다이어그램 연결${sfx}`);
+      const d = await json("venn/linked", scope);
+      if (d) await addJson(`venn/linked${sfx}`, d);
+    }
     for (const s of data.sets || []) { progress(`세트 ${s.set_id}${sfx}`); const d = await json(`sets/${encodeURIComponent(s.set_id)}`, scope); if (d) await addJson(`sets/${s.set_id}${sfx}`, d); }
     for (const g of data.groups || []) { progress(`그룹 ${g.group_id}${sfx}`); const d = await json(`groups/${encodeURIComponent(g.group_id)}`, scope); if (d) await addJson(`groups/${g.group_id}${sfx}`, d); }
   }
