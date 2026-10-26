@@ -1886,14 +1886,52 @@ if (!window.__msaColSelectGlobalWired) {
 
 // Binding detail (primer/probe alignment on this genome's amplicon) in a modal window -- opened
 // from a row of the per-genome tables and from a genome row of the MSA.
+// The genome window: a metadata card first (when / where / lineage / host / who), then the binding alignment.
+const GM_CACHE = new Map();
+const GM_HOST_LABEL = { human: "사람", animal: "동물", unknown: "미상", lab: "실험 숙주(세포주 등)" };
+function gmDate(v) {                                   // Nextstrain style "2012-XX-XX": show what is known
+  v = String(v || "").trim();
+  if (!v || /^X{4}/i.test(v)) return "";
+  const m = v.match(/^(\d{4})-(\d{2}|XX)-(\d{2}|XX)$/i);
+  if (!m) return v;
+  if (/XX/i.test(m[2])) return `${m[1]}년 (월·일 미상)`;
+  if (/XX/i.test(m[3])) return `${m[1]}-${m[2]} (일 미상)`;
+  return v;
+}
+function genomeMetaHtml(g, d) {
+  const raw = (d && d.raw) || {}, an = (d && d.analysis) || {};
+  const pick = (...ks) => { for (const k of ks) { const x = raw[k] ?? an[k] ?? g[k]; if (x !== undefined && String(x).trim() !== "") return String(x).trim(); } return ""; };
+  const row = (label, val, mono) => (val ? `<div class="gm-row"><span class="gm-k">${label}</span><span class="gm-v${mono ? " mono" : ""}">${escHtml(val)}</span></div>` : "");
+  const lins = Object.keys(raw).filter((k) => /lineage|clade/i.test(k) && String(raw[k]).trim()).map((k) => `${k}: ${raw[k]}`);
+  const used = an.lineage || g.lineage || "";
+  const hostRaw = pick("host"), cls = (d && d.host_class) || g.host_class || "";
+  const linked = d && d.linked ? Object.entries(d.linked.records).map(([sg, rs]) => `${sg.toUpperCase()}: ${rs.map((r) => `${r.accession}${r.lineage && r.lineage !== "NA" ? " (" + r.lineage + ")" : ""}`).join(", ")}`).join(" / ") : "";
+  const allRows = Object.entries(raw).filter(([, x]) => String(x).trim()).map(([k, x]) => `<tr><td class="note">${escHtml(k)}</td><td>${escHtml(String(x))}</td></tr>`).join("");
+  const acc = (g.genome_id || "").trim();
+  return `<div class="gm-meta">
+    <div class="gm-col"><h4>언제</h4>${row("채집일", gmDate(pick("date")) || "미상")}${row("등록일", pick("date_released"))}${row("갱신일", pick("date_updated"))}</div>
+    <div class="gm-col"><h4>어디서</h4>${row("국가", pick("country") || "미상")}${row("지역(대륙)", pick("region"))}${row("세부 위치", [pick("division"), pick("location")].filter(Boolean).join(" · "))}${row("제출 국가", pick("submitter_country"))}</div>
+    <div class="gm-col"><h4>클레이드 / 리니지</h4>${row("분석에 쓴 값", used || "미상")}${lins.length ? row("원본 열", lins.join(" · ")) : ""}${linked ? row("연결된 레코드", linked) : ""}</div>
+    <div class="gm-col"><h4>호스트</h4>${row("숙주", hostRaw || "미상")}${row("분류", cls ? (GM_HOST_LABEL[cls] || cls) : "")}${row("실험 숙주", String(raw.is_lab_host || "").trim() ? "예" : "")}${row("시료", pick("sample_type", "isolation_source"))}</div>
+    <div class="gm-col gm-wide"><h4>식별</h4>${row("계정번호", pick("accession_version") || acc, true)}${row("strain", pick("strain"))}${row("isolate", pick("isolate"))}${row("길이", pick("length") ? pick("length") + " bp" : "")}${row("기관", pick("institution"))}${row("저자", pick("abbr_authors", "authors"))}${row("SRA", pick("sra_accessions"))}${row("메모", pick("note"))}
+      ${acc ? `<div class="gm-row"><span class="gm-k">링크</span><span class="gm-v"><a href="https://www.ncbi.nlm.nih.gov/nuccore/${encodeURIComponent(acc)}" target="_blank" rel="noopener">NCBI에서 열기</a></span></div>` : ""}</div>
+    ${allRows ? `<details class="gm-all"><summary class="note">원본 메타데이터 전체 (${Object.keys(raw).filter((k) => String(raw[k]).trim()).length}개 열)</summary><table class="data-table"><tbody>${allRows}</tbody></table></details>` : ""}</div>`;
+}
 function openGenomeModal(g, setData, labels, combo) {
   const status = comboRowStatus(g);
   const meta = [g.lineage || "NA", g.country || "", combo || ""].filter(Boolean).map(escHtml).join(" · ");
-  return openDetailModal({
+  const seg = String((setData && setData.segment) || "").toLowerCase();
+  const m = openDetailModal({
     title: `<span class="mono">${escHtml(g.genome_id)}</span> <span class="combo-status combo-status-${status.level}">${status.icon} ${status.label}</span>`,
     subtitle: meta,
-    html: highlightAmplicon(g, setData, labels),
+    html: `<div id="gmMetaSlot">${genomeMetaHtml(g, null)}</div>${highlightAmplicon(g, setData, labels)}`,
   });
+  const slot = m.overlay.querySelector("#gmMetaSlot");
+  const key = `${seg}/${g.genome_id}`;
+  const show = (d) => { if (slot && document.body.contains(slot)) { slot.innerHTML = genomeMetaHtml(g, d); m.fit(); } };
+  if (seg && GM_CACHE.has(key)) show(GM_CACHE.get(key));
+  else if (seg) fetchJSON(`/api/genome-meta/${encodeURIComponent(seg)}/${encodeURIComponent(g.genome_id)}`).then((d) => { GM_CACHE.set(key, d); show(d); }).catch(() => { /* keep the basics from the row */ });
+  return m;
 }
 
 function renderBinding(binding) {

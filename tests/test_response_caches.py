@@ -25,3 +25,12 @@ def test_read_tsv_follows_the_file_and_hands_out_copies(tmp_path):
 
 def test_load_params_carries_the_scan_engine():
     assert server.load_params()["scan_engine"] in ("python", "go")
+
+
+def test_genome_meta_has_when_where_lineage_host():
+    seg = server.seg_keys()[0]
+    acc = next(iter(server.scope_ctx().ids(seg)))
+    d = server.load_genome_meta(seg, acc)
+    assert d and d["accession"] == acc and d["analysed"]
+    assert {"date", "country", "host"} <= set(d["raw"]) and d["host_class"] in ("human", "animal", "unknown", "lab")
+    assert server.load_genome_meta(seg, "NO_SUCH_ACCESSION") is None
