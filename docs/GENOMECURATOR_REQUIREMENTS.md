@@ -22,6 +22,7 @@ GC 개발의 기준 문서로 쓴다. 파이프라인 쪽에서 값을 고쳐 �
 | `date` | **P0** | 연도별 차트·표 | `YYYY-MM-DD`, 모르는 부분은 `XX`(`2012-XX-XX`, `XXXX-XX-XX`). 연도는 앞 4자리가 숫자일 때만 집계 | 빈 값은 `XXXX-XX-XX`로 처리됨. `2022-07` 같은 표기는 달·일 구분 불가 | △ `nextstrain` 프로파일만 이 형식(`std_date`). `plain`은 원형 `collection_date` |
 | `country` | **P0** | 국가별 지도·집계 | 표준 국가명, 미상은 **빈 값**(`Missing` 같은 임의 표기 금지) | 지도에서 빠짐, 집계 키가 갈라짐 | △ 사전 표준화 ✔(`isolation_country`). 우리 지도 이름과의 일치 ? |
 | `region` | **P0** | 대륙 단위 집계 | `Africa` `Asia` `Europe` `North America` `South America` `Oceania`. 미상은 빈 값(우리가 `Unknown/Missing`으로 바꿈) | 대륙 집계가 비어 있음 | △ `region_of(country)` ✔이지만 `nextstrain` 프로파일에서만 계산 |
+| `strain` 정규화 값 / `virus_id` | **P0**(분절 바이러스) | 같은 바이러스의 S·L 레코드를 잇는 키(파이프라인 결과를 바이러스 단위로 묶어 보는 통합 벤 다이어그램에 사용) | 대소문자·공백을 정리한 strain 이름, 한 바이러스에 레코드가 여럿이면 같은 `virus_id` 공유. 연결 근거와 신뢰도(`exact` / `manual` / `uncertain`) 함께 | 이름만으로 이으면 충돌(`AV`, `CSF` 등 짧은 이름)과 표기 차이(`LASV/H.sapiens-tc/NGA/2013/IRR_005` ↔ `IRR_005`)를 구분 못 함 | △ `strain` ✔, 연결·신뢰도 ✘ |
 | `host_taxid` | P1 | 숙주 분류의 우선 근거(`9606`이면 사람) | 정수 NCBI taxid | 자유 텍스트 규칙으로 분류(오분류 여지) | △ 사전에 `taxon_id` 열 ✔, 내보내기에 ✘ |
 | `strain` | P1 | 표시 이름 | 문자열 | 표에서 accession으로 대체 | ✔ |
 | `accession_version` | P1 | 출처 추적 | `KM822128.1` | — | ✔ |
@@ -30,6 +31,8 @@ GC 개발의 기준 문서로 쓴다. 파이프라인 쪽에서 값을 고쳐 �
 | `length` | P2 | 표시용(우리는 서열에서 다시 잼) | 정수 | — | ✔ `genome_length` |
 | `date_released` `date_updated` | P2 | 메타데이터 표 | `YYYY-MM-DD` | — | ✔ `release_date` `update_date` |
 | `institution` `authors` | P2 | 메타데이터 표 | 문자열 | — | ✔ `submitter` |
+
+> 분절 바이러스의 **연결(가안)**: 지금 파이프라인은 `webapp/strain_link.py`가 `strain` 이름 일치로 S·L 레코드를 묶는다(분석 코어는 그대로, 결과를 재가공). 실제 데이터에서 이어진 300쌍은 국가·리니지가 모두 일치했지만, 이름 충돌과 표기 차이는 원천에서 해결하는 것이 맞다.
 
 ## 2. 값이 지켜야 할 규칙(자세히)
 

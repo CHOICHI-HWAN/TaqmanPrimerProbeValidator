@@ -10,7 +10,7 @@ abstract: >-
 authors:
   - family-names: Choi
     given-names: Chihwan
-version: "0.27.1"
+version: "0.28.0"
 date-released: "2026-10-21"
 license: GPL-3.0-or-later
 repository-code: "https://github.com/CHOICHI-HWAN/TaqmanPrimerProbeValidator"

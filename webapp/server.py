@@ -189,6 +189,7 @@ def save_fetch_baseline_from_remote():
 STATIC_DIR = Path(__file__).resolve().parent / "static"  # this package's own bundled assets
 sys.path.insert(0, str(ROOT / "scripts"))
 import scope_view  # noqa: E402 -- host-scope view of the results (webapp/scope_view.py)
+import strain_link  # noqa: E402 -- draft S/L link by strain name (webapp/strain_link.py)
 import literature  # noqa: E402 -- literature primer lists (webapp/literature.py)
 
 from live_analyze import analyze_set  # noqa: E402
@@ -1693,6 +1694,40 @@ def load_venn(seg):
     return {"segment": seg.upper(), "host_scope": v.info(seg), "genomes": genomes, "items": items}
 
 
+def strain_link_data():
+    """The draft strain link (see strain_link.py) for the analysed populations in the active host scope, or None for a one-segment virus."""
+    segs = seg_keys()
+    if len(segs) < 2:
+        return None
+    v = scope_ctx()
+    return strain_link.build(ROOT, segs, {s: v.ids(s) for s in segs}, {s: v.lineage_of(s) for s in segs})
+
+
+def load_venn_linked():
+    """The coverage Venn page for the segments TOGETHER: the population is the viruses that have a record in every segment (linked by
+    strain name, a draft -- strain_link.py); a set/group 'catches' a virus when one of its records in the set's segment is validated.
+    Same payload shape as load_venn(), so the page and its saved selections work unchanged."""
+    link = strain_link_data()
+    if link is None:
+        return None
+    segs = link["segments"]
+    uni = strain_link.universe(link)
+    info_seg = segs[0]
+    items = []
+    for seg in segs:
+        part = load_venn(seg)
+        pos = {a: i for i, a in enumerate(sorted({a for x in uni for a in x["acc"][seg]}))}
+        for it in part["items"]:
+            ids = strain_link.map_ids(link, seg, it["ids"])
+            items.append({**it, "name": f"[{seg.upper()}] {it['name']}", "ids": ids, "seg": seg})
+    genomes = [[x["virus_id"], x["lineage"], x["country"]] for x in uni]
+    counts = dict(link["counts"])
+    return {"segment": "LINKED", "segments": [x.upper() for x in segs], "host_scope": scope_ctx().info(info_seg), "genomes": genomes, "items": items,
+            "linked": {"counts": counts, "conflicts": link["conflicts"][:50],
+                       "ambiguous": [{"virus_id": x["virus_id"], "name": x["name"], "acc": x["acc"]} for x in link["viruses"] if x["status"] == "ambiguous"][:50],
+                       "note": "strain 이름이 같은 레코드를 한 바이러스로 묶은 가안입니다(같은 국가·같은 리니지인지 확인, 서열은 합치지 않음)."}}
+
+
 def load_overview():
     sets = load_builtin_sets()
     groups = list(load_group_summary().values())
@@ -2663,6 +2698,21 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_json(load_venn_saved())
         if path == "/api/pipelines":
             return self._send_json(load_pipelines())
+        if path == "/api/venn/linked":
+            data = load_venn_linked()
+            return self._send_json(data if data is not None else {"error": "분절이 둘 이상인 바이러스만 지원합니다."}, 200 if data is not None else 404)
+        if path == "/api/strain-link.tsv":
+            link = strain_link_data()
+            if link is None:
+                return self._send_json({"error": "분절이 둘 이상인 바이러스만 지원합니다."}, 404)
+            body = strain_link.to_tsv(link).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/tab-separated-values; charset=utf-8")
+            self.send_header("Content-Disposition", 'attachment; filename="strain_link_draft.tsv"')
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         m = re.match(r"^/api/venn/(\w+)$", path)
         if m:
             seg = m.group(1).lower()
@@ -3083,7 +3133,7 @@ class Handler(BaseHTTPRequestHandler):
             name = str(body.get("name", "")).strip()[:80]
             keys = [k for k in (body.get("keys") or []) if isinstance(k, str) and re.fullmatch(r"[A-Za-z0-9_\-]+", k)][:12]
             seg = str(body.get("seg", "")).lower()
-            if not name or not keys or seg not in seg_keys():
+            if not name or not keys or (seg not in seg_keys() and not (seg == "linked" and len(seg_keys()) >= 2)):
                 return self._send_json({"error": "이름과 한 개 이상의 세트·그룹이 필요합니다."}, 400)
             items = [x for x in load_venn_saved() if not (x.get("name") == name and x.get("seg") == seg)]    # same name = replace
             item = {"id": uuid.uuid4().hex[:8], "name": name, "seg": seg, "keys": keys, "lineage": str(body.get("lineage", "ALL"))[:40],

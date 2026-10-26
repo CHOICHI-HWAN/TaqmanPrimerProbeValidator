@@ -7810,13 +7810,18 @@ async function showVennPage() {
   const view = $("#vennView");
   const segs = Object.keys((state.hostInfo || {}).segments || {}).map((x) => x.toUpperCase());
   const allSegs = segs.length ? segs : ["S", "L"];
-  if (!VN.seg || !allSegs.includes(VN.seg)) VN.seg = allSegs[0];
+  const tabs = allSegs.length >= 2 ? [...allSegs, "LINKED"] : allSegs;             // "LINKED" = the segments of one virus read together (draft link)
+  if (!VN.seg || !tabs.includes(VN.seg)) VN.seg = allSegs[0];
   view.innerHTML = "<p class='note'>불러오는 중...</p>";
   try { VN.data = await fetchJSON(`/api/venn/${VN.seg.toLowerCase()}`); } catch (e) { view.innerHTML = `<p class="note">불러오기 실패: ${escHtml(e.message)}</p>`; return; }
   const d = VN.data;
   if (!VN.selected || VN.selSeg !== VN.seg) {                       // first visit / other segment: the groups, else the first sets
     const groups = d.items.filter((it) => it.kind === "group").slice(0, 3);
     VN.selected = new Set((groups.length >= 2 ? groups : d.items.slice(0, 2)).map((it) => it.key));
+    if (VN.seg === "LINKED") {                                         // one group (else the first set) of each segment, so the pair is what is compared
+      const per = (d.segments || []).map((sg) => { const mine = d.items.filter((it) => it.seg === sg.toLowerCase()); return mine.find((it) => it.kind === "group") || mine[0]; }).filter(Boolean);
+      if (per.length >= 2) VN.selected = new Set(per.map((it) => it.key));
+    }
     VN.selSeg = VN.seg; VN.lineage = "ALL"; VN.region = null;
   }
   const lins = [...new Set(d.genomes.map((g) => g[1]))].sort((a, b) => a.localeCompare(b));
@@ -7829,7 +7834,11 @@ async function showVennPage() {
       <span class="vn-name">${it.kind === "group" ? "&#9633; " : ""}${escHtml(it.name)}</span><span class="vn-count">${it.ids.length}</span></label>`;
   };
   // the same group > set > variant tree as the sidebar: pick a whole group, or just its member sets
-  const selectorHtml = buildSetTree(VN.seg, "").map((node) => {
+  const treeNodes = VN.seg === "LINKED"
+    ? allSegs.flatMap((sg) => [{ type: "seghead", name: sg }, ...buildSetTree(sg, "")])
+    : buildSetTree(VN.seg, "");
+  const selectorHtml = treeNodes.map((node) => {
+    if (node.type === "seghead") return `<div class="vn-seghead">${escHtml(node.name)} 세그먼트</div>`;
     const row = (en, lv) => (byKey.has(en.s.set_id) ? itemChk(byKey.get(en.s.set_id), lv) : "") + en.variants.map((v) => (byKey.has(v.set_id) ? itemChk(byKey.get(v.set_id), lv + 1) : "")).join("");
     if (node.type === "group") return `<div class="vn-tree-group">${byKey.has(node.g.group_id) ? itemChk(byKey.get(node.g.group_id), 0) : ""}<div class="vn-members">${node.kids.map((k) => row(k, 1)).join("")}</div></div>`;
     return `<div class="vn-tree-group vn-tree-loose"><div class="vn-tree-vendor">그룹 없음 · ${escHtml(node.name)}</div><div class="vn-members">${node.sets.map((k) => row(k, 1)).join("")}</div></div>`;
@@ -7841,7 +7850,8 @@ async function showVennPage() {
     `<option value="${x.id}|now">💾 ${escHtml(x.name)} — 현재 데이터</option>`])).join("");
   view.innerHTML = `<h2>🔵 커버리지 벤 다이어그램</h2>
     <p class="note">고른 프라이머 세트·그룹이 <b>실제 검증을 통과시킨 유전체</b>를 겹쳐 봅니다: 합집합(하나라도 잡음), 교집합(모두 잡음), 영역별 단독·겹침, 그리고 어느 것도 못 잡는 유전체(여집합 = 대상 전체 − 합집합). 그룹은 교차 결합으로 통과한 유전체까지 포함합니다. ${pdScopeBadge(d.host_scope && d.host_scope.scope)} 숙주 기준을 따릅니다.</p>
-    <div class="seg-tab-row">${allSegs.map((x) => `<button class="seg-tab ${x === VN.seg ? "active" : ""}" data-vnseg="${x}">${x}</button>`).join("")}</div>
+    <div class="seg-tab-row">${tabs.map((x) => `<button class="seg-tab ${x === VN.seg ? "active" : ""}" data-vnseg="${x}" ${x === "LINKED" ? 'title="같은 바이러스의 S와 L 레코드를 strain 이름으로 묶은 가안으로, 세그먼트를 함께 봅니다"' : ""}>${x === "LINKED" ? allSegs.join(" + ") + " 연결(가안)" : x}</button>`).join("")}</div>
+    ${VN.data.linked ? vnLinkedCardHtml(VN.data) : ""}
     <div class="card">
       <div class="vn-selector-head"><b>비교할 세트·그룹을 고르세요</b> <span class="note">고른 순서대로 색이 정해집니다 · 지금 ${VN.selected.size}개 선택</span></div>
       <div class="vn-selector">${selectorHtml}</div>
@@ -9580,3 +9590,20 @@ function engineResultHtml(r) {
     <table class="data-table"><thead><tr><th>항목</th><th></th><th>값 / 차이</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 $("#engineBtn").addEventListener("click", showEngineCheckPage);
+
+
+// "S + L (draft link)" card of the Venn page: how the viruses were tied together and what is left out of the combined view.
+function vnLinkedCardHtml(d) {
+  const L = d.linked, c = L.counts, segs = d.segments || [];
+  const only = segs.map((s) => `${s} 레코드만 있음 <b>${c[s.toLowerCase() + "_only"] ?? 0}</b>`).join(" · ");
+  const rows = (L.conflicts || []).map((x) => `<li>${escHtml(x.name)} <span class="note">${escHtml(JSON.stringify(x.countries))} ${escHtml(JSON.stringify(x.lineages))}</span></li>`).join("");
+  const amb = (L.ambiguous || []).map((x) => `<li>${escHtml(x.name)} <span class="note">${escHtml(segs.map((s) => s + ": " + (x.acc[s.toLowerCase()] || []).join(",")).join(" / "))}</span></li>`).join("");
+  return `<div class="card" style="margin-bottom:12px;"><h3 style="margin:0 0 4px;">바이러스(strain) 단위로 묶은 가안</h3>
+    <div class="note" style="margin-bottom:6px;">${escHtml(L.note)}</div>
+    <div>분석 모집단의 바이러스 <b>${c.viruses}</b>개 중 ${segs.join("와 ")} 레코드가 모두 있어 <b>함께 볼 수 있는 바이러스 ${c.linked + c.ambiguous}개</b>(아래 벤 다이어그램의 전체).
+      ${only}. 이 바이러스들은 한쪽 세그먼트 세트만 평가할 수 있어 여기서는 빠집니다. 국가·리니지가 서로 어긋난 쌍 <b>${c.conflicts}</b>개, 한쪽에 레코드가 여러 개라 모호한 바이러스 <b>${c.ambiguous}</b>개.</div>
+    <div class="note" style="margin-top:6px;">합집합 = 고른 세트 중 <b>하나라도</b> 잡는 바이러스(스크리닝 패널), 교집합 = <b>모두</b> 잡는 바이러스(확진용). 한 바이러스에 레코드가 여럿이면 그중 하나만 통과해도 잡은 것으로 셉니다.
+      <a href="/api/strain-link.tsv" download>연결 표(TSV) 내려받기</a></div>
+    ${rows ? `<details style="margin-top:6px;"><summary class="note">어긋난 쌍 ${c.conflicts}개</summary><ul>${rows}</ul></details>` : ""}
+    ${amb ? `<details style="margin-top:6px;"><summary class="note">모호한 바이러스 ${c.ambiguous}개</summary><ul>${amb}</ul></details>` : ""}</div>`;
+}

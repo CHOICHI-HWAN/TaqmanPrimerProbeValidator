@@ -5,6 +5,13 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-10-26
+
+### Added
+- **S + L 연결(가안) 벤 다이어그램**: 분절이 둘 이상인 바이러스(Lassa)에서, 같은 바이러스의 S와 L 레코드를 `strain` 이름으로 묶어(`webapp/strain_link.py`) 세그먼트를 함께 봅니다. **분석 코어 파이프라인은 건드리지 않고 결과만 다시 가공합니다.** 분모는 두 세그먼트에 모두 서열이 있는 바이러스이고(한쪽만 있는 바이러스는 평가할 수 없어 제외, 건수는 카드에 표시), 세트는 자기 세그먼트의 레코드 중 하나라도 통과하면 그 바이러스를 잡은 것으로 셉니다. 합집합(스크리닝 패널)·교집합(확진용)·못 잡는 바이러스와 리니지별 누적 곡선, 저장·비교가 그대로 동작합니다. 서열은 합치지 않습니다(분절은 별개 RNA라 가짜 증폭산물이 생길 수 있음).
+- 연결 가안 카드: 묶인 수, 한쪽 레코드만 있는 수, 국가·리니지가 어긋난 쌍, 한 strain에 레코드가 여럿인 모호한 경우 목록, 연결 표(TSV) 다운로드(`GET /api/strain-link.tsv`). API `GET /api/venn/linked`(분절이 하나인 바이러스는 404). Firebase 게시에도 `venn/linked` 포함.
+- 테스트 `tests/test_strain_link.py`. 문서 `GENOMECURATOR_REQUIREMENTS.md`에 연결 키 요구 추가.
+
 ## [0.27.1] - 2026-10-23
 
 ### Fixed
