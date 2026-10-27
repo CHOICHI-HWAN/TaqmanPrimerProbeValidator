@@ -66,3 +66,15 @@ def test_a_scattered_mafft_placement_is_not_trusted_when_blastn_is_missing(tmp_p
     d = gm.build(tmp_path, "s", "REF1", [], [])
     x = d["standards"][0]
     assert x["method"] == "mafft" and x["reliable"] is False
+
+
+def test_standards_switched_off_are_not_listed(tmp_path):
+    make(tmp_path)
+    rep = tmp_path / "output" / "standards" / "s" / "representativeness.json"
+    data = json.loads(rep.read_text())
+    data["standards"]["OFF1"] = {"mapped": True, "ref_start": 1000, "ref_end": 1800, "length": 800, "mapped_fraction": 1.0, "identity_to_reference": 0.99}
+    rep.write_text(json.dumps(data))
+    gm._BLAST_CACHE.clear()
+    d = gm.build(tmp_path, "s", "REF1", [], [], active_standards={"STD1", "STD2"})
+    assert sorted(s["name"] for s in d["standards"]) == ["STD1", "STD2"]             # OFF1 (분석진행 False) is left out
+    assert len(gm.build(tmp_path, "s", "REF1", [], [])["standards"]) == 3              # no manifest filter = everything that has a result

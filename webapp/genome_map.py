@@ -8,10 +8,7 @@ the primer sets bind. Results that already exist are read, the standard material
 * sets        output/primers/<set>/refgenome_binding/binding.tsv (role, found, start, end, strand, mismatches)
 """
 import csv
-import glob
 import json
-import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -33,21 +30,10 @@ def _int(v):
 
 
 def find_blastn(root):
-    """blastn from $BLASTN_BIN, the PATH, the pipeline's conda env or any conda env next to it; None when there is none."""
-    cands = [os.environ.get("BLASTN_BIN"), shutil.which("blastn")]
-    try:
-        sys.path.insert(0, str(Path(root) / "scripts"))
-        from mfe_common import read_config_str  # noqa: PLC0415
-        prefix = read_config_str(root, "env_prefix")
-        if prefix:
-            cands.append(str(Path(prefix) / "bin" / "blastn"))
-    except Exception:  # noqa: BLE001
-        pass
-    pref = Path(sys.prefix)                      # a conda base (<base>/envs/*) or one of its envs (<base>/envs/<env>) -- the server usually runs in an env
-    base = pref.parent.parent if pref.parent.name == "envs" else pref
-    for pat in (pref / "bin" / "blastn", base / "envs" / "*" / "bin" / "blastn", base / "bin" / "blastn"):
-        cands += sorted(glob.glob(str(pat)))
-    return next((c for c in cands if c and Path(c).exists()), None)
+    """blastn (see scripts/standard_placement.py, which the pipeline uses too); None when there is none."""
+    sys.path.insert(0, str(Path(root) / "scripts"))
+    from standard_placement import find_blastn as _find  # noqa: PLC0415
+    return _find(root)
 
 
 def merge_hsps(rows, qlens, min_identity=80.0, min_cover=0.8):
@@ -102,8 +88,9 @@ def blast_standards(root, seg):
 _BLAST_CACHE = {}
 
 
-def build(root, seg, reference_accession, sets, groups):
+def build(root, seg, reference_accession, sets, groups, active_standards=None):
     """sets: [{"set_id", "name", ...}] of this segment; groups: [{"group_id", "label", "members": [set ids]}] of this segment.
+    active_standards: names of the standard materials switched on in the standards manifest (분석진행); the others are left out (None = all).
     -> {"segment", "reference", "length", "genes", "standards", "sets", "groups"}"""
     root = Path(root)
     genes = [r for r in _read_tsv(root / "config" / "refgenome_genes.tsv") if (r.get("segment") or "").lower() == seg.lower()]
@@ -126,7 +113,7 @@ def build(root, seg, reference_accession, sets, groups):
         _BLAST_CACHE.clear()
         _BLAST_CACHE[key] = blast_standards(root, seg.lower())
     blast = _BLAST_CACHE[key]
-    names = list(dict.fromkeys(list((data.get("standards") or {}).keys()) + list(blast)))
+    names = [n for n in dict.fromkeys(list((data.get("standards") or {}).keys()) + list(blast)) if active_standards is None or n in active_standards]
     for name in names:
         s = (data.get("standards") or {}).get(name) or {}
         piped = {"start": _int(s.get("ref_start")), "end": _int(s.get("ref_end")), "identity": s.get("identity_to_reference"), "mapped_fraction": s.get("mapped_fraction"),

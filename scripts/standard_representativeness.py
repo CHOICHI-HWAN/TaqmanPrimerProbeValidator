@@ -55,8 +55,10 @@ def grade_for(pct, good, critical):
     return "good" if pct >= good else ("review" if pct >= critical else "critical")
 
 
-def align_standards_to_reference(mafft_bin, ref_fasta, standards, threads=2):
-    """{standard_id: aligned row in reference coordinates (len == ref length, '-' outside)}"""
+def align_standards_to_reference(mafft_bin, ref_fasta, standards, threads=2, placement="mafft"):
+    """{standard_id: aligned row in reference coordinates (len == ref length, '-' outside)}.
+    placement="blastn": every standard blastn places reliably (identity and aligned share >= 80%) is taken from its blastn alignment instead of the
+    mafft one (mafft --keeplength can scatter a divergent standard over the wrong stretch, see standard_placement.py); the others keep the mafft row."""
     with tempfile.TemporaryDirectory() as tmp:
         add = Path(tmp) / "standards.fasta"
         add.write_text("".join(f">{k}\n{v}\n" for k, v in standards.items()), encoding="utf-8")
@@ -77,6 +79,17 @@ def align_standards_to_reference(mafft_bin, ref_fasta, standards, threads=2):
     if header is not None:
         rows[header] = "".join(chunks)
     rows, reversed_ids = resolve_add_flips(rows)
+    if placement == "blastn":
+        from standard_placement import blast_rows, find_blastn  # noqa: PLC0415 -- scripts/ is on sys.path
+        exe = find_blastn()
+        if exe:
+            b_rows, b_rev = blast_rows(exe, ref_fasta, standards)
+            for sid, row in b_rows.items():
+                rows[sid] = row
+            reversed_ids = [r for r in reversed_ids if r not in b_rows] + [r for r in b_rev]
+            print(f"[standard_rep] blastn placed {len(b_rows)}/{len(standards)} standards: {', '.join(sorted(b_rows))}", file=sys.stderr)
+        else:
+            print("[standard_rep] placement=blastn but blastn was not found: using the mafft placement", file=sys.stderr)
     return rows, reversed_ids
 
 
@@ -358,7 +371,8 @@ def main():
     ref = read_fasta(snakemake.input.ref_fasta)
     ref_id, ref_seq = next(iter(ref.items()))
     ref_seq = ref_seq.upper()
-    rows, reversed_ids = align_standards_to_reference(find_mafft(), snakemake.input.ref_fasta, standards)
+    rows, reversed_ids = align_standards_to_reference(find_mafft(), snakemake.input.ref_fasta, standards,
+                                                       placement=str(getattr(snakemake.params, "placement", "mafft") or "mafft"))
     lineage_of = {}
     with open(snakemake.input.populations, encoding="utf-8") as fh:
         for line in fh:

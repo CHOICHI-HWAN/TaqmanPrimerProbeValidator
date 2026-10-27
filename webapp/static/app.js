@@ -3701,7 +3701,7 @@ function injectCardControls(card) {
       setCardCollapsed(card, collapsed, ownHeader);
       minBtn.innerHTML = collapsed ? "&#43;" : "&#8722;";
     });
-    ownHeader.insertBefore(minBtn, ownFsBtn);
+    ownFsBtn.parentNode.insertBefore(minBtn, ownFsBtn);          // the button may sit in a wrapper inside the header (the MSA card), not directly in it
     if (savedState[cardTitleKey(card, ownHeader)]) { setCardCollapsed(card, true, ownHeader); minBtn.innerHTML = "&#43;"; }
     return;
   }
@@ -3730,7 +3730,7 @@ function injectCardControls(card) {
 }
 
 function attachCardControls(root) {
-  root.querySelectorAll(CARD_CONTROL_SELECTOR).forEach(injectCardControls);
+  root.querySelectorAll(CARD_CONTROL_SELECTOR).forEach((card) => { try { injectCardControls(card); } catch (err) { console.error("card controls", err); } });
 }
 
 // attachCardControls()/translateNode() both mutate the very subtree this observer watches
@@ -3743,9 +3743,14 @@ const cardControlsObserver = new MutationObserver((mutations) => {
     if (m.addedNodes.length) {
       const main = document.querySelector(".main");
       cardControlsObserver.disconnect();
-      attachCardControls(main);
-      translateNode(main);
-      cardControlsObserver.observe(main, { childList: true, subtree: true });
+      try {
+        attachCardControls(main);
+        translateNode(main);
+      } catch (err) {
+        console.error("card controls", err);                      // one broken card must not stop the controls of every later card
+      } finally {
+        cardControlsObserver.observe(main, { childList: true, subtree: true });
+      }
       return;
     }
   }
@@ -9833,6 +9838,16 @@ function gmSelected(seg, d) {
   const g = d.groups.find((x) => x.members.length) || null;                     // first visit: the sets of the first group, else the first few
   return new Set((g ? g.members : d.sets.slice(0, 4).map((s) => s.set_id)).filter((x) => ids.has(x)).slice(0, 6));
 }
+function gmOrderKey(seg) { return `lasv_gm_order_${seg}`; }
+function gmOrderGet(seg) { try { const o = JSON.parse(localStorage.getItem(gmOrderKey(seg)) || "[]"); return Array.isArray(o) ? o : []; } catch { return []; } }
+function gmOrderSave(seg, order) { try { localStorage.setItem(gmOrderKey(seg), JSON.stringify(order)); } catch { /* private mode */ } }
+// the drawn order of the chosen sets: the saved order first (what the user dragged), anything newly chosen after it in list order
+function gmShownSets(d, sel) {
+  const byId = new Map(d.sets.map((s) => [s.set_id, s])), out = [], seen = new Set();
+  for (const id of gmOrderGet(GM.seg)) if (sel.has(id) && byId.has(id) && !seen.has(id)) { out.push(byId.get(id)); seen.add(id); }
+  for (const s of d.sets) if (sel.has(s.set_id) && !seen.has(s.set_id)) out.push(s);
+  return out;
+}
 function gmSave(seg, sel) { try { localStorage.setItem(gmSelKey(seg), JSON.stringify([...sel])); } catch { /* private mode */ } }
 
 function gmTicks(a, b) {
@@ -9877,10 +9892,13 @@ function gmSvg(d, sel, range) {
   if (!stds.length) parts.push(`<text x="${L}" y="${y - 18}" font-size="11" fill="currentColor" opacity=".6">${d.standards.some((s) => s.mapped) ? "이 구간에는 표준물질이 없습니다" : "정렬된 표준물질이 없습니다"}</text>`);
   // primer sets
   parts.push(`<line x1="4" x2="${W - R}" y1="${y - 4}" y2="${y - 4}" stroke="currentColor" opacity=".15"/>`);
-  const shown = d.sets.filter((s) => sel.has(s.set_id));
-  shown.forEach((s) => {
+  const shown = gmShownSets(d, sel), row0 = y;
+  shown.forEach((s, ri) => {
     const nm = s.name.length > 22 ? s.name.slice(0, 21) + "…" : s.name, missing = ["F", "P", "R"].filter((r) => !(s.hits[r] && s.hits[r].found));
-    parts.push(`<text x="${L - 8}" y="${y + 13}" text-anchor="end" font-size="11" fill="currentColor" class="gm-setlabel" data-set="${escHtml(s.set_id)}" style="cursor:pointer;"><title>${escHtml(s.name)} — 눌러서 세트 열기</title>${escHtml(nm)}${missing.length ? " ⚠" : ""}</text>
+    parts.push(`<g class="gm-row" data-set="${escHtml(s.set_id)}" data-ri="${ri}">
+      <rect class="gm-grab" x="0" y="${y}" width="${L - 4}" height="22" fill="transparent" style="cursor:grab;" data-set="${escHtml(s.set_id)}"><title>${escHtml(s.name)} — 드래그해서 위아래 순서를 바꿉니다 · 누르면 세트를 엽니다</title></rect>
+      <text x="6" y="${y + 14}" font-size="12" fill="currentColor" opacity=".45" style="pointer-events:none;">⠿</text>
+      <text x="${L - 8}" y="${y + 13}" text-anchor="end" font-size="11" fill="currentColor" class="gm-setlabel" style="pointer-events:none;">${escHtml(nm)}${missing.length ? " ⚠" : ""}</text>
       <line x1="${L}" x2="${W - R}" y1="${y + 9}" y2="${y + 9}" stroke="currentColor" opacity=".08"/>`);
     if (s.amplicon && inView(s.amplicon[0], s.amplicon[1])) parts.push(`<rect x="${x(s.amplicon[0]).toFixed(1)}" y="${y + 7}" width="${Math.max(2, x(s.amplicon[1]) - x(s.amplicon[0])).toFixed(1)}" height="4" fill="currentColor" opacity=".28"><title>${escHtml(s.name)} amplicon ${s.amplicon[0].toLocaleString()}–${s.amplicon[1].toLocaleString()} (${s.amplicon[1] - s.amplicon[0] + 1} bp)</title></rect>`);
     ["F", "P", "R"].forEach((role) => {
@@ -9890,10 +9908,47 @@ function gmSvg(d, sel, range) {
       const pts = fwd ? `${x1},${y + 2} ${x2 - tip},${y + 2} ${x2},${y + 9} ${x2 - tip},${y + 16} ${x1},${y + 16}` : `${x2},${y + 2} ${x1 + tip},${y + 2} ${x1},${y + 9} ${x1 + tip},${y + 16} ${x2},${y + 16}`;
       parts.push(`<polygon points="${pts}" fill="${GM_COL[role]}"><title>${escHtml(s.name)} ${role}: ${lo.toLocaleString()}–${hi.toLocaleString()} (${fwd ? "+" : "−"} 가닥) · mismatch ${h.mismatches ?? "?"}</title></polygon>`);
     });
+    parts.push("</g>");
     y += 24;
   });
   if (!shown.length) { parts.push(`<text x="${L}" y="${y + 12}" font-size="12" fill="currentColor" opacity=".6">왼쪽에서 프라이머 세트를 고르세요</text>`); y += 24; }
-  return `<svg id="gmSvg" viewBox="0 0 ${W} ${y + 6}" style="width:100%;height:auto;display:block;color:var(--fg);">${parts.join("")}</svg>`;
+  return `<svg id="gmSvg" viewBox="0 0 ${W} ${y + 6}" data-row0="${row0}" data-rowh="24" data-n="${shown.length}" data-w="${W}" style="width:100%;height:auto;display:block;color:var(--fg);touch-action:none;">${parts.join("")}<line id="gmDrop" x1="4" x2="${W - R}" y1="0" y2="0" stroke="#e5484d" stroke-width="2" visibility="hidden"/></svg>`;
+}
+
+// Drag a set row (by its name) up or down to change the drawing order; a plain click opens the set. The order is remembered per segment.
+function gmWireDrag(view, d, sel) {
+  const card = view.querySelector("#gmCard"), svg = card.querySelector("#gmSvg");
+  if (!svg) return;
+  const row0 = Number(svg.dataset.row0), rh = Number(svg.dataset.rowh), n = Number(svg.dataset.n);
+  const toUser = (ev) => { const pt = svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY; return pt.matrixTransform(svg.getScreenCTM().inverse()); };
+  svg.querySelectorAll(".gm-grab").forEach((g) => g.addEventListener("pointerdown", (ev) => {
+    if (ev.button !== 0) return;
+    ev.preventDefault();
+    const rowEl = g.closest(".gm-row"), from = Number(rowEl.dataset.ri), id = g.dataset.set, y0 = toUser(ev).y;
+    let moved = false, to = from;
+    const drop = svg.querySelector("#gmDrop");
+    g.setPointerCapture(ev.pointerId);
+    const move = (e) => {
+      const dy = toUser(e).y - y0;
+      if (!moved && Math.abs(dy) < 4) return;
+      if (!moved) { moved = true; rowEl.setAttribute("opacity", ".6"); g.style.cursor = "grabbing"; }
+      rowEl.setAttribute("transform", `translate(0,${dy.toFixed(1)})`);
+      to = Math.max(0, Math.min(n - 1, Math.floor((toUser(e).y - row0) / rh)));
+      const yy = row0 + (to > from ? to + 1 : to) * rh - 2;
+      drop.setAttribute("y1", yy); drop.setAttribute("y2", yy); drop.setAttribute("visibility", to === from ? "hidden" : "visible");
+    };
+    const up = (e) => {
+      g.removeEventListener("pointermove", move); g.removeEventListener("pointerup", up); g.removeEventListener("pointercancel", up);
+      try { g.releasePointerCapture(ev.pointerId); } catch { /* already released */ }
+      if (!moved) { if (e.type === "pointerup") selectSet(id); return; }
+      const ids = gmShownSets(d, sel).map((s) => s.set_id);
+      ids.splice(from, 1); ids.splice(to, 0, id);
+      gmOrderSave(GM.seg, ids);
+      card.innerHTML = gmSvg(d, sel, GM.range);
+      gmWireDrag(view, d, sel);
+    };
+    g.addEventListener("pointermove", move); g.addEventListener("pointerup", up); g.addEventListener("pointercancel", up);
+  }));
 }
 
 async function showGenomeMapPage() {
@@ -9937,7 +9992,7 @@ async function showGenomeMapPage() {
         <div id="gmCard">${gmSvg(d, sel, GM.range)}</div>
         <div class="vn-legend" style="margin-top:6px;"><span class="vn-chip"><i style="background:${GM_COL.F}"></i>Forward</span><span class="vn-chip"><i style="background:${GM_COL.P}"></i>Probe</span><span class="vn-chip"><i style="background:${GM_COL.R}"></i>Reverse</span>
           <span class="vn-chip"><i style="background:#2a9d8f"></i>표준물질 ${nMapped}/${nStd}개 위치 결정(blastn)${nStd - nMapped ? ` (못 찾은 ${nStd - nMapped}개는 그리지 않음)` : ""}${d.standards.some((s) => s.pipeline_differs) ? ` · ⚠ ${d.standards.filter((s) => s.pipeline_differs).map((s) => s.name).join(", ")}: 파이프라인(mafft) 위치와 다름` : ""}</span><span class="vn-chip"><i style="background:#7a8aa3"></i>+ 가닥 유전자</span><span class="vn-chip"><i style="background:#a38a9b"></i>− 가닥 유전자</span>
-          <span class="note">↺ = 표준물질이 반대 가닥 · 점선 ? = 정렬이 불확실 · ⚠ = F/P/R 중 참조유전체에서 결합을 못 찾은 것이 있음</span></div></div></div>`;
+          <span class="note">세트 이름(⠿)을 드래그하면 위아래 순서를 바꿉니다 · ↺ = 표준물질이 반대 가닥 · 점선 ? = 정렬이 불확실 · ⚠ = F/P/R 중 참조유전체에서 결합을 못 찾은 것이 있음</span></div></div></div>`;
   const redraw = () => { gmSave(GM.seg, sel); showGenomeMapPage(); };
   view.querySelectorAll("[data-gmseg]").forEach((b) => b.addEventListener("click", () => { GM.seg = b.dataset.gmseg; GM.filter = ""; showGenomeMapPage(); }));
   view.querySelectorAll(".gm-it").forEach((c) => c.addEventListener("change", () => { if (c.checked) sel.add(c.value); else sel.delete(c.value); redraw(); }));
@@ -9955,7 +10010,7 @@ async function showGenomeMapPage() {
     setRange(lo - pad, hi + pad);
   });
   view.querySelectorAll(".gm-gene").forEach((b) => b.addEventListener("click", () => { const lo = Number(b.dataset.a), hi = Number(b.dataset.b), pad = (hi - lo) * 0.03; setRange(lo - pad, hi + pad); }));
-  view.querySelector("#gmCard").addEventListener("click", (e) => { const t = e.target.closest(".gm-setlabel"); if (t) selectSet(t.dataset.set); });
+  gmWireDrag(view, d, sel);
   view.querySelector("#gmPng").addEventListener("click", async () => { try { downloadBlob(await domToPngBlob(view.querySelector("#gmCard")), `genome_map_${GM.seg}.png`); } catch (err) { uiAlert(err.message); } });
 }
 $("#genomeMapBtn").addEventListener("click", showGenomeMapPage);
