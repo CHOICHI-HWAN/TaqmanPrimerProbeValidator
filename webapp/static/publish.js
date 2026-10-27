@@ -22,6 +22,21 @@ export function scrub(v) {                                   // absolute server 
 
 export const docId = (key) => key.replaceAll("/", "~");
 
+const fmtSec = (s) => (s >= 60 ? `${Math.floor(s / 60)}분 ${Math.round(s % 60)}초` : `${Math.round(s)}초`);
+/** The text and bar fraction of the upload toast. p = {phase: "login"|"collect"|"upload", n, nExp, text, done, total, t0, tPhase}, now in ms.
+ *  -> {msg, frac} (frac null = unknown total: the bar slides instead of filling) */
+export function progressLine(p, now) {
+  const el = (now - p.t0) / 1000;
+  if (p.phase === "login") return { msg: `Firebase 업로드 · 1/3 로그인·확인 중 — 로그인 창이나 확인 창을 살펴보세요 (경과 ${fmtSec(el)})`, frac: null };
+  if (p.phase === "collect") {
+    const exp = p.nExp > 0 ? p.nExp : 0;
+    return { msg: `Firebase 업로드 · 2/3 결과 수집 중 — ${p.text || "시작"} (${p.n}${exp ? `/약 ${exp}` : ""}번째, 경과 ${fmtSec(el)})`, frac: exp ? Math.min(0.97, p.n / exp) : null };
+  }
+  const frac = p.total ? p.done / p.total : 0, spent = Math.max(0.001, (now - p.tPhase) / 1000);
+  const left = p.done >= 3 && p.total > p.done ? ((p.total - p.done) * spent) / p.done : null;
+  return { msg: `Firebase 업로드 · 3/3 올리는 중 — ${p.done}/${p.total}개 (${Math.round(frac * 100)}%${left != null ? `, 남은 약 ${fmtSec(left)}` : ""}, 경과 ${fmtSec(el)})`, frac };
+}
+
 export function b64(bytes) {
   let s = "";
   for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
@@ -151,7 +166,13 @@ if (typeof document !== "undefined") {
   step("스크립트 로드됨");
 
   const T = (m, o) => { try { if (typeof toast === "function") toast(m, Object.assign({ id: "fb-upload" }, o)); } catch (e) { /* no toast */ } };
-  const setLabel = (t) => { if (t && /^(업로드 \d|로그인 중|수집)/.test(t)) T("Firebase: " + t, { type: "run" }); btn.title = t && !/Firebase 업로드$/.test(t) ? t : BTN_TITLE; btn.classList.toggle("busy", !!t && !/Firebase 업로드$/.test(t)); };
+  // staged progress toast: 1 login/confirm, 2 collect (unknown size -> sliding bar, or a fill from the last run's count), 3 upload (percent + time left)
+  const prog = { phase: "", n: 0, nExp: 0, text: "", done: 0, total: 0, t0: 0, tPhase: 0 };
+  let ticker = null;
+  const paint = () => { const { msg, frac } = progressLine(prog, Date.now()); T(msg, { type: "run", progress: frac, indeterminate: frac == null }); };
+  const progStart = () => { let exp = 0; try { exp = Number(localStorage.getItem("lasv_fb_collect_n")) || 0; } catch (e) { /* private mode */ } Object.assign(prog, { phase: "login", n: 0, nExp: exp, text: "", done: 0, total: 0, t0: Date.now(), tPhase: Date.now() }); paint(); clearInterval(ticker); ticker = setInterval(paint, 1000); };
+  const progStop = () => { clearInterval(ticker); ticker = null; };
+  const setLabel = (t) => { btn.title = t && !/Firebase 업로드$/.test(t) ? t : BTN_TITLE; btn.classList.toggle("busy", !!t && !/Firebase 업로드$/.test(t)); };
   const say = (t, bad) => { msg.textContent = t; msg.style.borderColor = bad ? "#e5484d" : "#94a3b8"; msg.hidden = !t; };
   let sdk = null, busy = false;
 
@@ -168,9 +189,12 @@ if (typeof document !== "undefined") {
   }
 
   async function upload(cfg) {
-    const items = await collect(cfg.project, (p) => fetch(p), (t) => setLabel(t));
+    Object.assign(prog, { phase: "collect", n: 0, text: "", tPhase: Date.now() }); paint();
+    const items = await collect(cfg.project, (p) => fetch(p), (t) => { prog.n += 1; prog.text = String(t).replace(/^읽는 중: /, ""); setLabel(t); });
+    try { localStorage.setItem("lasv_fb_collect_n", String(prog.n)); } catch (e) { /* private mode */ }
     items.push({ key: "_probe", gz: false, ctype: "application/json", bytes: new TextEncoder().encode('{"ok":1}') });
     let done = 0;
+    Object.assign(prog, { phase: "upload", done: 0, total: items.length, tPhase: Date.now() }); paint();
     for (const it of items) {
       const parts = chunks(it.bytes);
       for (let i = 0; i < parts.length; i++) {
@@ -181,6 +205,8 @@ if (typeof document !== "undefined") {
         }
       }
       setLabel(`업로드 ${++done}/${items.length}`);
+      prog.done = done;
+      if (done % 4 === 0 || done === items.length) paint();
     }
     return items.length;
   }
@@ -203,6 +229,7 @@ if (typeof document !== "undefined") {
       say("", false);
       step(sdk.auth.currentUser ? "로그인됨" : "로그인 팝업 요청");
       busy = true; btn.disabled = true;
+      progStart();
       // Called directly inside the click -- no await / confirm() before it.
       const login = sdk.auth.currentUser ? Promise.resolve() : (setLabel("로그인 중…"), sdk.signInWithPopup(sdk.auth, new sdk.GoogleAuthProvider()));
       // Firefox (tracking protection / partitioned storage) can let the popup log in and close without the result ever reaching this
@@ -211,18 +238,20 @@ if (typeof document !== "undefined") {
       login.then(async () => {
         if (stuck) clearTimeout(stuck);
         say("", false);
-        if (!confirm(`${sdk.auth.currentUser.email} 계정으로 현재 분석 결과(분석 제외, 결과만)를 Firebase에 올립니다.\n허가된 계정만 열람할 수 있습니다. 계속할까요?`)) { setLabel("☁ Firebase 업로드"); return; }
+        if (!confirm(`${sdk.auth.currentUser.email} 계정으로 현재 분석 결과(분석 제외, 결과만)를 Firebase에 올립니다.\n허가된 계정만 열람할 수 있습니다. 계속할까요?`)) { setLabel("☁ Firebase 업로드"); progStop(); T("Firebase 업로드를 취소했습니다.", { type: "info", ttl: 3000 }); return; }
         const n = await upload(cfg);
         setLabel("☁ Firebase 업로드");
-        T(`Firebase 업로드 완료: ${n}개 파일`, { type: "ok" });
+        progStop();
+        T(`Firebase 업로드 완료 — ${n}개 파일, 걸린 시간 ${fmtSec((Date.now() - prog.t0) / 1000)}`, { type: "ok", ttl: 9000 });
         say(`업로드 완료: ${n}개 파일. https://primervalidator.web.app/${cfg.project}/ 에서 확인하세요.`, false);
       }).catch((e) => {
         if (stuck) clearTimeout(stuck);
         console.error("Firebase upload failed", e);
         setLabel("☁ Firebase 업로드");
-        T("Firebase 업로드 실패", { type: "err" });
+        progStop();
+        T("Firebase 업로드 실패: " + explainError(e), { type: "err", ttl: 20000 });
         say("업로드 실패: " + explainError(e), true);
-      }).finally(() => { busy = false; btn.disabled = false; });
+      }).finally(() => { progStop(); busy = false; btn.disabled = false; });
     };
   }).catch((e) => { step("설정 요청 실패: " + (e.message || e)); });
 }
