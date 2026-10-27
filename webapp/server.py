@@ -471,9 +471,18 @@ def redesign_scope(seg, host):
     return scope, v.ids(seg, scope)
 
 
+RD_ENGINES = ("varvamp", "primerhunter", "coverage")
+RD_ENGINE_LABEL = {"varvamp": "varVAMP", "primerhunter": "PrimerHunter", "coverage": "커버리지 우선"}
+
+
+def rd_engine(value):
+    """The redesign tool named in a request; anything unknown means varVAMP."""
+    return value if value in RD_ENGINES else "varvamp"
+
+
 def _rd_dir(seg, scope, engine="varvamp"):
     base = ROOT / "output" / "redesign" / seg / scope
-    return base / "primerhunter" if engine == "primerhunter" else base
+    return base / engine if engine in ("primerhunter", "coverage") else base
 
 
 def probe_for_pair(seg, f_seq, r_seq, ids, scope, work_dir):
@@ -522,13 +531,22 @@ def _set_cover(ids_by_design, targets):
     return {"steps": steps, "covered": len(covered), "total": total, "pct": round(100.0 * len(covered) / total, 1) if total else 0.0}
 
 
+def params_pass_mm():
+    return int(load_params()["primer_mismatch_pass"])
+
+
+def params_tp_n():
+    return int(load_params()["three_prime_consecutive_match"])
+
+
 def run_redesign_job(job_id, seg, scope, ids, opts):
     """varVAMP redesign per lineage (and optionally for all genomes together), every design validated with the real pipeline
     validation. Results: output/redesign/<seg>/<scope>/run.json (+ one folder per lineage/design) -- shown only in the redesign page."""
     import redesign_varvamp  # noqa: PLC0415 -- scripts/ is on sys.path
     import redesign_primerhunter  # noqa: PLC0415
+    import redesign_coverage  # noqa: PLC0415
     from mfe_common import read_fasta_seqs  # noqa: PLC0415
-    engine = opts.get("engine", "varvamp")
+    engine = rd_engine(opts.get("engine"))
 
     def progress(msg):
         with JOBS_LOCK:
@@ -548,7 +566,7 @@ def run_redesign_job(job_id, seg, scope, ids, opts):
         base = _rd_dir(seg, scope, engine)
         base.mkdir(parents=True, exist_ok=True)
         run = {"engine": engine, "segment": seg.upper(), "host_scope": scope, "generated": time.strftime("%Y-%m-%d %H:%M:%S"),
-               "population_n": len(ids), "params": {k: opts[k] for k in ("threshold", "min_threshold", "ambig", "probe_ambig", "pair_ambig", "top", "min_n", "ph_sample", "ph_min_cov", "ph_min_tm") if k in opts},
+               "population_n": len(ids), "params": {k: opts[k] for k in ("threshold", "min_threshold", "ambig", "probe_ambig", "pair_ambig", "top", "min_n", "pass_mm", "tp_n", "ph_sample", "ph_min_cov", "ph_min_tm") if k in opts},
                "lineages": [], "done": False}
         (base / "run.json").write_text(json.dumps(run), encoding="utf-8")
         for gi, (L, members) in enumerate(groups, 1):
@@ -561,6 +579,10 @@ def run_redesign_job(job_id, seg, scope, ids, opts):
                 if engine == "primerhunter":
                     res = _ph_designs(redesign_primerhunter, {k: seqs[k] for k in members if k in seqs}, base / L, opts, seg, ids, scope,
                                       lambda m, tag=tag: progress(tag + m))
+                elif engine == "coverage":
+                    res = redesign_coverage.design_lineage(
+                        {k: seqs[k] for k in members if k in seqs}, base / L, ambig=opts["ambig"], probe_ambig=opts["probe_ambig"], top=opts["top"],
+                        pass_mm=opts.get("pass_mm", 2), tp_n=opts.get("tp_n", 2), threads=4, progress=lambda m, tag=tag: progress(tag + m))
                 else:
                     res = redesign_varvamp.design_lineage(
                         {k: seqs[k] for k in members if k in seqs}, base / L, opts["threshold"], opts["min_threshold"],
@@ -2955,7 +2977,7 @@ class Handler(BaseHTTPRequestHandler):
             if seg not in seg_keys():
                 return self._send_json({"error": "bad segment"}, 400)
             scope, _ids = redesign_scope(seg, (qs.get("host") or [None])[0])
-            engine = "primerhunter" if (qs.get("engine") or [""])[0] == "primerhunter" else "varvamp"
+            engine = rd_engine((qs.get("engine") or [""])[0])
             f = _rd_dir(seg, scope, engine) / "run.json"
             out = json.loads(f.read_text(encoding="utf-8")) if f.exists() else {"generated": None}
             out["host_scope"] = out.get("host_scope") or scope
@@ -2974,7 +2996,7 @@ class Handler(BaseHTTPRequestHandler):
             if seg not in seg_keys() or not re.fullmatch(r"[A-Za-z0-9_\-]+/designs/[A-Za-z0-9_\-]+", rel):
                 return self._send_json({"error": "bad request"}, 400)
             scope, _ids = redesign_scope(seg, (qs.get("host") or [None])[0])
-            engine = "primerhunter" if (qs.get("engine") or [""])[0] == "primerhunter" else "varvamp"
+            engine = rd_engine((qs.get("engine") or [""])[0])
             f = _rd_dir(seg, scope, engine) / rel / "result.json"
             if not f.exists():
                 return self._send_json({"error": "결과가 없습니다."}, 404)
@@ -3757,14 +3779,14 @@ class Handler(BaseHTTPRequestHandler):
         opts = {"threshold": thr, "min_threshold": min(thr, num("min_threshold", 0.6, 0.3, 1.0)),
                 "ambig": num("ambig", 2, 0, 8, int), "probe_ambig": num("probe_ambig", 1, 0, 6, int), "pair_ambig": num("pair_ambig", 0, 0, 16, int),
                 "top": num("top", 3, 1, 8, int), "min_n": num("min_n", 5, 3, 1000, int),
-                "include_all": bool(o.get("include_all")), "engine": "primerhunter" if o.get("engine") == "primerhunter" else "varvamp",
+                "include_all": bool(o.get("include_all")), "engine": rd_engine(o.get("engine")), "pass_mm": params_pass_mm(), "tp_n": params_tp_n(),
                 "ph_sample": num("ph_sample", 25, 5, 100, int), "ph_threads": num("ph_threads", 12, 1, 32, int),
                 "ph_min_cov": num("ph_min_cov", 80.0, 10.0, 100.0), "ph_min_tm": num("ph_min_tm", 56.0, 40.0, 70.0),
                 "lineages": [x for x in (o.get("lineages") or []) if isinstance(x, str) and re.fullmatch(r"[A-Za-z0-9_\-]+", x)]}
         scope, ids = redesign_scope(seg, o.get("host"))
         job_id = uuid.uuid4().hex[:12]
         with JOBS_LOCK:
-            JOBS[job_id] = {"status": "running", "kind": "redesign", "label": f"{seg.upper()} 리니지별 프라이머·프로브 재설계 ({'PrimerHunter' if opts['engine'] == 'primerhunter' else 'varVAMP'})",
+            JOBS[job_id] = {"status": "running", "kind": "redesign", "label": f"{seg.upper()} 리니지별 프라이머·프로브 재설계 ({RD_ENGINE_LABEL[opts['engine']]})",
                             "progress": "시작...", "started": time.time()}
         threading.Thread(target=run_redesign_job, args=(job_id, seg, scope, ids, opts), daemon=True).start()
         return self._send_json({"job_id": job_id})

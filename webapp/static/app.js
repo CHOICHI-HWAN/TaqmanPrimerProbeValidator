@@ -7272,7 +7272,7 @@ function rdDesignRow(d, L, run) {
   return `<tr>
     <td class="mono">${escHtml(d.name)}</td>
     <td>${seqCell("F", "F")}${seqCell("P", "P")}${seqCell("R", "R")}</td>
-    <td>${d.amplicon_len ?? "&mdash;"} bp<div class="note">${d.pair_cov != null ? `표본 쌍 커버리지 ${d.pair_cov}%` : `penalty ${d.penalty ?? "&mdash;"} · ΔG ${d.deltaG ?? "&mdash;"}`}</div></td>
+    <td>${d.amplicon_len ?? "&mdash;"} bp<div class="note">${d.est_cov != null ? `정렬 추정 통과 ${d.est_cov}개 (${d.est_cov_pct}%) · 새로 +${d.est_added}` : d.pair_cov != null ? `표본 쌍 커버리지 ${d.pair_cov}%` : `penalty ${d.penalty ?? "&mdash;"} · ΔG ${d.deltaG ?? "&mdash;"}`}</div></td>
     <td>${own}</td>
     <td>${d.validated ?? "&mdash;"} (${pct(d.validated_pct)})<div style="margin-top:2px;">${chips}</div></td>
     <td>${pct(d.probe_pct)}<div class="note">dropout ${d.dropout ?? "&mdash;"}</div></td>
@@ -7283,7 +7283,7 @@ function rdDesignRow(d, L, run) {
 function renderRedesignResults(run, seg) {
   if (!run || !run.generated) return "<p class='note'>아직 실행하지 않았습니다. 위에서 리니지를 고르고 \"재설계 실행\"을 누르세요.</p>";
   const stale = state.hostScope && run.host_scope && state.hostScope !== run.host_scope;
-  const head = `<p class="note">${escHtml(run.generated)} 실행 · <span class="pill pill-ok">${run.engine === "primerhunter" ? "PrimerHunter" : "varVAMP"}</span> ${pdScopeBadge(run.host_scope)} <span class="note">(집계 대상 ${run.population_n}개)</span>${run.done ? "" : " · <b>진행 중... 아래는 지금까지의 결과입니다</b>"}</p>`;
+  const head = `<p class="note">${escHtml(run.generated)} 실행 · <span class="pill pill-ok">${{ primerhunter: "PrimerHunter", coverage: "커버리지 우선" }[run.engine] || "varVAMP"}</span> ${pdScopeBadge(run.host_scope)} <span class="note">(집계 대상 ${run.population_n}개)</span>${run.done ? "" : " · <b>진행 중... 아래는 지금까지의 결과입니다</b>"}</p>`;
   const blocks = (run.lineages || []).map((e) => {
     const title = e.lineage === "ALL" ? "전체 (pan, 리니지 구분 없이)" : escHtml(e.lineage);
     if (e.status !== "ok") return `<div class="card" style="margin-top:10px;"><h4 style="margin:0;">${title} <span class="note">(${e.n}개)</span> <span class="pill pill-warn">${e.status === "skipped" ? "건너뜀" : "설계 없음"}</span></h4><p class="note">${escHtml(e.message || "")}</p></div>`;
@@ -7319,11 +7319,11 @@ async function showRedesignPage() {
     <div class="card">
       <div class="table-toolbar" style="flex-wrap:wrap;gap:12px;">
         <span class="note">숙주 기준 ${pdScopeBadge(run.active_scope)}</span>
-        <label class="note" title="설계 도구. PrimerHunter는 느립니다(리니지당 수 분~수십 분)">도구 <select id="rdEngine"><option value="varvamp" ${RD.engine === "varvamp" ? "selected" : ""}>varVAMP</option><option value="primerhunter" ${RD.engine === "primerhunter" ? "selected" : ""}>PrimerHunter</option></select></label>
+        <label class="note" title="설계 도구. 커버리지 우선: 우리 검증 기준(프라이머 불일치 허용·3′ 끝 일치·Probe 완전 일치)을 통과하는 유전체가 가장 많도록 F·R·Probe를 직접 고릅니다(리니지당 수 초). PrimerHunter는 느립니다(리니지당 수 분~수십 분)">도구 <select id="rdEngine"><option value="varvamp" ${RD.engine === "varvamp" ? "selected" : ""}>varVAMP</option><option value="primerhunter" ${RD.engine === "primerhunter" ? "selected" : ""}>PrimerHunter</option><option value="coverage" ${RD.engine === "coverage" ? "selected" : ""}>커버리지 우선</option></select></label>
         <label class="note" ${RD.engine === "primerhunter" ? "" : 'hidden'} title="PrimerHunter는 모든 게놈이 아니라 가장 다양한 대표 게놈 N개로 설계합니다 (검증은 리니지 전체로)">대표 표본 <input id="rdSample" type="number" min="5" max="100" value="${RD.sample ?? 25}" style="width:56px;"></label>
         <label class="note" ${RD.engine === "primerhunter" ? "" : 'hidden'} title="프라이머-표본 결합의 최소 Tm(℃). 높일수록 mismatch가 적은(우리 검증 기준에 가까운) 프라이머만 남지만 후보가 줄어듭니다">최소 Tm <input id="rdMinTm" type="number" min="40" max="70" value="${RD.minTm ?? 56}" style="width:56px;"></label>
         <label class="note" ${RD.engine === "primerhunter" ? "" : 'hidden'} title="한 프라이머가 이 비율 이상의 표본에 결합해야 합니다. 100 미만이면 여러 쌍으로 전체를 덮는 세트 커버를 씁니다">최소 커버리지 % <input id="rdMinCov" type="number" min="10" max="100" value="${RD.minCov ?? 80}" style="width:56px;"></label>
-        <label class="note" title="consensus 임계값: 높을수록 특이적이지만 설계가 안 나올 수 있습니다">임계값 <input id="rdThr" type="number" step="0.05" min="0.3" max="1" value="${RD.thr ?? 0.9}" style="width:62px;"> → 최저 <input id="rdMinThr" type="number" step="0.05" min="0.3" max="1" value="${RD.minThr ?? 0.6}" style="width:62px;"></label>
+        <label class="note${RD.engine === "coverage" ? " rd-off" : ""}" title="${RD.engine === "coverage" ? "커버리지 우선에서는 쓰지 않습니다. " : ""}consensus 임계값: 높을수록 특이적이지만 설계가 안 나올 수 있습니다">임계값 <input id="rdThr" type="number" step="0.05" min="0.3" max="1" value="${RD.thr ?? 0.9}" style="width:62px;"> → 최저 <input id="rdMinThr" type="number" step="0.05" min="0.3" max="1" value="${RD.minThr ?? 0.6}" style="width:62px;"></label>
         <label class="note${RD.engine === "primerhunter" ? " rd-off" : ""}" title="${RD.engine === "primerhunter" ? "varVAMP 전용: PrimerHunter에는 적용되지 않습니다. " : ""}F와 R 각각에 넣을 수 있는 모호 염기(IUPAC) 최대 수 (F+R 합계가 아님)">F/R IUPAC (각각) <input id="rdAmbig" type="number" min="0" max="8" value="${RD.ambig ?? 2}" style="width:48px;" ${RD.engine === "primerhunter" ? "disabled" : ""}></label>
         <label class="note${RD.engine === "primerhunter" ? " rd-off" : ""}" title="${RD.engine === "primerhunter" ? "varVAMP 전용: PrimerHunter에는 적용되지 않습니다. " : ""}Probe 하나의 모호 염기 최대 수 (프라이머보다 엄격하게 1 적게가 권장)">Probe IUPAC <input id="rdPAmbig" type="number" min="0" max="6" value="${RD.pAmbig ?? 1}" style="width:48px;" ${RD.engine === "primerhunter" ? "disabled" : ""}></label>
         <label class="note" title="한 쌍(F+R)의 모호 염기 합이 이 값을 넘는 설계는 검증 전에 제외합니다. 0 = 제한 없음. varVAMP는 F·R 각각만 제한하므로 합계는 설계 뒤에 걸러냅니다">F+R 합계 최대 <input id="rdPairAmbig" type="number" min="0" max="16" value="${RD.pairAmbig ?? 0}" style="width:48px;"></label>
@@ -7370,7 +7370,7 @@ async function showRedesignPage() {
     RD.checked = Object.fromEntries([...view.querySelectorAll(".rd-lin")].map((x) => [x.value, x.checked]));
     const lineages = [...view.querySelectorAll(".rd-lin:checked")].map((x) => x.value);
     if (!lineages.length && !RD.all) { uiAlert("리니지를 하나 이상 고르세요."); return; }
-    if (!(await uiConfirm(`${lineages.length}개 리니지${RD.all ? " + 전체" : ""}를 설계하고 설계마다 실제 검증을 돌립니다. ${RD.engine === "primerhunter" ? "PrimerHunter는 리니지당 수 분에서 수십 분이 걸리고 CPU를 여러 개 씁니다." : "리니지당 1분 안팎이 걸립니다."} 그동안 서버가 계산에 쓰입니다. 계속할까요?`, { title: "리니지별 재설계", okLabel: "시작" }))) return;
+    if (!(await uiConfirm(`${lineages.length}개 리니지${RD.all ? " + 전체" : ""}를 설계하고 설계마다 실제 검증을 돌립니다. ${RD.engine === "primerhunter" ? "PrimerHunter는 리니지당 수 분에서 수십 분이 걸리고 CPU를 여러 개 씁니다." : RD.engine === "coverage" ? "리니지당 수십 초(정렬 + 설계)와 설계마다 검증 시간이 걸립니다." : "리니지당 1분 안팎이 걸립니다."} 그동안 서버가 계산에 쓰입니다. 계속할까요?`, { title: "리니지별 재설계", okLabel: "시작" }))) return;
     try {
       const { job_id, error } = await fetchJSON("/api/redesign", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ segment: RD.seg.toLowerCase(), host: state.hostScope, lineages, include_all: RD.all, threshold: RD.thr, min_threshold: RD.minThr, ambig: RD.ambig, probe_ambig: RD.pAmbig, pair_ambig: RD.pairAmbig, top: RD.top, min_n: RD.minN, engine: RD.engine, ph_sample: RD.sample, ph_min_cov: RD.minCov, ph_min_tm: RD.minTm }) });
