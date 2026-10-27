@@ -64,6 +64,9 @@ class Aligned:
         self.cons_u8 = np.frombuffer(self.cons.encode(), dtype=np.uint8)
         self.cs = np.concatenate([np.zeros((self.G, 1), dtype=np.int32), np.cumsum(self.A != self.cons_u8, axis=1, dtype=np.int32)], axis=1)
         self.gapcs = np.concatenate([[0], np.cumsum([c == "-" for c in self.cons])])
+        self.scs = None
+        if self.S is not None:
+            self.scs = np.concatenate([np.zeros((len(self.S), 1), dtype=np.int32), np.cumsum(self.S != self.cons_u8, axis=1, dtype=np.int32)], axis=1)
 
     def windows(self, k):
         """Start columns whose k-window is entirely conserved-column (no '-' in the consensus)."""
@@ -74,6 +77,13 @@ class Aligned:
         """Genomes with <= thr mismatches against the consensus window, for many windows at once."""
         mm = self.cs[:, starts + k] - self.cs[:, starts]
         return (mm <= thr).sum(axis=0)
+
+    def std_possible(self, k, starts, thr):
+        """Windows a standard material could pass at all (<= thr mismatches against the consensus window); all True without standards."""
+        if self.scs is None:
+            return np.ones(len(starts), dtype=bool)
+        mm = self.scs[:, starts + k] - self.scs[:, starts]
+        return (mm <= thr).any(axis=0)
 
     def evaluate(self, s, k, kind, amb, pass_mm, tp_n):
         """(oligo, bits, standard bits) for the window [s, s+k): the consensus with up to `amb` two-base IUPAC codes and the genomes it
@@ -145,10 +155,15 @@ def candidates(al, kind, amb, pass_mm, tp_n, primer_tm, gc, say):
         if not len(starts):
             continue
         ub = al.upper_bound(k, starts, thr)
-        pool.extend(zip(ub.tolist(), starts.tolist(), [k] * len(starts)))
+        sp = al.std_possible(k, starts, thr)
+        pool.extend(zip(ub.tolist(), starts.tolist(), [k] * len(starts), sp.tolist()))
     pool.sort(key=lambda x: (-x[0], x[1]))
+    chosen = pool[:POOL_BOUND]
+    if al.S is not None:                                    # windows a standard can pass are kept apart, or a requirement could find none
+        chosen = chosen + [x for x in pool if x[3]][:POOL_BOUND]
+        chosen = list({(x[1], x[2]): x for x in chosen}.values())
     out = []
-    for ub, s, k in pool[:POOL_BOUND]:
+    for ub, s, k, _sp in chosen:
         oligo, bits, sbits = al.evaluate(s, k, kind, amb, pass_mm, tp_n)
         cnt = bits.bit_count()
         strands = [("+", oligo), ("-", reverse_complement(oligo))] if kind == "P" else [("+", oligo if kind == "F" else reverse_complement(oligo))]
@@ -165,29 +180,36 @@ def candidates(al, kind, amb, pass_mm, tp_n, primer_tm, gc, say):
                     continue
             out.append({"cnt": cnt, "s": s, "e": s + k, "seq": seq, "strand": strand, "tm": tm, "gc": gcp, "bits": bits, "sbits": sbits, "amb": n_ambig(seq)})
     out.sort(key=lambda x: (-x["cnt"], x["amb"], x["s"]))
-    say(f"{kind} 후보 {len(out[:POOL_KEEP])}개 (최대 {out[0]['cnt'] if out else 0}개 유전체 통과)")
-    return out[:POOL_KEEP]
+    keep = out[:POOL_KEEP]
+    if al.S is not None:
+        keep += [x for x in out if x["sbits"]][:POOL_KEEP]
+        keep = list({(x["s"], x["e"], x["strand"]): x for x in keep}.values())
+        keep.sort(key=lambda x: (-x["cnt"], x["amb"], x["s"]))
+    say(f"{kind} 후보 {len(keep)}개 (최대 {out[0]['cnt'] if out else 0}개 유전체 통과)")
+    return keep
 
 
-def best_triples(F, R, P, covered, amp, probe_above, max_dtm, want=12, require_std=False):
+def best_triples(F, R, P, covered, amp, probe_above, max_dtm, want=12, require_std=False, std_bonus=0):
     """Triples (F, R, P) ranked by the NEW genomes they pass (those not in `covered`), then by the genomes they pass in all. The lists are
-    sorted by genomes passed (best first), so a branch whose best possible count cannot beat the current `want`-th best is cut off."""
+    sorted by genomes passed (best first), so a branch whose best possible count cannot beat the current `want`-th best is cut off.
+    `require_std`: only triples that pass at least one standard material. `std_bonus`: a triple that passes one counts as that many more
+    new genomes when ranking (a preference, not a requirement)."""
     import heapq
     heap, seq = [], 0                                      # min-heap of (new, total, -amb, tiebreak, f, r, p)
     floor = 0
     for p in P:
-        if p["cnt"] <= floor:
+        if p["cnt"] + std_bonus <= floor:
             break
         fs = [f for f in F if f["e"] <= p["s"] and p["e"] - f["s"] <= amp[1]]
         rs = [r for r in R if r["s"] >= p["e"] and r["e"] - p["s"] <= amp[1]]
         for f in fs:
-            if f["cnt"] <= floor:
+            if f["cnt"] + std_bonus <= floor:
                 break
             fp = f["bits"] & p["bits"] & ~covered
-            if fp.bit_count() <= floor:
+            if fp.bit_count() + std_bonus <= floor:
                 continue
             for r in rs:
-                if r["cnt"] <= floor:
+                if r["cnt"] + std_bonus <= floor:
                     break
                 if not (amp[0] <= r["e"] - f["s"] <= amp[1]) or abs(f["tm"] - r["tm"]) > max_dtm:
                     continue
@@ -195,13 +217,15 @@ def best_triples(F, R, P, covered, amp, probe_above, max_dtm, want=12, require_s
                 if not (hi + probe_above[0] <= p["tm"] <= hi + probe_above[1]):
                     continue
                 new = (fp & r["bits"]).bit_count()
-                if new <= floor:
+                std_pass = bool(f["sbits"] & r["sbits"] & p["sbits"])           # at least one standard material passes the whole set
+                if require_std and not std_pass:
                     continue
-                if require_std and not (f["sbits"] & r["sbits"] & p["sbits"]):      # at least one standard material passes the whole set
+                score = new + (std_bonus if std_pass else 0)
+                if score <= floor:
                     continue
                 tot = (f["bits"] & p["bits"] & r["bits"]).bit_count()
                 seq += 1
-                item = (new, tot, -(f["amb"] + r["amb"] + p["amb"]), -abs(f["tm"] - r["tm"]), -seq, f, r, p)
+                item = (score, tot, -(f["amb"] + r["amb"] + p["amb"]), -abs(f["tm"] - r["tm"]), -seq, new, f, r, p)
                 if len(heap) < want:
                     heapq.heappush(heap, item)
                 else:
@@ -209,11 +233,11 @@ def best_triples(F, R, P, covered, amp, probe_above, max_dtm, want=12, require_s
                 if len(heap) >= want:
                     floor = heap[0][0] - 1 if heap[0][0] > 0 else 0       # equal counts may still win on the tie-breakers
     out = sorted(heap, reverse=True)
-    return [(x[0], x[1], x[5], x[6], x[7]) for x in out]
+    return [(x[5], x[1], x[6], x[7], x[8]) for x in out]
 
 
 def design_from_alignment(ids, rows, ambig=2, probe_ambig=2, top=3, pass_mm=2, tp_n=2, amp=(70, 200), primer_tm=(52.0, 66.0),
-                          gc=(30.0, 75.0), probe_above=(2.0, 14.0), max_dtm=5.0, progress=None, std_rows=None, require_std=False):
+                          gc=(30.0, 75.0), probe_above=(2.0, 14.0), max_dtm=5.0, progress=None, std_rows=None, require_std=False, std_prefer_pct=0.0):
     """-> {"status": "ok"|"none", "n", "designs": [...], "message"}; each design: name, F, P, R, F_tm .. R_gc, amplicon_len,
     est_cov (genomes of the alignment it passes under the pipeline's rule), est_added (new ones beyond the earlier designs)."""
     def say(msg):
@@ -221,6 +245,7 @@ def design_from_alignment(ids, rows, ambig=2, probe_ambig=2, top=3, pass_mm=2, t
             progress(msg)
     al = Aligned(ids, rows, std_rows)
     require_std = bool(require_std and std_rows)
+    std_bonus = int(round(al.G * std_prefer_pct / 100.0)) if (std_rows and not require_std) else 0
     t0 = time.time()
     F = candidates(al, "F", ambig, pass_mm, tp_n, primer_tm, gc, say)
     R = candidates(al, "R", ambig, pass_mm, tp_n, primer_tm, gc, say)
@@ -230,7 +255,7 @@ def design_from_alignment(ids, rows, ambig=2, probe_ambig=2, top=3, pass_mm=2, t
     designs, covered = [], 0
     for i in range(top):
         say(f"조합 탐색 {i + 1}/{top}...")
-        cand = best_triples(F, R, P, covered, amp, probe_above, max_dtm, require_std=require_std)
+        cand = best_triples(F, R, P, covered, amp, probe_above, max_dtm, require_std=require_std, std_bonus=std_bonus)
         # the next design must differ from the earlier ones in at least one oligo (no repeats of the same amplicon)
         cand = [c for c in cand if not any(abs(c[2]["s"] - d["_f"]) < 6 and abs(c[3]["e"] - d["_r"]) < 6 for d in designs)]
         if not cand:
@@ -253,10 +278,11 @@ def design_from_alignment(ids, rows, ambig=2, probe_ambig=2, top=3, pass_mm=2, t
     return {"status": "ok", "n": al.G, "designs": designs, "message": "", "threshold": None}
 
 
-def design_lineage(members, out_dir, ambig=2, probe_ambig=2, top=3, threads=4, progress=None, standards=None, require_std=False, **kw):
+def design_lineage(members, out_dir, ambig=2, probe_ambig=2, top=3, threads=4, progress=None, standards=None, require_std=False, std_prefer_pct=0.0, **kw):
     """members = {accession: sequence}: MAFFT alignment, then design_from_alignment(). `standards` = {id: sequence} of the reference
     standard material: aligned onto the same columns (mafft --keeplength --add) and judged with the same rule; `require_std` demands that
-    at least one of them passes the designed set."""
+    at least one of them passes the designed set; `std_prefer_pct` (when not required) lets a set that passes one count as that % of the
+    population more genomes, so it wins over a slightly wider set that does not."""
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     n = len(members)
@@ -279,7 +305,7 @@ def design_lineage(members, out_dir, ambig=2, probe_ambig=2, top=3, threads=4, p
         by = dict(zip(all_ids, all_rows))
         std_rows = [by[k] for k in standards if k in by]
     return design_from_alignment(ids, rows, ambig=ambig, probe_ambig=probe_ambig, top=top, progress=progress, std_rows=std_rows,
-                                 require_std=require_std, **kw)
+                                 require_std=require_std, std_prefer_pct=std_prefer_pct, **kw)
 
 
 def main():

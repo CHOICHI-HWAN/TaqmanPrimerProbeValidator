@@ -74,6 +74,11 @@ export async function collect(project, get, progress = () => {}) {
     for (const s of data.sets || []) { progress(`세트 ${s.set_id}${sfx}`); const d = await json(`sets/${encodeURIComponent(s.set_id)}`, scope); if (d) await addJson(`sets/${s.set_id}${sfx}`, d); }
     for (const g of data.groups || []) { progress(`그룹 ${g.group_id}${sfx}`); const d = await json(`groups/${encodeURIComponent(g.group_id)}`, scope); if (d) await addJson(`groups/${g.group_id}${sfx}`, d); }
   }
+  for (const seg of Object.keys((data.profile || {}).segments || {})) {                  // reference-genome map (not host dependent)
+    progress(`유전체 지도 ${seg}`);
+    const gm = await json(`genome-map/${seg}`, null);
+    if (gm) await addJson(`genome-map/${seg}`, gm);
+  }
   for (const seg of Object.keys((data.profile || {}).segments || {})) {
     const u = await get(`/api/standards/unmatched?seg=${seg}`);
     if (u.ok) out.push({ key: `${project}/standards/unmatched/${seg}`, gz: true, ctype: "text/plain; charset=utf-8", bytes: await gzip(new Uint8Array(await u.arrayBuffer())) });
