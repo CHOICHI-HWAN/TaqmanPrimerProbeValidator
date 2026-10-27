@@ -1777,7 +1777,15 @@ def load_genome_map(seg):
             if str(st.get("segment", "")).lower() == seg]
     groups = [{"group_id": g["group_id"], "label": g.get("label"), "members": [m for m in (g.get("member_ids") or "").split(";") if m]}
               for g in load_groups_config() if str(g.get("segment", "")).lower() == seg]
-    return genome_map.build(ROOT, seg, (prof["segments"].get(seg) or {}).get("reference_accession", ""), sets, groups)
+    active = None
+    try:                                       # standard materials switched off in 표준물질 입력/관리 are not drawn
+        from standards_common import active_rows, read_manifest  # noqa: PLC0415
+        rows = read_manifest(ROOT / "config" / "standards.tsv")
+        if rows:
+            active = {r["name"].strip() for r in active_rows(rows) if (r.get("segment") or "").strip().lower() in (seg, "")}
+    except (OSError, ImportError, KeyError):
+        active = None
+    return genome_map.build(ROOT, seg, (prof["segments"].get(seg) or {}).get("reference_accession", ""), sets, groups, active)
 
 
 def strain_link_data():

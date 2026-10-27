@@ -147,6 +147,7 @@ rule standard_representativeness:
         site_tol_probe=config["standard_rep_site_tol_probe"],
         good=config["standard_rep_good"],
         critical=config["standard_rep_critical"],
+        placement=config.get("standard_rep_placement", "mafft"),
     log:
         "logs/standard_representativeness_{seg}.log",
     script:
