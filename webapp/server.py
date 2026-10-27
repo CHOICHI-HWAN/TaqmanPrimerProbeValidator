@@ -1807,7 +1807,7 @@ def load_mismatch_curves(seg, kmax=4):
         except (OSError, KeyError):
             continue
         total = c["total"]
-        series.append({"set_id": st["set_id"], "name": st.get("display_name") or st["set_id"], "fixed": c["fixed"], "same": c["same"]})
+        series.append({"set_id": st["set_id"], "name": st.get("display_name") or st["set_id"], "fixed": c["fixed"], "same": c["same"], "by_lineage": c["by_lineage"]})
     return {"segment": seg.upper(), "x": list(range(kmax + 1)), "total": total, "primer_pass": v.mm, "probe_pass": v.pm, "host_scope": v.info(seg), "series": series}
 
 
@@ -3184,7 +3184,7 @@ class Handler(BaseHTTPRequestHandler):
                     return self._send_json(engine_check.compare_scan(msa, label=m.group(1)))
                 return self._send_json(engine_check.compare(msa, top=top, max_iupac=iup, label=m.group(1)))
             except (ValueError, RuntimeError, KeyError) as exc:
-                return self._send_json({"error": str(exc)}, 500)
+                return self._send_json({"error": str(exc)}, 422)          # the data of this set cannot be compared (not a server fault)
 
         if path == "/api/jobs/active":
             # Polled by every connected browser (not just the one that clicked a button) so

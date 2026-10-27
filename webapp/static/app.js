@@ -9963,12 +9963,19 @@ async function gmCurveRender(view, d, sel) {
   const key = GM.seg + "|" + (state.hostScope || "");
   try { if (!GM.curve || GM.curveKey !== key) { GM.curve = await fetchJSON(`/api/mismatch-curve/${GM.seg.toLowerCase()}`); GM.curveKey = key; } }
   catch (e) { box.innerHTML = `<p class="note">커버리지 곡선을 불러오지 못했습니다: ${escHtml(e.message)}</p>`; return; }
-  const c = GM.curve, mode = GM.curveMode || "fixed", byId = new Map(c.series.map((s) => [s.set_id, s]));
+  const c0 = GM.curve, mode = GM.curveMode || "fixed";
+  const lins = [...new Set(c0.series.flatMap((s) => Object.keys(s.by_lineage || {})))].sort();
+  const lin = lins.includes(GM.curveLin) ? GM.curveLin : "ALL";
+  // one lineage: its own totals and counts replace the whole-population ones
+  const c = lin === "ALL" ? c0 : { ...c0, total: (c0.series.find((s) => s.by_lineage && s.by_lineage[lin]) || { by_lineage: { [lin]: { total: 0 } } }).by_lineage[lin].total,
+    series: c0.series.filter((s) => s.by_lineage && s.by_lineage[lin]).map((s) => ({ ...s, fixed: s.by_lineage[lin].fixed, same: s.by_lineage[lin].same })) };
+  const byId = new Map(c.series.map((s) => [s.set_id, s]));
   const shown = gmShownSets(d, sel).map((s) => byId.get(s.set_id)).filter(Boolean);
   const head = `<div class="table-toolbar" style="gap:10px;flex-wrap:wrap;margin-bottom:4px;"><b>커버리지 곡선</b>
-    <span class="note">허용하는 mismatch가 늘 때 통과하는 유전체의 비율 (${c.total}개 기준)</span>
-    <label class="note" style="margin-left:auto;">곡선 기준 <select id="gmCurveMode"><option value="fixed" ${mode === "fixed" ? "selected" : ""}>F·R만 k까지 (프로브는 파이프라인 기준 ${c.probe_pass})</option><option value="same" ${mode === "same" ? "selected" : ""}>F·R·프로브 모두 k까지</option></select></label></div>`;
-  if (!shown.length) { box.innerHTML = head + `<p class="note">세트를 고르면 곡선이 나옵니다.</p>`; box.querySelector("#gmCurveMode").addEventListener("change", (e) => { GM.curveMode = e.target.value; gmCurveRender(view, d, sel); }); return; }
+    <span class="note">허용하는 mismatch가 늘 때 통과하는 유전체의 비율 (${lin === "ALL" ? "" : lin + " "}${c.total}개 기준)</span>
+    <label class="note" style="margin-left:auto;" title="한 리니지만 따로 볼 수 있습니다 (유전체 3개 이상인 리니지)">리니지 <select id="gmCurveLin"><option value="ALL">전체</option>${lins.map((L) => `<option value="${escHtml(L)}" ${lin === L ? "selected" : ""}>${escHtml(L)}</option>`).join("")}</select></label>
+    <label class="note">곡선 기준 <select id="gmCurveMode"><option value="fixed" ${mode === "fixed" ? "selected" : ""}>F·R만 k까지 (프로브는 파이프라인 기준 ${c.probe_pass})</option><option value="same" ${mode === "same" ? "selected" : ""}>F·R·프로브 모두 k까지</option></select></label></div>`;
+  if (!shown.length) { box.innerHTML = head + `<p class="note">세트를 고르면 곡선이 나옵니다.</p>`; box.querySelector("#gmCurveMode").addEventListener("change", (e) => { GM.curveMode = e.target.value; gmCurveRender(view, d, sel); }); box.querySelector("#gmCurveLin").addEventListener("change", (e) => { GM.curveLin = e.target.value; gmCurveRender(view, d, sel); }); return; }
   const W = 860, H = 290, L = 50, R = 22, T = 16, B = 46, ks = c.x, kmax = ks[ks.length - 1];
   const X = (k) => L + (k / kmax) * (W - L - R), Y = (p) => T + (1 - p / 100) * (H - T - B);
   const grid = [0, 20, 40, 60, 80, 100].map((p) => `<line x1="${L}" x2="${W - R}" y1="${Y(p)}" y2="${Y(p)}" stroke="currentColor" opacity="${p % 100 ? ".08" : ".3"}"/><text x="${L - 7}" y="${Y(p) + 4}" text-anchor="end" font-size="10" fill="currentColor" opacity=".75">${p}%</text>`).join("");
@@ -9985,6 +9992,7 @@ async function gmCurveRender(view, d, sel) {
       <text transform="translate(13,${(T + H - B) / 2}) rotate(-90)" text-anchor="middle" font-size="11" fill="currentColor">통과 유전체 (%)</text></svg>
     <div class="vn-legend">${legend}<span class="note">범례 숫자 = 현재 기준에서의 커버리지</span></div>`;
   box.querySelector("#gmCurveMode").addEventListener("change", (e) => { GM.curveMode = e.target.value; gmCurveRender(view, d, sel); });
+  box.querySelector("#gmCurveLin").addEventListener("change", (e) => { GM.curveLin = e.target.value; gmCurveRender(view, d, sel); });
 }
 
 async function showGenomeMapPage() {

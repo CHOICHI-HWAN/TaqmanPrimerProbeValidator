@@ -102,8 +102,7 @@ def _load_set_genomes(msa, limit=None):
     """(genome id -> sequence) of the population this set was analysed on: the filtered fasta that holds its alignment rows."""
     import mfe_common as mc
     ids = [r["genome_id"] for r in msa["rows"]]
-    for seg in ("s", "l"):
-        f = ROOT / "data" / "filtered" / f"{seg}_filtered.fasta"
+    for f in sorted((ROOT / "data" / "filtered").glob("*_filtered.fasta")):          # s / l for Lassa, genome for a one-segment virus
         if f.exists():
             seqs = mc.read_fasta_seqs(f)
             if ids and ids[0] in seqs:

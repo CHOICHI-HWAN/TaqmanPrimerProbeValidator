@@ -60,4 +60,4 @@ standard_rep_critical: 50
 # where a standard material sits on the reference: "mafft" = reference-anchored alignment only; "blastn" = a standard that blastn places reliably
 # (identity and aligned share >= 80%) is taken from its blastn alignment (mafft --keeplength can scatter a divergent standard, see
 # scripts/standard_placement.py); every other standard keeps its mafft placement.
-standard_rep_placement: "mafft"
+standard_rep_placement: "blastn"

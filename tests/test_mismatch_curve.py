@@ -32,3 +32,13 @@ def test_curve_counts(tmp_path):
     # F, R and probe all tolerated up to k: g3 joins at k1 (probe 1), g5 at k2 (max 2)
     assert c["same"] == [1, 3, 5, 6]
     assert all(b >= a for a, b in zip(c["fixed"], c["fixed"][1:])) and all(b >= a for a, b in zip(c["same"], c["same"][1:]))      # a curve never falls
+    assert c["by_lineage"]["LII"] == {"total": 6, "fixed": c["fixed"], "same": c["same"]}                                          # all six genomes are LII
+
+
+def test_small_lineages_get_no_curve(tmp_path):
+    make(tmp_path)
+    meta = tmp_path / "data" / "filtered" / "s_filtered_metadata.tsv"
+    meta.write_text("accession\tlineage\n" + "".join(f"g{i}\t{'LII' if i < 4 else 'LIII'}\n" for i in range(6)))        # LIII has two genomes
+    v = scope_view.View(tmp_path, {"accession": "accession", "host": "host"}, 2, 0)
+    c = v.mismatch_curve("X1", "s", kmax=2, scope="all")
+    assert set(c["by_lineage"]) == {"LII"} and c["by_lineage"]["LII"]["total"] == 4

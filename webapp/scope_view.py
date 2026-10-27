@@ -128,7 +128,7 @@ class View:
     def mismatch_curve(self, set_id, seg, kmax=4, scope=None):
         """How many genomes of the scope a set validates when `k` mismatches are tolerated, k = 0..kmax, in two readings: `fixed` = F and R may differ
         in k positions (3' ends intact) while the probe keeps the pipeline's own setting, `same` = F, R and the probe all may differ in k positions.
-        -> {"total", "fixed": [...], "same": [...]} (counts)"""
+        -> {"total", "fixed": [...], "same": [...], "by_lineage": {lineage: {"total", "fixed", "same"}}} (counts)"""
         path = self.root / "output" / "primers" / set_id / "alignment" / "mismatch_table.tsv"
         scope = scope or self.scope(seg)
         key = ("curve", str(path), _stamp(path), seg.lower(), scope, kmax, self.pm, repr(self.columns),
@@ -137,8 +137,15 @@ class View:
         if hit is None:
             rows = _cached(path, None, lambda p: {r["genome_id"]: r for r in _read_tsv(p)})
             ids = sorted(self.ids(seg, scope))
-            ok = lambda a, b: H.summarize(ids, rows, a, b, probe_inside_amplicon)["validated"]  # noqa: E731
-            hit = {"total": len(ids), "fixed": [ok(k, self.pm) for k in range(kmax + 1)], "same": [ok(k, k) for k in range(kmax + 1)]}
+            ok = lambda subset, a, b: H.summarize(subset, rows, a, b, probe_inside_amplicon)["validated"]  # noqa: E731
+            curve = lambda subset: {"total": len(subset), "fixed": [ok(subset, k, self.pm) for k in range(kmax + 1)], "same": [ok(subset, k, k) for k in range(kmax + 1)]}  # noqa: E731
+            lin = self.lineage_of(seg)
+            by = {}
+            for L in sorted({lin.get(i, "NA") for i in ids}):
+                sub = [i for i in ids if lin.get(i, "NA") == L]
+                if len(sub) >= 3:                                  # a lineage of one or two genomes makes no curve
+                    by[L] = curve(sub)
+            hit = dict(curve(ids), by_lineage=by)
             if len(_SUMMARIES) > 600:
                 _SUMMARIES.clear()
             _SUMMARIES[key] = hit

@@ -42,6 +42,14 @@ Nipah 에디션은 비분절 유전체를 다루며, 클레이드는 공식 next
 
 7) **자체 점검.** `./test.sh`는 정답을 아는 합성 게놈을 실제 mfeprimer로 돌려 핵심 기능을 확인하고, `./test.sh --full`은 실제 결과까지 감사합니다.
 
+8) **설계와 재설계.** 세트마다 Probe 설계 카드(자체 TaqMan 규칙 + Primer3, IUPAC 허용, 숙주 기준, 후보마다 실제 파이프라인 검증)와, 클레이드별 **재설계** 페이지(varVAMP, PrimerHunter, 그리고 이 파이프라인의 통과 규칙을 통과하는 유전체가 가장 많도록 F / R / Probe를 고르는 *커버리지 우선* 도구; 표준물질: 상관없음 / 가능하면 / 반드시)가 있습니다.
+
+9) **패널 겹침.** 세트·그룹을 골라 전체 또는 클레이드별로 합집합·교집합·영역별 겹침·어느 것도 못 잡는 유전체를 **벤 다이어그램**으로 봅니다.
+
+10) **프라이머 매핑지도.** 참조유전체 위에 유전자, **blastn으로 위치를 정한 표준물질**, 고른 세트의 F · Probe · R 결합 위치를 겹쳐 봅니다(세트를 끌어서 순서 변경). 아래에는 허용 mismatch가 늘 때 통과하는 유전체 비율의 **커버리지 곡선**(전체 또는 클레이드별)이 나옵니다. 유전체 창에는 메타데이터 한 줄(언제 · 어디서 · 클레이드 · 호스트)도 나옵니다.
+
+11) **선택형 Go 엔진.** `go/probedesign`, `go/scan`이 파이썬의 Probe 설계와 전체 유전체 스캔을 결과까지 똑같이 재현합니다(모든 세트에서 확인). `scan_engine: python | go`로 전환하고 **엔진 검증** 페이지에서 두 엔진을 비교합니다. Go는 필수가 아닙니다.
+
 ## 개략도
 
 ![개략도](docs/schematic/pipeline_schematic.svg)
@@ -68,7 +76,7 @@ Nipah 에디션은 비분절 유전체를 다루며, 클레이드는 공식 next
 
 ### 현재 버전
 
-코드: **v0.35.0 (Nipah 에디션)**   ·   Ubuntu 24.04, x86_64에서 테스트
+코드: **v0.36.0 (Nipah 에디션)**   ·   Ubuntu 24.04, x86_64에서 테스트
 
 ### 필요한 것
 
@@ -78,6 +86,8 @@ Nipah 에디션은 비분절 유전체를 다루며, 클레이드는 공식 next
 | **mfeprimer 4.2.4** | **저장소에 없고 conda로도 설치되지 않습니다. 직접 설치하세요(아래 3–4단계)** |
 | 인터넷 | 유전체 내려받기, 선택 항목인 계통수 뷰어 |
 | Chrome (선택) | PDF 보고서 내보내기만 |
+| blastn (선택) | 표준물질의 참조유전체 위치를 정합니다(프라이머 매핑지도, 표준물질 대표성). 없으면 mafft 위치를 씁니다 |
+| Go ≥ 1.21 (선택) | Go 엔진(`go/probedesign`, `go/scan`)을 빌드합니다. 파이프라인 실행에는 필요 없습니다 |
 | Nextstrain CLI (선택) | 클레이드별 커버리지가 필요할 때만: `./setup.sh --nextstrain` 후 `scripts/run_nextstrain_nipah.sh` |
 
 **1)  코드 받기**
@@ -229,7 +239,7 @@ python3 webapp/server.py --host 0.0.0.0 --port 8767
   author  = {Choi, Chihwan},
   title   = {TaqMan Primer/Probe Validator (Nipah edition)},
   year    = {2026},
-  version = {0.35.0},
+  version = {0.36.0},
   url     = {https://github.com/CHOICHI-HWAN/TaqmanPrimerProbeValidator/tree/nipah}
 }
 ```
