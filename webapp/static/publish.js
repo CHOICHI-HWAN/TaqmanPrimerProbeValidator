@@ -75,7 +75,7 @@ export async function collect(project, get, progress = () => {}) {
     for (const g of data.groups || []) { progress(`그룹 ${g.group_id}${sfx}`); const d = await json(`groups/${encodeURIComponent(g.group_id)}`, scope); if (d) await addJson(`groups/${g.group_id}${sfx}`, d); }
   }
   for (const seg of Object.keys((data.profile || {}).segments || {})) {                  // reference-genome map (not host dependent)
-    progress(`유전체 지도 ${seg}`);
+    progress(`프라이머 매핑지도 ${seg}`);
     const gm = await json(`genome-map/${seg}`, null);
     if (gm) await addJson(`genome-map/${seg}`, gm);
   }
