@@ -555,7 +555,7 @@ def run_redesign_job(job_id, seg, scope, ids, opts):
         base = _rd_dir(seg, scope, engine)
         base.mkdir(parents=True, exist_ok=True)
         run = {"engine": engine, "segment": seg.upper(), "host_scope": scope, "generated": time.strftime("%Y-%m-%d %H:%M:%S"),
-               "population_n": len(ids), "params": {k: opts[k] for k in ("threshold", "min_threshold", "ambig", "probe_ambig", "top", "min_n", "ph_sample", "ph_min_cov", "ph_min_tm") if k in opts},
+               "population_n": len(ids), "params": {k: opts[k] for k in ("threshold", "min_threshold", "ambig", "probe_ambig", "pair_ambig", "top", "min_n", "ph_sample", "ph_min_cov", "ph_min_tm") if k in opts},
                "lineages": [], "done": False}
         (base / "run.json").write_text(json.dumps(run), encoding="utf-8")
         for gi, (L, members) in enumerate(groups, 1):
@@ -573,6 +573,7 @@ def run_redesign_job(job_id, seg, scope, ids, opts):
                         {k: seqs[k] for k in members if k in seqs}, base / L, opts["threshold"], opts["min_threshold"],
                         ambig=opts["ambig"], probe_ambig=opts["probe_ambig"], top=opts["top"],
                         threads=4, progress=lambda m, tag=tag: progress(tag + m))
+                res = filter_pair_ambig(res, opts.get("pair_ambig", 0))
                 entry.update(status=res["status"], threshold=res.get("threshold"), message=res["message"],
                              sample_n=res.get("sample_n"))
                 for di, d in enumerate(res["designs"], 1):
@@ -1724,6 +1725,24 @@ def load_genome_meta(seg, acc):
                                                                                       for sg in link["segments"] if x["acc"][sg]}}
                 break
     return out
+
+
+def n_ambiguous(seq):
+    """Number of IUPAC (non-ACGT) characters of an oligo."""
+    return sum(1 for c in str(seq or "").upper() if c not in "ACGT")
+
+
+def filter_pair_ambig(res, limit):
+    """Redesign result without the F/R pairs whose ambiguous characters add up (F + R) to more than `limit` (0 = no limit). varVAMP only limits
+    each primer on its own (-a), so the pair total is applied afterwards; the dropped count is added to the message."""
+    if not limit:
+        return res
+    kept = [d for d in res.get("designs") or [] if n_ambiguous(d.get("F")) + n_ambiguous(d.get("R")) <= limit]
+    dropped = len(res.get("designs") or []) - len(kept)
+    if not dropped:
+        return res
+    note = f"F+R 모호 염기 합이 {limit}개를 넘는 설계 {dropped}개를 제외했습니다."
+    return {**res, "designs": kept, "message": f"{res.get('message') or ''} {note}".strip()}
 
 
 def strain_link_data():
@@ -3752,7 +3771,7 @@ class Handler(BaseHTTPRequestHandler):
                 return default
         thr = num("threshold", 0.9, 0.3, 1.0)
         opts = {"threshold": thr, "min_threshold": min(thr, num("min_threshold", 0.6, 0.3, 1.0)),
-                "ambig": num("ambig", 2, 0, 8, int), "probe_ambig": num("probe_ambig", 1, 0, 6, int),
+                "ambig": num("ambig", 2, 0, 8, int), "probe_ambig": num("probe_ambig", 1, 0, 6, int), "pair_ambig": num("pair_ambig", 0, 0, 16, int),
                 "top": num("top", 3, 1, 8, int), "min_n": num("min_n", 5, 3, 1000, int),
                 "include_all": bool(o.get("include_all")), "engine": "primerhunter" if o.get("engine") == "primerhunter" else "varvamp",
                 "ph_sample": num("ph_sample", 25, 5, 100, int), "ph_threads": num("ph_threads", 12, 1, 32, int),

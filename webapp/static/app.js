@@ -7459,8 +7459,10 @@ async function showRedesignPage() {
         <label class="note" ${RD.engine === "primerhunter" ? "" : 'hidden'} title="프라이머-표본 결합의 최소 Tm(℃). 높일수록 mismatch가 적은(우리 검증 기준에 가까운) 프라이머만 남지만 후보가 줄어듭니다">최소 Tm <input id="rdMinTm" type="number" min="40" max="70" value="${RD.minTm ?? 56}" style="width:56px;"></label>
         <label class="note" ${RD.engine === "primerhunter" ? "" : 'hidden'} title="한 프라이머가 이 비율 이상의 표본에 결합해야 합니다. 100 미만이면 여러 쌍으로 전체를 덮는 세트 커버를 씁니다">최소 커버리지 % <input id="rdMinCov" type="number" min="10" max="100" value="${RD.minCov ?? 80}" style="width:56px;"></label>
         <label class="note" title="consensus 임계값: 높을수록 특이적이지만 설계가 안 나올 수 있습니다">임계값 <input id="rdThr" type="number" step="0.05" min="0.3" max="1" value="${RD.thr ?? 0.9}" style="width:62px;"> → 최저 <input id="rdMinThr" type="number" step="0.05" min="0.3" max="1" value="${RD.minThr ?? 0.6}" style="width:62px;"></label>
-        <label class="note" title="F/R 프라이머 하나에 넣을 수 있는 모호 염기(IUPAC) 최대 수">F/R IUPAC <input id="rdAmbig" type="number" min="0" max="8" value="${RD.ambig ?? 2}" style="width:48px;"></label>
-        <label class="note" title="Probe의 모호 염기 최대 수 (프라이머보다 엄격하게 1 적게가 권장)">Probe IUPAC <input id="rdPAmbig" type="number" min="0" max="6" value="${RD.pAmbig ?? 1}" style="width:48px;"></label>
+        <label class="note${RD.engine === "primerhunter" ? " rd-off" : ""}" title="${RD.engine === "primerhunter" ? "varVAMP 전용: PrimerHunter에는 적용되지 않습니다. " : ""}F와 R 각각에 넣을 수 있는 모호 염기(IUPAC) 최대 수 (F+R 합계가 아님)">F/R IUPAC (각각) <input id="rdAmbig" type="number" min="0" max="8" value="${RD.ambig ?? 2}" style="width:48px;" ${RD.engine === "primerhunter" ? "disabled" : ""}></label>
+        <label class="note${RD.engine === "primerhunter" ? " rd-off" : ""}" title="${RD.engine === "primerhunter" ? "varVAMP 전용: PrimerHunter에는 적용되지 않습니다. " : ""}Probe 하나의 모호 염기 최대 수 (프라이머보다 엄격하게 1 적게가 권장)">Probe IUPAC <input id="rdPAmbig" type="number" min="0" max="6" value="${RD.pAmbig ?? 1}" style="width:48px;" ${RD.engine === "primerhunter" ? "disabled" : ""}></label>
+        <label class="note" title="한 쌍(F+R)의 모호 염기 합이 이 값을 넘는 설계는 검증 전에 제외합니다. 0 = 제한 없음. varVAMP는 F·R 각각만 제한하므로 합계는 설계 뒤에 걸러냅니다">F+R 합계 최대 <input id="rdPairAmbig" type="number" min="0" max="16" value="${RD.pairAmbig ?? 0}" style="width:48px;"></label>
+        ${RD.engine === "primerhunter" ? '<span class="note rd-off">F/R·Probe IUPAC 칸은 varVAMP 전용입니다(PrimerHunter에는 적용되지 않음).</span>' : ""}
         <label class="note" title="리니지마다 검증할 설계 수">설계 수 <input id="rdTop" type="number" min="1" max="8" value="${RD.top ?? 3}" style="width:48px;"></label>
         <label class="note" title="게놈이 이보다 적은 리니지는 건너뜁니다">최소 게놈 수 <input id="rdMinN" type="number" min="3" max="1000" value="${RD.minN ?? 5}" style="width:56px;"></label>
         <button id="rdRunBtn" class="btn btn-primary">&#9654; 재설계 실행</button>
@@ -7499,14 +7501,14 @@ async function showRedesignPage() {
   };
   runBtn.addEventListener("click", async () => {
     const num = (id) => Number(view.querySelector(id).value);
-    Object.assign(RD, { thr: num("#rdThr"), minThr: num("#rdMinThr"), ambig: num("#rdAmbig"), pAmbig: num("#rdPAmbig"), top: num("#rdTop"), minN: num("#rdMinN"), all: view.querySelector("#rdAll").checked, sample: num("#rdSample"), minCov: num("#rdMinCov"), minTm: num("#rdMinTm") });
+    Object.assign(RD, { thr: num("#rdThr"), minThr: num("#rdMinThr"), ambig: num("#rdAmbig"), pAmbig: num("#rdPAmbig"), pairAmbig: num("#rdPairAmbig"), top: num("#rdTop"), minN: num("#rdMinN"), all: view.querySelector("#rdAll").checked, sample: num("#rdSample"), minCov: num("#rdMinCov"), minTm: num("#rdMinTm") });
     RD.checked = Object.fromEntries([...view.querySelectorAll(".rd-lin")].map((x) => [x.value, x.checked]));
     const lineages = [...view.querySelectorAll(".rd-lin:checked")].map((x) => x.value);
     if (!lineages.length && !RD.all) { uiAlert("리니지를 하나 이상 고르세요."); return; }
     if (!(await uiConfirm(`${lineages.length}개 리니지${RD.all ? " + 전체" : ""}를 설계하고 설계마다 실제 검증을 돌립니다. ${RD.engine === "primerhunter" ? "PrimerHunter는 리니지당 수 분에서 수십 분이 걸리고 CPU를 여러 개 씁니다." : "리니지당 1분 안팎이 걸립니다."} 그동안 서버가 계산에 쓰입니다. 계속할까요?`, { title: "리니지별 재설계", okLabel: "시작" }))) return;
     try {
       const { job_id, error } = await fetchJSON("/api/redesign", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ segment: RD.seg.toLowerCase(), host: state.hostScope, lineages, include_all: RD.all, threshold: RD.thr, min_threshold: RD.minThr, ambig: RD.ambig, probe_ambig: RD.pAmbig, top: RD.top, min_n: RD.minN, engine: RD.engine, ph_sample: RD.sample, ph_min_cov: RD.minCov, ph_min_tm: RD.minTm }) });
+        body: JSON.stringify({ segment: RD.seg.toLowerCase(), host: state.hostScope, lineages, include_all: RD.all, threshold: RD.thr, min_threshold: RD.minThr, ambig: RD.ambig, probe_ambig: RD.pAmbig, pair_ambig: RD.pairAmbig, top: RD.top, min_n: RD.minN, engine: RD.engine, ph_sample: RD.sample, ph_min_cov: RD.minCov, ph_min_tm: RD.minTm }) });
       if (error) throw new Error(error);
       poll(job_id);
     } catch (err) { uiAlert("재설계를 시작하지 못했습니다: " + err.message); }
