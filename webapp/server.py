@@ -1795,6 +1795,22 @@ def load_genome_map(seg):
     return genome_map.build(ROOT, seg, (prof["segments"].get(seg) or {}).get("reference_accession", ""), sets, groups, active)
 
 
+def load_mismatch_curves(seg, kmax=4):
+    """Coverage of every primer set of a segment as the tolerated number of mismatches grows (see scope_view.View.mismatch_curve), in the active host scope."""
+    v = scope_ctx()
+    series, total = [], 0
+    for st in load_builtin_sets():
+        if str(st.get("segment", "")).lower() != seg:
+            continue
+        try:
+            c = v.mismatch_curve(st["set_id"], seg, kmax)
+        except (OSError, KeyError):
+            continue
+        total = c["total"]
+        series.append({"set_id": st["set_id"], "name": st.get("display_name") or st["set_id"], "fixed": c["fixed"], "same": c["same"]})
+    return {"segment": seg.upper(), "x": list(range(kmax + 1)), "total": total, "primer_pass": v.mm, "probe_pass": v.pm, "host_scope": v.info(seg), "series": series}
+
+
 def strain_link_data():
     """The draft strain link (see strain_link.py) for the analysed populations in the active host scope, or None for a one-segment virus."""
     segs = seg_keys()
@@ -2812,6 +2828,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send_json({"error": "bad segment"}, 400)
             data = load_genome_meta(seg, m.group(2))
             return self._send_json(data if data is not None else {"error": "메타데이터에 없는 유전체입니다."}, 200 if data is not None else 404)
+        m = re.match(r"^/api/mismatch-curve/(\w+)$", path)
+        if m:
+            seg = m.group(1).lower()
+            if seg not in seg_keys():
+                return self._send_json({"error": "bad segment"}, 400)
+            return self._send_json(load_mismatch_curves(seg))
         m = re.match(r"^/api/genome-map/(\w+)$", path)
         if m:
             seg = m.group(1).lower()

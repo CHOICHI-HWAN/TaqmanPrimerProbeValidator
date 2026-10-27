@@ -125,6 +125,25 @@ class View:
         behind the set card's number (set_summary), so a figure built from these ids can never disagree with the card."""
         return set(self._set_numbers(set_id, seg, scope)["_validated_ids"])
 
+    def mismatch_curve(self, set_id, seg, kmax=4, scope=None):
+        """How many genomes of the scope a set validates when `k` mismatches are tolerated, k = 0..kmax, in two readings: `fixed` = F and R may differ
+        in k positions (3' ends intact) while the probe keeps the pipeline's own setting, `same` = F, R and the probe all may differ in k positions.
+        -> {"total", "fixed": [...], "same": [...]} (counts)"""
+        path = self.root / "output" / "primers" / set_id / "alignment" / "mismatch_table.tsv"
+        scope = scope or self.scope(seg)
+        key = ("curve", str(path), _stamp(path), seg.lower(), scope, kmax, self.pm, repr(self.columns),
+               _stamp(self.root / "data" / "filtered" / f"{seg.lower()}_filtered_metadata.tsv"), _stamp(self.root / "data" / "raw" / f"{seg.lower()}_metadata.tsv"))
+        hit = _SUMMARIES.get(key)
+        if hit is None:
+            rows = _cached(path, None, lambda p: {r["genome_id"]: r for r in _read_tsv(p)})
+            ids = sorted(self.ids(seg, scope))
+            ok = lambda a, b: H.summarize(ids, rows, a, b, probe_inside_amplicon)["validated"]  # noqa: E731
+            hit = {"total": len(ids), "fixed": [ok(k, self.pm) for k in range(kmax + 1)], "same": [ok(k, k) for k in range(kmax + 1)]}
+            if len(_SUMMARIES) > 600:
+                _SUMMARIES.clear()
+            _SUMMARIES[key] = hit
+        return hit
+
     def lineage_of(self, seg):
         return _cached(self.root / "data" / "filtered" / f"{seg.lower()}_filtered_metadata.tsv", "lineage",
                        lambda p: {r["accession"]: (r.get("lineage") or "NA") for r in _read_tsv(p)})

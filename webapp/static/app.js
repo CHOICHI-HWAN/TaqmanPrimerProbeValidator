@@ -9948,9 +9948,43 @@ function gmWireDrag(view, d, sel) {
       gmOrderSave(GM.seg, ids);
       card.innerHTML = gmSvg(d, sel, GM.range);
       gmWireDrag(view, d, sel);
+      gmCurveRender(view, d, sel);
     };
     g.addEventListener("pointermove", move); g.addEventListener("pointerup", up); g.addEventListener("pointercancel", up);
   }));
+}
+
+// Coverage curve of every chosen set under the map: how many genomes pass as the tolerated number of mismatches grows (a ROC-style curve; the
+// dashed line marks the pipeline's current rule). Same order and colours as the rows of the map.
+const GM_CURVE_COL = ["#4e79a7", "#f28e2b", "#59a14f", "#e15759", "#76b7b2", "#b07aa1", "#edc948", "#9c755f", "#ff9da7", "#86bcb6", "#8cd17d", "#d37295"];
+async function gmCurveRender(view, d, sel) {
+  const box = view.querySelector("#gmCurve");
+  if (!box) return;
+  const key = GM.seg + "|" + (state.hostScope || "");
+  try { if (!GM.curve || GM.curveKey !== key) { GM.curve = await fetchJSON(`/api/mismatch-curve/${GM.seg.toLowerCase()}`); GM.curveKey = key; } }
+  catch (e) { box.innerHTML = `<p class="note">커버리지 곡선을 불러오지 못했습니다: ${escHtml(e.message)}</p>`; return; }
+  const c = GM.curve, mode = GM.curveMode || "fixed", byId = new Map(c.series.map((s) => [s.set_id, s]));
+  const shown = gmShownSets(d, sel).map((s) => byId.get(s.set_id)).filter(Boolean);
+  const head = `<div class="table-toolbar" style="gap:10px;flex-wrap:wrap;margin-bottom:4px;"><b>커버리지 곡선</b>
+    <span class="note">허용하는 mismatch가 늘 때 통과하는 유전체의 비율 (${c.total}개 기준)</span>
+    <label class="note" style="margin-left:auto;">곡선 기준 <select id="gmCurveMode"><option value="fixed" ${mode === "fixed" ? "selected" : ""}>F·R만 k까지 (프로브는 파이프라인 기준 ${c.probe_pass})</option><option value="same" ${mode === "same" ? "selected" : ""}>F·R·프로브 모두 k까지</option></select></label></div>`;
+  if (!shown.length) { box.innerHTML = head + `<p class="note">세트를 고르면 곡선이 나옵니다.</p>`; box.querySelector("#gmCurveMode").addEventListener("change", (e) => { GM.curveMode = e.target.value; gmCurveRender(view, d, sel); }); return; }
+  const W = 860, H = 290, L = 50, R = 22, T = 16, B = 46, ks = c.x, kmax = ks[ks.length - 1];
+  const X = (k) => L + (k / kmax) * (W - L - R), Y = (p) => T + (1 - p / 100) * (H - T - B);
+  const grid = [0, 20, 40, 60, 80, 100].map((p) => `<line x1="${L}" x2="${W - R}" y1="${Y(p)}" y2="${Y(p)}" stroke="currentColor" opacity="${p % 100 ? ".08" : ".3"}"/><text x="${L - 7}" y="${Y(p) + 4}" text-anchor="end" font-size="10" fill="currentColor" opacity=".75">${p}%</text>`).join("");
+  const xl = ks.map((k) => `<line x1="${X(k)}" x2="${X(k)}" y1="${H - B}" y2="${H - B + 5}" stroke="currentColor" opacity=".4"/><text x="${X(k)}" y="${H - B + 17}" text-anchor="middle" font-size="11" fill="currentColor">${k}</text>`).join("");
+  const rule = c.primer_pass <= kmax ? `<line x1="${X(c.primer_pass)}" x2="${X(c.primer_pass)}" y1="${T}" y2="${H - B}" stroke="#e5484d" stroke-dasharray="5 4" opacity=".7"/><text x="${X(c.primer_pass) + 5}" y="${T + 11}" font-size="10" fill="#e5484d">현재 기준 (프라이머 ${c.primer_pass})</text>` : "";
+  const lines = shown.map((s, i) => {
+    const col = GM_CURVE_COL[i % GM_CURVE_COL.length], vals = s[mode], pts = ks.map((k) => [X(k), Y(100 * vals[k] / (c.total || 1))]);
+    const dots = ks.map((k, j) => `<circle cx="${pts[j][0].toFixed(1)}" cy="${pts[j][1].toFixed(1)}" r="3.6" fill="${col}" stroke="var(--bg, #fff)" stroke-width="1.2"><title>${escHtml(s.name)} · k=${k}: ${vals[k]} / ${c.total} (${(100 * vals[k] / (c.total || 1)).toFixed(1)}%)</title></circle>`).join("");
+    return `<path d="${vnSmoothPath(pts)}" fill="none" stroke="${col}" stroke-width="2.2" stroke-linecap="round"/>${dots}`;
+  }).join("");
+  const legend = shown.map((s, i) => { const v = s[mode][Math.min(c.primer_pass, kmax)]; return `<span class="vn-chip" title="${escHtml(s.name)}"><i style="background:${GM_CURVE_COL[i % GM_CURVE_COL.length]}"></i>${escHtml(s.name.length > 30 ? s.name.slice(0, 29) + "…" : s.name)} <span class="note">${(100 * v / (c.total || 1)).toFixed(1)}%</span></span>`; }).join("");
+  box.innerHTML = `${head}<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block;color:var(--fg);">${grid}${rule}${lines}${xl}
+      <text x="${(L + W - R) / 2}" y="${H - 6}" text-anchor="middle" font-size="11" fill="currentColor">허용하는 mismatch 수 k (${mode === "fixed" ? "F·R 각각, 3′ 끝은 일치" : "F·R·프로브 각각"})</text>
+      <text transform="translate(13,${(T + H - B) / 2}) rotate(-90)" text-anchor="middle" font-size="11" fill="currentColor">통과 유전체 (%)</text></svg>
+    <div class="vn-legend">${legend}<span class="note">범례 숫자 = 현재 기준에서의 커버리지</span></div>`;
+  box.querySelector("#gmCurveMode").addEventListener("change", (e) => { GM.curveMode = e.target.value; gmCurveRender(view, d, sel); });
 }
 
 async function showGenomeMapPage() {
@@ -9994,7 +10028,7 @@ async function showGenomeMapPage() {
         <div id="gmCard">${gmSvg(d, sel, GM.range)}</div>
         <div class="vn-legend" style="margin-top:6px;"><span class="vn-chip"><i style="background:${GM_COL.F.fill};border:1px solid ${GM_COL.F.stroke}"></i>Forward</span><span class="vn-chip"><i style="background:${GM_COL.P.fill};border:1px solid ${GM_COL.P.stroke}"></i>Probe</span><span class="vn-chip"><i style="background:${GM_COL.R.fill};border:1px solid ${GM_COL.R.stroke}"></i>Reverse</span>
           <span class="vn-chip"><i style="background:${GM_STD.fill};border:1px solid ${GM_STD.stroke}"></i>표준물질 ${nMapped}/${nStd}개 위치 결정(blastn)${nStd - nMapped ? ` (못 찾은 ${nStd - nMapped}개는 그리지 않음)` : ""}${d.standards.some((s) => s.pipeline_differs) ? ` · ⚠ ${d.standards.filter((s) => s.pipeline_differs).map((s) => s.name).join(", ")}: 파이프라인(mafft) 위치와 다름` : ""}</span><span class="vn-chip"><i style="background:${GM_GENE.fill};border:1px solid ${GM_GENE.stroke}"></i>유전자(화살표 = 가닥)</span><span class="vn-chip"><i style="background:${GM_AMP.fill};border:1px solid ${GM_AMP.stroke}"></i>증폭산물</span>
-          <span class="note">세트 이름(⠿)을 드래그하면 위아래 순서를 바꿉니다 · ↺ = 표준물질이 반대 가닥 · 점선 ? = 정렬이 불확실 · ⚠ = F/P/R 중 참조유전체에서 결합을 못 찾은 것이 있음</span></div></div></div>`;
+          <span class="note">세트 이름(⠿)을 드래그하면 위아래 순서를 바꿉니다 · ↺ = 표준물질이 반대 가닥 · 점선 ? = 정렬이 불확실 · ⚠ = F/P/R 중 참조유전체에서 결합을 못 찾은 것이 있음</span></div><div id="gmCurve" style="margin-top:16px;"></div></div></div>`;
   const redraw = () => { gmSave(GM.seg, sel); showGenomeMapPage(); };
   view.querySelectorAll("[data-gmseg]").forEach((b) => b.addEventListener("click", () => { GM.seg = b.dataset.gmseg; GM.filter = ""; showGenomeMapPage(); }));
   view.querySelectorAll(".gm-it").forEach((c) => c.addEventListener("change", () => { if (c.checked) sel.add(c.value); else sel.delete(c.value); redraw(); }));
@@ -10013,6 +10047,7 @@ async function showGenomeMapPage() {
   });
   view.querySelectorAll(".gm-gene").forEach((b) => b.addEventListener("click", () => { const lo = Number(b.dataset.a), hi = Number(b.dataset.b), pad = (hi - lo) * 0.03; setRange(lo - pad, hi + pad); }));
   gmWireDrag(view, d, sel);
+  gmCurveRender(view, d, sel);
   view.querySelector("#gmPng").addEventListener("click", async () => { try { downloadBlob(await domToPngBlob(view.querySelector("#gmCard")), `genome_map_${GM.seg}.png`); } catch (err) { uiAlert(err.message); } });
 }
 $("#genomeMapBtn").addEventListener("click", showGenomeMapPage);
