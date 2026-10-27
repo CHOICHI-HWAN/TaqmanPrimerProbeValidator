@@ -34,3 +34,15 @@ def test_genome_meta_has_when_where_lineage_host():
     assert d and d["accession"] == acc and d["analysed"]
     assert {"date", "country", "host"} <= set(d["raw"]) and d["host_class"] in ("human", "animal", "unknown", "lab")
     assert server.load_genome_meta(seg, "NO_SUCH_ACCESSION") is None
+
+
+def test_redesign_pair_ambiguity_filter():
+    designs = [{"name": "a", "F": "ACGTRY", "R": "ACGTAC"},       # 2 + 0
+               {"name": "b", "F": "ACGTRY", "R": "ACGNAC"},       # 2 + 1
+               {"name": "c", "F": "ACGTAC", "R": "ACGTAC"}]       # 0
+    res = {"status": "ok", "message": "m", "designs": designs}
+    assert server.filter_pair_ambig(res, 0) is res                 # 0 = no limit
+    out = server.filter_pair_ambig(res, 2)
+    assert [d["name"] for d in out["designs"]] == ["a", "c"] and "1개" in out["message"]
+    assert server.filter_pair_ambig(res, 5) is res                 # nothing dropped: untouched
+    assert server.n_ambiguous("acgtn-R") == 3

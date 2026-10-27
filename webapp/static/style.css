@@ -1213,3 +1213,5 @@ a.pipe-pill:hover { border-color: var(--accent); color: var(--accent); }
 .gm-line:hover { text-decoration: underline dotted; }
 .gm-caret { display: inline-block; transition: transform .15s; }
 .gm-line.open .gm-caret { transform: rotate(180deg); }
+
+.rd-off { opacity: .55; }

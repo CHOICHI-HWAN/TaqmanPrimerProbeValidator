@@ -5,6 +5,14 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-10-26
+
+### Added
+- **재설계: "F+R 합계 최대" 옵션**: varVAMP의 `-a`는 F와 R **각각**의 모호 염기(IUPAC) 상한이라 한 쌍의 합계는 제한하지 못합니다. 합계 상한(0 = 제한 없음)을 두고, 설계 뒤 검증 전에 합이 상한을 넘는 쌍을 걸러 냅니다(제외 건수는 결과 메시지에 표시).
+
+### Changed
+- 재설계 화면에서 PrimerHunter를 고르면 `F/R IUPAC`·`Probe IUPAC` 칸을 비활성으로 표시하고 "varVAMP 전용(PrimerHunter에는 적용되지 않음)"이라고 안내합니다. 칸 이름도 "F/R IUPAC (각각)"으로 의미를 분명히 했습니다.
+
 ## [0.29.1] - 2026-10-26
 
 ### Changed
