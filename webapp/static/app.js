@@ -7463,6 +7463,7 @@ async function showRedesignPage() {
         <label class="note${RD.engine === "primerhunter" ? " rd-off" : ""}" title="${RD.engine === "primerhunter" ? "varVAMP 전용: PrimerHunter에는 적용되지 않습니다. " : ""}Probe 하나의 모호 염기 최대 수 (프라이머보다 엄격하게 1 적게가 권장)">Probe IUPAC <input id="rdPAmbig" type="number" min="0" max="6" value="${RD.pAmbig ?? 1}" style="width:48px;" ${RD.engine === "primerhunter" ? "disabled" : ""}></label>
         <label class="note" title="한 쌍(F+R)의 모호 염기 합이 이 값을 넘는 설계는 검증 전에 제외합니다. 0 = 제한 없음. varVAMP는 F·R 각각만 제한하므로 합계는 설계 뒤에 걸러냅니다">F+R 합계 최대 <input id="rdPairAmbig" type="number" min="0" max="16" value="${RD.pairAmbig ?? 0}" style="width:48px;"></label>
         ${RD.engine === "primerhunter" ? '<span class="note rd-off">F/R·Probe IUPAC 칸은 varVAMP 전용입니다(PrimerHunter에는 적용되지 않음).</span>' : ""}
+        <label class="note" ${RD.engine === "coverage" ? "" : "hidden"} title="커버리지 우선 전용: 등록된 표준물질(KDCA) 중 하나 이상이 같은 통과 규칙을 만족하는 조합만 고릅니다. 표준물질이 한 영역만 담고 있으면 설계 위치가 그 안으로 제한됩니다"><input id="rdStd" type="checkbox" ${RD.requireStd ? "checked" : ""}> 표준물질 일치 요구</label>
         <label class="note" title="리니지마다 검증할 설계 수">설계 수 <input id="rdTop" type="number" min="1" max="8" value="${RD.top ?? 3}" style="width:48px;"></label>
         <label class="note" title="게놈이 이보다 적은 리니지는 건너뜁니다">최소 게놈 수 <input id="rdMinN" type="number" min="3" max="1000" value="${RD.minN ?? 5}" style="width:56px;"></label>
         <button id="rdRunBtn" class="btn btn-primary">&#9654; 재설계 실행</button>
@@ -7501,14 +7502,14 @@ async function showRedesignPage() {
   };
   runBtn.addEventListener("click", async () => {
     const num = (id) => Number(view.querySelector(id).value);
-    Object.assign(RD, { thr: num("#rdThr"), minThr: num("#rdMinThr"), ambig: num("#rdAmbig"), pAmbig: num("#rdPAmbig"), pairAmbig: num("#rdPairAmbig"), top: num("#rdTop"), minN: num("#rdMinN"), all: view.querySelector("#rdAll").checked, sample: num("#rdSample"), minCov: num("#rdMinCov"), minTm: num("#rdMinTm") });
+    Object.assign(RD, { thr: num("#rdThr"), minThr: num("#rdMinThr"), ambig: num("#rdAmbig"), pAmbig: num("#rdPAmbig"), pairAmbig: num("#rdPairAmbig"), top: num("#rdTop"), minN: num("#rdMinN"), requireStd: !!view.querySelector("#rdStd")?.checked, all: view.querySelector("#rdAll").checked, sample: num("#rdSample"), minCov: num("#rdMinCov"), minTm: num("#rdMinTm") });
     RD.checked = Object.fromEntries([...view.querySelectorAll(".rd-lin")].map((x) => [x.value, x.checked]));
     const lineages = [...view.querySelectorAll(".rd-lin:checked")].map((x) => x.value);
     if (!lineages.length && !RD.all) { uiAlert("리니지를 하나 이상 고르세요."); return; }
     if (!(await uiConfirm(`${lineages.length}개 리니지${RD.all ? " + 전체" : ""}를 설계하고 설계마다 실제 검증을 돌립니다. ${RD.engine === "primerhunter" ? "PrimerHunter는 리니지당 수 분에서 수십 분이 걸리고 CPU를 여러 개 씁니다." : RD.engine === "coverage" ? "리니지당 수십 초(정렬 + 설계)와 설계마다 검증 시간이 걸립니다." : "리니지당 1분 안팎이 걸립니다."} 그동안 서버가 계산에 쓰입니다. 계속할까요?`, { title: "리니지별 재설계", okLabel: "시작" }))) return;
     try {
       const { job_id, error } = await fetchJSON("/api/redesign", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ segment: RD.seg.toLowerCase(), host: state.hostScope, lineages, include_all: RD.all, threshold: RD.thr, min_threshold: RD.minThr, ambig: RD.ambig, probe_ambig: RD.pAmbig, pair_ambig: RD.pairAmbig, top: RD.top, min_n: RD.minN, engine: RD.engine, ph_sample: RD.sample, ph_min_cov: RD.minCov, ph_min_tm: RD.minTm }) });
+        body: JSON.stringify({ segment: RD.seg.toLowerCase(), host: state.hostScope, lineages, include_all: RD.all, threshold: RD.thr, min_threshold: RD.minThr, ambig: RD.ambig, require_std: RD.engine === "coverage" && RD.requireStd, probe_ambig: RD.pAmbig, pair_ambig: RD.pairAmbig, top: RD.top, min_n: RD.minN, engine: RD.engine, ph_sample: RD.sample, ph_min_cov: RD.minCov, ph_min_tm: RD.minTm }) });
       if (error) throw new Error(error);
       poll(job_id);
     } catch (err) { uiAlert("재설계를 시작하지 못했습니다: " + err.message); }

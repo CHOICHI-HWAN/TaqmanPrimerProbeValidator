@@ -538,6 +538,13 @@ def _set_cover(ids_by_design, targets):
     return {"steps": steps, "covered": len(covered), "total": total, "pct": round(100.0 * len(covered) / total, 1) if total else 0.0}
 
 
+def _standard_seqs(seg):
+    """The reference standard material of a segment ({id: sequence}), or {} when none is registered."""
+    from mfe_common import read_fasta_seqs  # noqa: PLC0415
+    f = ROOT / "config" / f"kdca_standard_{seg}.fasta"
+    return read_fasta_seqs(f) if f.exists() else {}
+
+
 def params_pass_mm():
     return int(load_params()["primer_mismatch_pass"])
 
@@ -573,7 +580,7 @@ def run_redesign_job(job_id, seg, scope, ids, opts):
         base = _rd_dir(seg, scope, engine)
         base.mkdir(parents=True, exist_ok=True)
         run = {"engine": engine, "segment": seg.upper(), "host_scope": scope, "generated": time.strftime("%Y-%m-%d %H:%M:%S"),
-               "population_n": len(ids), "params": {k: opts[k] for k in ("threshold", "min_threshold", "ambig", "probe_ambig", "pair_ambig", "top", "min_n", "pass_mm", "tp_n", "ph_sample", "ph_min_cov", "ph_min_tm") if k in opts},
+               "population_n": len(ids), "params": {k: opts[k] for k in ("threshold", "min_threshold", "ambig", "probe_ambig", "pair_ambig", "top", "min_n", "pass_mm", "tp_n", "require_std", "ph_sample", "ph_min_cov", "ph_min_tm") if k in opts},
                "lineages": [], "done": False}
         (base / "run.json").write_text(json.dumps(run), encoding="utf-8")
         for gi, (L, members) in enumerate(groups, 1):
@@ -589,7 +596,8 @@ def run_redesign_job(job_id, seg, scope, ids, opts):
                 elif engine == "coverage":
                     res = redesign_coverage.design_lineage(
                         {k: seqs[k] for k in members if k in seqs}, base / L, ambig=opts["ambig"], probe_ambig=opts["probe_ambig"], top=opts["top"],
-                        pass_mm=opts.get("pass_mm", 2), tp_n=opts.get("tp_n", 2), threads=4, progress=lambda m, tag=tag: progress(tag + m))
+                        pass_mm=opts.get("pass_mm", 2), tp_n=opts.get("tp_n", 2), threads=4, progress=lambda m, tag=tag: progress(tag + m),
+                        standards=_standard_seqs(seg) if opts.get("require_std") else None, require_std=bool(opts.get("require_std")))
                 else:
                     res = redesign_varvamp.design_lineage(
                         {k: seqs[k] for k in members if k in seqs}, base / L, opts["threshold"], opts["min_threshold"],
@@ -3795,7 +3803,7 @@ class Handler(BaseHTTPRequestHandler):
         opts = {"threshold": thr, "min_threshold": min(thr, num("min_threshold", 0.6, 0.3, 1.0)),
                 "ambig": num("ambig", 2, 0, 8, int), "probe_ambig": num("probe_ambig", 1, 0, 6, int), "pair_ambig": num("pair_ambig", 0, 0, 16, int),
                 "top": num("top", 3, 1, 8, int), "min_n": num("min_n", 5, 3, 1000, int),
-                "include_all": bool(o.get("include_all")), "engine": rd_engine(o.get("engine")), "pass_mm": params_pass_mm(), "tp_n": params_tp_n(),
+                "include_all": bool(o.get("include_all")), "engine": rd_engine(o.get("engine")), "require_std": bool(o.get("require_std")), "pass_mm": params_pass_mm(), "tp_n": params_tp_n(),
                 "ph_sample": num("ph_sample", 25, 5, 100, int), "ph_threads": num("ph_threads", 12, 1, 32, int),
                 "ph_min_cov": num("ph_min_cov", 80.0, 10.0, 100.0), "ph_min_tm": num("ph_min_tm", 56.0, 40.0, 70.0),
                 "lineages": [x for x in (o.get("lineages") or []) if isinstance(x, str) and re.fullmatch(r"[A-Za-z0-9_\-]+", x)]}

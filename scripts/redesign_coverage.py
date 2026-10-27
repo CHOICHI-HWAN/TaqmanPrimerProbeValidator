@@ -50,8 +50,9 @@ def _bits(ok):
 
 
 class Aligned:
-    def __init__(self, ids, rows):
+    def __init__(self, ids, rows, std_rows=None):
         self.ids, self.G, self.L = ids, len(rows), len(rows[0])
+        self.S = np.frombuffer("".join(std_rows).encode(), dtype=np.uint8).reshape(len(std_rows), self.L) if std_rows else None
         self.A = np.frombuffer("".join(rows).encode(), dtype=np.uint8).reshape(self.G, self.L)
         cons = []
         for c in range(self.L):
@@ -86,14 +87,15 @@ class Aligned:
         for j, ch in enumerate(oligo):
             for b in IUPAC.get(ch, "ACGT"):
                 tab[j, ord(b)] = True
-        bad = ~tab[np.arange(k)[None, :], sub]
-        nbad = bad.sum(axis=1)
-        if kind == "P":
-            ok = nbad == 0
-        else:
+        def passes(block):
+            bad = ~tab[np.arange(k)[None, :], block]
+            nbad = bad.sum(axis=1)
+            if kind == "P":
+                return nbad == 0
             end = slice(k - tp_n, k) if kind == "F" else slice(0, tp_n)
-            ok = (nbad <= pass_mm) & ~bad[:, end].any(axis=1)
-        return oligo, _bits(ok)
+            return (nbad <= pass_mm) & ~bad[:, end].any(axis=1)
+        sbits = _bits(passes(self.S[:, s:s + k])) if self.S is not None else 0
+        return oligo, _bits(passes(sub)), sbits
 
 
 def _stats(seq):
@@ -115,7 +117,7 @@ def candidates(al, kind, amb, pass_mm, tp_n, primer_tm, gc, say):
     pool.sort(key=lambda x: (-x[0], x[1]))
     out = []
     for ub, s, k in pool[:POOL_BOUND]:
-        oligo, bits = al.evaluate(s, k, kind, amb, pass_mm, tp_n)
+        oligo, bits, sbits = al.evaluate(s, k, kind, amb, pass_mm, tp_n)
         cnt = bits.bit_count()
         strands = [("+", oligo), ("-", reverse_complement(oligo))] if kind == "P" else [("+", oligo if kind == "F" else reverse_complement(oligo))]
         for strand, seq in strands:
@@ -129,13 +131,13 @@ def candidates(al, kind, amb, pass_mm, tp_n, primer_tm, gc, say):
             else:
                 if not (primer_tm[0] <= tm <= primer_tm[1]) or not (gc[0] <= gcp <= gc[1]) or any(pd.longest_run(x) >= 5 for x in res):
                     continue
-            out.append({"cnt": cnt, "s": s, "e": s + k, "seq": seq, "strand": strand, "tm": tm, "gc": gcp, "bits": bits, "amb": n_ambig(seq)})
+            out.append({"cnt": cnt, "s": s, "e": s + k, "seq": seq, "strand": strand, "tm": tm, "gc": gcp, "bits": bits, "sbits": sbits, "amb": n_ambig(seq)})
     out.sort(key=lambda x: (-x["cnt"], x["amb"], x["s"]))
     say(f"{kind} 후보 {len(out[:POOL_KEEP])}개 (최대 {out[0]['cnt'] if out else 0}개 유전체 통과)")
     return out[:POOL_KEEP]
 
 
-def best_triples(F, R, P, covered, amp, probe_above, max_dtm, want=12):
+def best_triples(F, R, P, covered, amp, probe_above, max_dtm, want=12, require_std=False):
     """Triples (F, R, P) ranked by the NEW genomes they pass (those not in `covered`), then by the genomes they pass in all. The lists are
     sorted by genomes passed (best first), so a branch whose best possible count cannot beat the current `want`-th best is cut off."""
     import heapq
@@ -163,6 +165,8 @@ def best_triples(F, R, P, covered, amp, probe_above, max_dtm, want=12):
                 new = (fp & r["bits"]).bit_count()
                 if new <= floor:
                     continue
+                if require_std and not (f["sbits"] & r["sbits"] & p["sbits"]):      # at least one standard material passes the whole set
+                    continue
                 tot = (f["bits"] & p["bits"] & r["bits"]).bit_count()
                 seq += 1
                 item = (new, tot, -(f["amb"] + r["amb"] + p["amb"]), -abs(f["tm"] - r["tm"]), -seq, f, r, p)
@@ -177,13 +181,14 @@ def best_triples(F, R, P, covered, amp, probe_above, max_dtm, want=12):
 
 
 def design_from_alignment(ids, rows, ambig=2, probe_ambig=2, top=3, pass_mm=2, tp_n=2, amp=(70, 200), primer_tm=(52.0, 66.0),
-                          gc=(30.0, 75.0), probe_above=(2.0, 14.0), max_dtm=5.0, progress=None):
+                          gc=(30.0, 75.0), probe_above=(2.0, 14.0), max_dtm=5.0, progress=None, std_rows=None, require_std=False):
     """-> {"status": "ok"|"none", "n", "designs": [...], "message"}; each design: name, F, P, R, F_tm .. R_gc, amplicon_len,
     est_cov (genomes of the alignment it passes under the pipeline's rule), est_added (new ones beyond the earlier designs)."""
     def say(msg):
         if progress:
             progress(msg)
-    al = Aligned(ids, rows)
+    al = Aligned(ids, rows, std_rows)
+    require_std = bool(require_std and std_rows)
     t0 = time.time()
     F = candidates(al, "F", ambig, pass_mm, tp_n, primer_tm, gc, say)
     R = candidates(al, "R", ambig, pass_mm, tp_n, primer_tm, gc, say)
@@ -193,7 +198,7 @@ def design_from_alignment(ids, rows, ambig=2, probe_ambig=2, top=3, pass_mm=2, t
     designs, covered = [], 0
     for i in range(top):
         say(f"조합 탐색 {i + 1}/{top}...")
-        cand = best_triples(F, R, P, covered, amp, probe_above, max_dtm)
+        cand = best_triples(F, R, P, covered, amp, probe_above, max_dtm, require_std=require_std)
         # the next design must differ from the earlier ones in at least one oligo (no repeats of the same amplicon)
         cand = [c for c in cand if not any(abs(c[2]["s"] - d["_f"]) < 6 and abs(c[3]["e"] - d["_r"]) < 6 for d in designs)]
         if not cand:
@@ -204,18 +209,22 @@ def design_from_alignment(ids, rows, ambig=2, probe_ambig=2, top=3, pass_mm=2, t
                         "F_tm": round(f["tm"], 1), "P_tm": round(p["tm"], 1), "R_tm": round(r["tm"], 1),
                         "F_gc": round(f["gc"], 1), "P_gc": round(p["gc"], 1), "R_gc": round(r["gc"], 1),
                         "amplicon_len": int(sum(1 for c in al.cons[f["s"]:r["e"]] if c != "-")),
+                        "std_est": (bool(f["sbits"] & r["sbits"] & p["sbits"]) if std_rows else None),
                         "est_cov": total, "est_cov_pct": round(100.0 * total / al.G, 1), "est_added": new, "P_strand": p["strand"],
                         "_f": f["s"], "_r": r["e"]})
     for d in designs:
         d.pop("_f"), d.pop("_r")
     if not designs:
-        return {"status": "none", "n": al.G, "designs": [], "message": "F·R·Probe가 함께 맞는 조합을 찾지 못했습니다(증폭산물 길이·Tm 조건을 확인하세요)."}
+        why = "표준물질이 통과하면서 " if require_std else ""
+        return {"status": "none", "n": al.G, "designs": [], "message": f"{why}F·R·Probe가 함께 맞는 조합을 찾지 못했습니다(증폭산물 길이·Tm 조건을 확인하세요)."}
     say(f"설계 {len(designs)}개 ({time.time() - t0:.0f}초)")
     return {"status": "ok", "n": al.G, "designs": designs, "message": "", "threshold": None}
 
 
-def design_lineage(members, out_dir, ambig=2, probe_ambig=2, top=3, threads=4, progress=None, **kw):
-    """members = {accession: sequence}: MAFFT alignment, then design_from_alignment()."""
+def design_lineage(members, out_dir, ambig=2, probe_ambig=2, top=3, threads=4, progress=None, standards=None, require_std=False, **kw):
+    """members = {accession: sequence}: MAFFT alignment, then design_from_alignment(). `standards` = {id: sequence} of the reference
+    standard material: aligned onto the same columns (mafft --keeplength --add) and judged with the same rule; `require_std` demands that
+    at least one of them passes the designed set."""
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     n = len(members)
@@ -228,7 +237,17 @@ def design_lineage(members, out_dir, ambig=2, probe_ambig=2, top=3, threads=4, p
     with open(aln, "w", encoding="utf-8") as fh:
         subprocess.run([find_mafft(), "--auto", "--thread", str(threads), str(fa)], stdout=fh, stderr=subprocess.DEVNULL, check=True)
     ids, rows = read_aligned(aln)
-    return design_from_alignment(ids, rows, ambig=ambig, probe_ambig=probe_ambig, top=top, progress=progress, **kw)
+    std_rows = None
+    if standards:
+        sfa, saln = out_dir / "standards.fa", out_dir / "aligned_with_standards.fa"
+        sfa.write_text("".join(f">{k}\n{v}\n" for k, v in standards.items()), encoding="utf-8")
+        with open(saln, "w", encoding="utf-8") as fh:
+            subprocess.run([find_mafft(), "--keeplength", "--thread", str(threads), "--add", str(sfa), str(aln)], stdout=fh, stderr=subprocess.DEVNULL, check=True)
+        all_ids, all_rows = read_aligned(saln)
+        by = dict(zip(all_ids, all_rows))
+        std_rows = [by[k] for k in standards if k in by]
+    return design_from_alignment(ids, rows, ambig=ambig, probe_ambig=probe_ambig, top=top, progress=progress, std_rows=std_rows,
+                                 require_std=require_std, **kw)
 
 
 def main():

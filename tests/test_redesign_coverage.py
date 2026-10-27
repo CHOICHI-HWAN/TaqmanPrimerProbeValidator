@@ -74,3 +74,17 @@ def test_no_candidates_gives_a_clear_message():
     ids, rows, ref = alignment(n=10, length=60)           # too short for a 70 bp amplicon
     res = rc.design_from_alignment(ids, rows, top=1)
     assert res["status"] == "none" and res["message"]
+
+
+def test_required_standard_limits_the_design_to_its_span():
+    ids, rows, ref = alignment(seed=7, n=40, length=480)
+    kw = dict(top=1, primer_tm=(40.0, 80.0), probe_above=(-30.0, 30.0), max_dtm=30.0)
+    wide = ref[:20].replace("", "") + ref[20:460] + ref[460:]
+    std_wide = ["-" * 40 + ref[40:440] + "-" * 40]                 # a standard that spans most of the amplicon region
+    res = rc.design_from_alignment(ids, rows, std_rows=std_wide, require_std=True, **kw)
+    assert res["status"] == "ok" and res["designs"][0]["std_est"] is True
+    std_tiny = ["-" * 200 + ref[200:240] + "-" * 240]              # 40 bp of sequence: no 70 bp amplicon can pass on it
+    res = rc.design_from_alignment(ids, rows, std_rows=std_tiny, require_std=True, **kw)
+    assert res["status"] == "none" and "표준물질" in res["message"]
+    res = rc.design_from_alignment(ids, rows, std_rows=std_tiny, require_std=False, **kw)         # not required: designs come back, flagged
+    assert res["status"] == "ok" and res["designs"][0]["std_est"] is False
