@@ -9694,7 +9694,9 @@ function vnLinkedCardHtml(d) {
 
 // ---------------- 프라이머 매핑지도: reference genome + genes, standard material (placed by alignment), and where the chosen primer sets bind ----------------
 const GM = { seg: null, data: null, range: null, filter: "" };
-const GM_COL = { F: "#4C78A8", P: "#F2A65A", R: "#54A24B" };
+// Geneious-style annotation colours: a soft fill with a darker outline of the same hue, dark text inside
+const GM_COL = { F: { fill: "#a7c7f2", stroke: "#3f74c4" }, P: { fill: "#fbcb94", stroke: "#d4882a" }, R: { fill: "#b0dfa6", stroke: "#4a9a40" } };
+const GM_GENE = { fill: "#f6e28f", stroke: "#b59a2f" }, GM_STD = { fill: "#b9e0f3", stroke: "#4f9cc4" }, GM_AMP = { fill: "#d5dde8", stroke: "#9aa9bd" }, GM_TXT = "#2d3748";
 
 function gmSelKey(seg) { return `lasv_gm_sel_${seg}`; }
 function gmSelected(seg, d) {
@@ -9730,8 +9732,8 @@ function gmSvg(d, sel, range) {
   const inView = (s, e) => e >= a && s <= b;
   let y = 8, parts = [];
   // ruler
-  parts.push(`<line x1="${L}" x2="${W - R}" y1="${y + 22}" y2="${y + 22}" stroke="currentColor" opacity=".5"/>`);
-  gmTicks(a, b).forEach((p) => parts.push(`<line x1="${x(p).toFixed(1)}" x2="${x(p).toFixed(1)}" y1="${y + 17}" y2="${y + 27}" stroke="currentColor" opacity=".5"/><text x="${x(p).toFixed(1)}" y="${y + 12}" text-anchor="middle" font-size="10" fill="currentColor" opacity=".75">${p.toLocaleString()}</text>`));
+  parts.push(`<rect x="${L}" y="${y + 20}" width="${W - R - L}" height="3" rx="1.5" fill="currentColor" opacity=".22"/>`);
+  gmTicks(a, b).forEach((p) => parts.push(`<line x1="${x(p).toFixed(1)}" x2="${x(p).toFixed(1)}" y1="${y + 24}" y2="@@H@@" stroke="currentColor" opacity=".07"/><line x1="${x(p).toFixed(1)}" x2="${x(p).toFixed(1)}" y1="${y + 17}" y2="${y + 26}" stroke="currentColor" opacity=".45"/><text x="${x(p).toFixed(1)}" y="${y + 12}" text-anchor="middle" font-size="10" fill="currentColor" opacity=".75">${p.toLocaleString()}</text>`));
   parts.push(`<text x="${L - 8}" y="${y + 26}" text-anchor="end" font-size="11" font-weight="700" fill="currentColor">${escHtml(d.reference || "참조유전체")}</text>`);
   y += 40;
   // genes
@@ -9739,8 +9741,8 @@ function gmSvg(d, sel, range) {
   d.genes.filter((g) => inView(g.start, g.end)).forEach((g) => {
     const x1 = x(g.start), x2 = x(g.end), h = 22, tip = Math.min(10, (x2 - x1) / 3), fwd = g.strand !== "-";
     const pts = fwd ? `${x1},${y} ${x2 - tip},${y} ${x2},${y + h / 2} ${x2 - tip},${y + h} ${x1},${y + h}` : `${x2},${y} ${x1 + tip},${y} ${x1},${y + h / 2} ${x1 + tip},${y + h} ${x2},${y + h}`;
-    parts.push(`<polygon points="${pts}" fill="${fwd ? "#7a8aa3" : "#a38a9b"}" opacity=".85"><title>${escHtml(g.gene)} ${g.start.toLocaleString()}–${g.end.toLocaleString()} (${fwd ? "+" : "−"} 가닥)</title></polygon>
-      ${x2 - x1 > 34 ? `<text x="${((x1 + x2) / 2).toFixed(1)}" y="${y + 15}" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">${escHtml(g.gene)}</text>` : ""}`);
+    parts.push(`<polygon points="${pts}" fill="${GM_GENE.fill}" stroke="${GM_GENE.stroke}" stroke-width="1" stroke-linejoin="round"><title>${escHtml(g.gene)} ${g.start.toLocaleString()}–${g.end.toLocaleString()} (${fwd ? "+" : "−"} 가닥)</title></polygon>
+      ${x2 - x1 > 34 ? `<text x="${((x1 + x2) / 2).toFixed(1)}" y="${y + 15}" text-anchor="middle" font-size="11" font-weight="700" fill="${GM_TXT}" style="pointer-events:none;">${escHtml(g.gene)}</text>` : ""}`);
   });
   y += 34;
   // standards: greedy lanes so overlapping ones do not hide each other
@@ -9751,9 +9753,9 @@ function gmSvg(d, sel, range) {
     const x1 = x(s.start), x2 = x(s.end), yy = y + s._lane * 24;
     const tip = `${s.name}: ${s.start.toLocaleString()}–${s.end.toLocaleString()} (${s.length} nt${s.mapped_fraction != null && s.mapped_fraction < 1 ? `, 정렬된 비율 ${(s.mapped_fraction * 100).toFixed(0)}%` : ""}) · 일치도 ${s.identity != null ? (s.identity * 100).toFixed(1) + "%" : "—"}${s.reversed ? " · 반대 가닥" : ""} · 위치 결정: ${s.method === "blastn" ? "blastn" : "mafft 정렬(파이프라인)"}${s.matched_pct != null ? ` · 집단 통과 ${s.matched_pct}%` : ""}${s.pipeline_differs ? ` · ⚠ 파이프라인(mafft)은 ${s.pipeline_start}–${s.pipeline_end}로 정렬했지만 blastn 위치를 표시합니다` : ""}${s.reliable ? "" : " · ⚠ 정렬이 불확실해 위치를 믿기 어렵습니다"}`;
     parts.push(s.reliable
-      ? `<rect x="${x1.toFixed(1)}" y="${yy}" width="${Math.max(3, x2 - x1).toFixed(1)}" height="18" rx="3" fill="#2a9d8f" opacity=".85"><title>${escHtml(tip)}</title></rect>`
-      : `<rect x="${x1.toFixed(1)}" y="${yy}" width="${Math.max(3, x2 - x1).toFixed(1)}" height="18" rx="3" fill="none" stroke="#2a9d8f" stroke-width="1.5" stroke-dasharray="4 3"><title>${escHtml(tip)}</title></rect>`,
-      `<text x="${((x1 + x2) / 2).toFixed(1)}" y="${yy + 13}" text-anchor="middle" font-size="11" font-weight="700" fill="${s.reliable ? "#fff" : "currentColor"}" style="pointer-events:none;">${escHtml(s.name)}${s.reversed ? " ↺" : ""}${s.reliable ? "" : " ?"}${s.pipeline_differs ? " ⚠" : ""}</text>`);
+      ? `<rect x="${x1.toFixed(1)}" y="${yy}" width="${Math.max(3, x2 - x1).toFixed(1)}" height="18" rx="4" fill="${GM_STD.fill}" stroke="${GM_STD.stroke}" stroke-width="1"><title>${escHtml(tip)}</title></rect>`
+      : `<rect x="${x1.toFixed(1)}" y="${yy}" width="${Math.max(3, x2 - x1).toFixed(1)}" height="18" rx="4" fill="none" stroke="${GM_STD.stroke}" stroke-width="1.5" stroke-dasharray="4 3"><title>${escHtml(tip)}</title></rect>`,
+      `<text x="${((x1 + x2) / 2).toFixed(1)}" y="${yy + 13}" text-anchor="middle" font-size="11" font-weight="700" fill="${s.reliable ? GM_TXT : "currentColor"}" style="pointer-events:none;">${escHtml(s.name)}${s.reversed ? " ↺" : ""}${s.reliable ? "" : " ?"}${s.pipeline_differs ? " ⚠" : ""}</text>`);
   });
   y += Math.max(1, lanes.length) * 24 + 10;
   if (!stds.length) parts.push(`<text x="${L}" y="${y - 18}" font-size="11" fill="currentColor" opacity=".6">${d.standards.some((s) => s.mapped) ? "이 구간에는 표준물질이 없습니다" : "정렬된 표준물질이 없습니다"}</text>`);
@@ -9762,24 +9764,24 @@ function gmSvg(d, sel, range) {
   const shown = gmShownSets(d, sel), row0 = y;
   shown.forEach((s, ri) => {
     const nm = s.name.length > 22 ? s.name.slice(0, 21) + "…" : s.name, missing = ["F", "P", "R"].filter((r) => !(s.hits[r] && s.hits[r].found));
-    parts.push(`<g class="gm-row" data-set="${escHtml(s.set_id)}" data-ri="${ri}">
+    parts.push(`<g class="gm-row" data-set="${escHtml(s.set_id)}" data-ri="${ri}">${ri % 2 === 0 ? `<rect x="2" y="${y - 1}" width="${W - R - 2}" height="24" rx="4" fill="currentColor" opacity=".045"/>` : ""}
       <rect class="gm-grab" x="0" y="${y}" width="${L - 4}" height="22" fill="transparent" style="cursor:grab;" data-set="${escHtml(s.set_id)}"><title>${escHtml(s.name)} — 드래그해서 위아래 순서를 바꿉니다 · 누르면 세트를 엽니다</title></rect>
       <text x="6" y="${y + 14}" font-size="12" fill="currentColor" opacity=".45" style="pointer-events:none;">⠿</text>
       <text x="${L - 8}" y="${y + 13}" text-anchor="end" font-size="11" fill="currentColor" class="gm-setlabel" style="pointer-events:none;">${escHtml(nm)}${missing.length ? " ⚠" : ""}</text>
       <line x1="${L}" x2="${W - R}" y1="${y + 9}" y2="${y + 9}" stroke="currentColor" opacity=".08"/>`);
-    if (s.amplicon && inView(s.amplicon[0], s.amplicon[1])) parts.push(`<rect x="${x(s.amplicon[0]).toFixed(1)}" y="${y + 7}" width="${Math.max(2, x(s.amplicon[1]) - x(s.amplicon[0])).toFixed(1)}" height="4" fill="currentColor" opacity=".28"><title>${escHtml(s.name)} amplicon ${s.amplicon[0].toLocaleString()}–${s.amplicon[1].toLocaleString()} (${s.amplicon[1] - s.amplicon[0] + 1} bp)</title></rect>`);
+    if (s.amplicon && inView(s.amplicon[0], s.amplicon[1])) parts.push(`<rect x="${x(s.amplicon[0]).toFixed(1)}" y="${y + 6}" width="${Math.max(2, x(s.amplicon[1]) - x(s.amplicon[0])).toFixed(1)}" height="6" rx="3" fill="${GM_AMP.fill}" stroke="${GM_AMP.stroke}" stroke-width=".8"><title>${escHtml(s.name)} amplicon ${s.amplicon[0].toLocaleString()}–${s.amplicon[1].toLocaleString()} (${s.amplicon[1] - s.amplicon[0] + 1} bp)</title></rect>`);
     ["F", "P", "R"].forEach((role) => {
       const h = s.hits[role];
       if (!h || !h.found || !inView(h.start, h.end)) return;
       const lo = Math.min(h.start, h.end), hi = Math.max(h.start, h.end), x1 = x(lo), x2 = Math.max(x(hi), x1 + 4), fwd = h.strand !== "-", tip = Math.min(6, (x2 - x1) / 2);
       const pts = fwd ? `${x1},${y + 2} ${x2 - tip},${y + 2} ${x2},${y + 9} ${x2 - tip},${y + 16} ${x1},${y + 16}` : `${x2},${y + 2} ${x1 + tip},${y + 2} ${x1},${y + 9} ${x1 + tip},${y + 16} ${x2},${y + 16}`;
-      parts.push(`<polygon points="${pts}" fill="${GM_COL[role]}"><title>${escHtml(s.name)} ${role}: ${lo.toLocaleString()}–${hi.toLocaleString()} (${fwd ? "+" : "−"} 가닥) · mismatch ${h.mismatches ?? "?"}</title></polygon>`);
+      parts.push(`<polygon points="${pts}" fill="${GM_COL[role].fill}" stroke="${GM_COL[role].stroke}" stroke-width="1" stroke-linejoin="round"><title>${escHtml(s.name)} ${role}: ${lo.toLocaleString()}–${hi.toLocaleString()} (${fwd ? "+" : "−"} 가닥) · mismatch ${h.mismatches ?? "?"}</title></polygon>`);
     });
     parts.push("</g>");
     y += 24;
   });
   if (!shown.length) { parts.push(`<text x="${L}" y="${y + 12}" font-size="12" fill="currentColor" opacity=".6">왼쪽에서 프라이머 세트를 고르세요</text>`); y += 24; }
-  return `<svg id="gmSvg" viewBox="0 0 ${W} ${y + 6}" data-row0="${row0}" data-rowh="24" data-n="${shown.length}" data-w="${W}" style="width:100%;height:auto;display:block;color:var(--fg);touch-action:none;">${parts.join("")}<line id="gmDrop" x1="4" x2="${W - R}" y1="0" y2="0" stroke="#e5484d" stroke-width="2" visibility="hidden"/></svg>`;
+  return `<svg id="gmSvg" viewBox="0 0 ${W} ${y + 6}" data-row0="${row0}" data-rowh="24" data-n="${shown.length}" data-w="${W}" style="width:100%;height:auto;display:block;color:var(--fg);touch-action:none;">${parts.join("").replaceAll("@@H@@", String(y))}<line id="gmDrop" x1="4" x2="${W - R}" y1="0" y2="0" stroke="#e5484d" stroke-width="2" visibility="hidden"/></svg>`;
 }
 
 // Drag a set row (by its name) up or down to change the drawing order; a plain click opens the set. The order is remembered per segment.
@@ -9857,8 +9859,8 @@ async function showGenomeMapPage() {
           ${d.genes.map((g) => `<button type="button" class="btn btn-secondary gm-gene" data-a="${g.start}" data-b="${g.end}" title="${escHtml(g.gene)} ${g.start}–${g.end}">${escHtml(g.gene)}</button>`).join("")}
           <button type="button" class="btn btn-secondary" id="gmPng" title="지도를 PNG 이미지로 저장">&#128247; 그림 저장</button></div>
         <div id="gmCard">${gmSvg(d, sel, GM.range)}</div>
-        <div class="vn-legend" style="margin-top:6px;"><span class="vn-chip"><i style="background:${GM_COL.F}"></i>Forward</span><span class="vn-chip"><i style="background:${GM_COL.P}"></i>Probe</span><span class="vn-chip"><i style="background:${GM_COL.R}"></i>Reverse</span>
-          <span class="vn-chip"><i style="background:#2a9d8f"></i>표준물질 ${nMapped}/${nStd}개 위치 결정(blastn)${nStd - nMapped ? ` (못 찾은 ${nStd - nMapped}개는 그리지 않음)` : ""}${d.standards.some((s) => s.pipeline_differs) ? ` · ⚠ ${d.standards.filter((s) => s.pipeline_differs).map((s) => s.name).join(", ")}: 파이프라인(mafft) 위치와 다름` : ""}</span><span class="vn-chip"><i style="background:#7a8aa3"></i>+ 가닥 유전자</span><span class="vn-chip"><i style="background:#a38a9b"></i>− 가닥 유전자</span>
+        <div class="vn-legend" style="margin-top:6px;"><span class="vn-chip"><i style="background:${GM_COL.F.fill};border:1px solid ${GM_COL.F.stroke}"></i>Forward</span><span class="vn-chip"><i style="background:${GM_COL.P.fill};border:1px solid ${GM_COL.P.stroke}"></i>Probe</span><span class="vn-chip"><i style="background:${GM_COL.R.fill};border:1px solid ${GM_COL.R.stroke}"></i>Reverse</span>
+          <span class="vn-chip"><i style="background:${GM_STD.fill};border:1px solid ${GM_STD.stroke}"></i>표준물질 ${nMapped}/${nStd}개 위치 결정(blastn)${nStd - nMapped ? ` (못 찾은 ${nStd - nMapped}개는 그리지 않음)` : ""}${d.standards.some((s) => s.pipeline_differs) ? ` · ⚠ ${d.standards.filter((s) => s.pipeline_differs).map((s) => s.name).join(", ")}: 파이프라인(mafft) 위치와 다름` : ""}</span><span class="vn-chip"><i style="background:${GM_GENE.fill};border:1px solid ${GM_GENE.stroke}"></i>유전자(화살표 = 가닥)</span><span class="vn-chip"><i style="background:${GM_AMP.fill};border:1px solid ${GM_AMP.stroke}"></i>증폭산물</span>
           <span class="note">세트 이름(⠿)을 드래그하면 위아래 순서를 바꿉니다 · ↺ = 표준물질이 반대 가닥 · 점선 ? = 정렬이 불확실 · ⚠ = F/P/R 중 참조유전체에서 결합을 못 찾은 것이 있음</span></div></div></div>`;
   const redraw = () => { gmSave(GM.seg, sel); showGenomeMapPage(); };
   view.querySelectorAll("[data-gmseg]").forEach((b) => b.addEventListener("click", () => { GM.seg = b.dataset.gmseg; GM.filter = ""; showGenomeMapPage(); }));

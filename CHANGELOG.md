@@ -5,6 +5,11 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.34.3] - 2026-10-27
+
+### Changed
+- **프라이머 매핑지도 색감을 Geneious Prime 주석 트랙처럼**: 부드러운 파스텔 채움에 같은 계열의 진한 테두리, 막대 안에는 어두운 글자. 유전자(노랑, 화살표 방향 = 가닥), 표준물질(하늘색, 불확실하면 점선), Forward(파랑)·Probe(주황)·Reverse(초록) 화살표, 증폭산물(회색 둥근 막대), 눈금자 위치의 옅은 세로 격자선과 세트 행의 줄무늬 배경. 범례도 같은 색으로 맞췄습니다.
+
 ## [0.34.2] - 2026-10-27
 
 ### Changed
