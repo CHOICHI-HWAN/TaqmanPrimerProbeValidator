@@ -5,6 +5,11 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.34.2] - 2026-10-27
+
+### Changed
+- **프라이머 매핑지도**: 프라이머 세트 선택을 지도 **아래**(전체 폭, 여러 열)로 옮겼습니다. 왼쪽의 좁고 긴 목록이 없어져 지도가 화면 폭을 모두 씁니다.
+
 ## [0.34.1] - 2026-10-27
 
 ### Changed

@@ -1216,8 +1216,9 @@ a.pipe-pill:hover { border-color: var(--accent); color: var(--accent); }
 
 .rd-off { opacity: .55; }
 
-.gm-layout { display: grid; grid-template-columns: minmax(230px, 300px) minmax(0, 1fr); gap: 14px; align-items: start; }
-@media (max-width: 1000px) { .gm-layout { grid-template-columns: minmax(0, 1fr); } }
+.gm-layout { display: flex; flex-direction: column; gap: 14px; }      /* the map first, the set picker below it (wide, in columns) */
+.gm-main { order: 1; }
+.gm-pick { order: 2; }
 .gm-setlabel:hover { text-decoration: underline; }
 
 /* maximise that does not need the browser's Fullscreen API (see toggleFullscreen) */
