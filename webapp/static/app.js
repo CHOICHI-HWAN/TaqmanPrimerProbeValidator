@@ -2404,7 +2404,7 @@ const NAV_VIEW_BTN = { overview: "overviewBtn", addForm: "addSetBtn", paramsView
 NAV_VIEW_BTN.requirementsView = "requirementsBtn";
 NAV_VIEW_BTN.engineView = "engineBtn";
 NAV_VIEW_BTN.genomeMapView = "genomeMapBtn";
-const NAV_TITLE = { genomeMapView: "유전체 지도", engineView: "엔진 검증 (Go)", overview: "전체 대시보드", addForm: "새 프라이머 세트 분석", paramsView: "분석 파라미터", changelogView: "변경 이력", guideView: "파이프라인 개요 / 가이드",
+const NAV_TITLE = { genomeMapView: "프라이머 매핑지도", engineView: "엔진 검증 (Go)", overview: "전체 대시보드", addForm: "새 프라이머 세트 분석", paramsView: "분석 파라미터", changelogView: "변경 이력", guideView: "파이프라인 개요 / 가이드",
   diversityView: "리니지별 유전체 다양성", geneConsView: "유전자 보존영역", redesignView: "리니지별 재설계", vennView: "커버리지 벤 다이어그램", metadataView: "메타데이터 / 지도",
   primersView: "프라이머 입력 / 관리", litView: "문헌 프라이머", standardsView: "표준물질 대표성", metaTableView: "메타데이터 표", stdMgrView: "표준물질 입력 / 관리", requirementsView: "요구사항 기록" };
 function navTitle(d) {
@@ -9825,7 +9825,7 @@ function vnLinkedCardHtml(d) {
     ${amb ? `<details style="margin-top:6px;"><summary class="note">모호한 바이러스 ${c.ambiguous}개</summary><ul>${amb}</ul></details>` : ""}</div>`;
 }
 
-// ---------------- 유전체 지도: reference genome + genes, standard material (placed by alignment), and where the chosen primer sets bind ----------------
+// ---------------- 프라이머 매핑지도: reference genome + genes, standard material (placed by alignment), and where the chosen primer sets bind ----------------
 const GM = { seg: null, data: null, range: null, filter: "" };
 const GM_COL = { F: "#4C78A8", P: "#F2A65A", R: "#54A24B" };
 
@@ -9974,7 +9974,7 @@ async function showGenomeMapPage() {
     return mem.length ? `<div class="vn-tree-group"><label class="vn-pick vn-pick-group"><input type="checkbox" class="gm-grp" value="${escHtml(g.group_id)}" ${mem.every((s) => sel.has(s.set_id)) ? "checked" : ""}> <span class="vn-name">&#9633; ${escHtml(g.label)}</span><span class="vn-count">${mem.length}</span></label><div class="vn-members">${mem.map(row).join("")}</div></div>` : "";
   }).join("") + (() => { const loose = d.sets.filter((s) => !inGroup.has(s.set_id) && match(s)); return loose.length ? `<div class="vn-tree-group vn-tree-loose"><div class="vn-tree-vendor">그룹 없음</div><div class="vn-members">${loose.map(row).join("")}</div></div>` : ""; })();
   const nStd = d.standards.length, nMapped = d.standards.filter((s) => s.mapped).length;
-  view.innerHTML = `<h2>🧭 유전체 지도</h2>
+  view.innerHTML = `<h2>🧭 프라이머 매핑지도</h2>
     <p class="note">참조유전체 한 가닥 위에 <b>유전자</b>, <b>표준물질</b>(참조유전체에 정렬해 위치를 정한 것), 고른 <b>프라이머 세트</b>의 F · Probe · R 결합 위치를 겹쳐 봅니다. 좌표는 참조유전체 <b>${escHtml(d.reference)}</b>(${(d.length || 0).toLocaleString()} bp) 기준 1-based이고, 화살표 방향은 결합 가닥입니다.</p>
     ${allSegs.length > 1 ? `<div class="seg-tab-row">${allSegs.map((x) => `<button class="seg-tab ${x === GM.seg ? "active" : ""}" data-gmseg="${x}">${x}</button>`).join("")}</div>` : ""}
     <div class="gm-layout">

@@ -46,6 +46,7 @@
         <button id="primersBtn" class="btn btn-secondary btn-block">📝 프라이머 입력 / 관리</button>
         <button id="stdMgrBtn" class="btn btn-secondary btn-block">🧫 표준물질 입력 / 관리</button>
         <button id="vennBtn" class="btn btn-secondary btn-block" title="프라이머 세트·그룹이 전체와 리니지별로 얼마나 덮는지 벤 다이어그램(합집합·교집합·못 잡는 유전체)으로 봅니다">🔵 커버리지 벤 다이어그램</button>
+        <button id="genomeMapBtn" class="btn btn-secondary btn-block" title="참조유전체 위에 유전자, 표준물질(정렬로 위치 결정), 고른 프라이머 세트의 결합 위치를 한눈에 봅니다">🧭 프라이머 매핑지도</button>
       </details>
       <details class="menu-group" data-menu="design">
         <summary>🛠 설계</summary>
@@ -59,7 +60,6 @@
         <button id="geneConsBtn" class="btn btn-secondary btn-block">🧬 유전자 보존영역</button>
         <button id="standardsBtn" class="btn btn-secondary btn-block">🧪 표준물질 대표성</button>
         <button id="metaTableBtn" class="btn btn-secondary btn-block">📊 메타데이터 표</button>
-        <button id="genomeMapBtn" class="btn btn-secondary btn-block" title="참조유전체 위에 유전자, 표준물질(정렬로 위치 결정), 고른 프라이머 세트의 결합 위치를 한눈에 봅니다">🧭 유전체 지도</button>
         <button id="metadataBtn" class="btn btn-secondary btn-block">🗺 메타데이터 / 지도</button>
         <button id="guideBtn" class="btn btn-secondary btn-block">📖 파이프라인 개요 / 가이드</button>
         <button id="tourBtn" class="btn btn-secondary btn-block" title="화면 구성과 주요 기능을 단계별로 안내합니다">🧭 UI 사용 안내 (투어)</button>
@@ -88,7 +88,7 @@
       </div>
       <input id="searchBox" class="search-box" type="text" placeholder="세트 검색 (이름, 벤더)...">
       <div id="setList" class="set-list"></div>
-      <div class="sidebar-footer">&copy; 2026 Chihwan Choi &middot; GPL-3.0 &middot; v<span id="footerVersion">0.34.0</span><br><button id="skinToggleBtn" class="skin-toggle" title="화면 스타일 전환 (Vaadin Lumo / 기본)">스타일: Lumo</button></div>
+      <div class="sidebar-footer">&copy; 2026 Chihwan Choi &middot; GPL-3.0 &middot; v<span id="footerVersion">0.34.1</span><br><button id="skinToggleBtn" class="skin-toggle" title="화면 스타일 전환 (Vaadin Lumo / 기본)">스타일: Lumo</button></div>
     </aside>
 
     <main class="main">

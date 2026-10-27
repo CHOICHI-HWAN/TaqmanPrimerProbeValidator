@@ -5,6 +5,11 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.34.1] - 2026-10-27
+
+### Changed
+- "🧭 유전체 지도"의 이름을 **"🧭 프라이머 매핑지도"** 로 바꾸고, 메뉴 위치를 📊 데이터 · 정보에서 **🔬 분석 · 검증** 그룹(커버리지 벤 다이어그램 아래)으로 옮겼습니다. 기능은 같습니다.
+
 ## [0.34.0] - 2026-10-27
 
 ### Changed
