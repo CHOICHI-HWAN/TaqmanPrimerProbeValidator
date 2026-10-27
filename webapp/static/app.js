@@ -9848,7 +9848,7 @@ async function showGenomeMapPage() {
       <div class="card gm-pick"><div class="vn-selector-head"><b>프라이머 세트</b> <span class="note">지금 ${sel.size}개 표시 · 전체 ${d.sets.length}개</span></div>
         <div class="table-toolbar" style="gap:6px;margin:6px 0;"><input id="gmFilter" type="search" placeholder="이름 검색" value="${escHtml(GM.filter || "")}" style="flex:1;min-width:90px;">
           <button type="button" class="btn btn-secondary" id="gmAll">모두</button><button type="button" class="btn btn-secondary" id="gmNone">해제</button></div>
-        <div class="vn-selector" style="max-height:62vh;grid-template-columns:1fr;">${listHtml || "<span class='note'>없음</span>"}</div></div>
+        <div class="vn-selector" style="max-height:44vh;">${listHtml || "<span class='note'>없음</span>"}</div></div>
       <div class="card gm-main">
         <div class="table-toolbar" style="gap:8px;flex-wrap:wrap;margin-bottom:6px;">
           <label class="note">구간 <input id="gmFrom" type="number" min="1" max="${d.length}" value="${GM.range[0]}" style="width:78px;"> – <input id="gmTo" type="number" min="1" max="${d.length}" value="${GM.range[1]}" style="width:78px;"></label>
