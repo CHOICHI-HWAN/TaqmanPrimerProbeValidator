@@ -6,7 +6,7 @@ export const CHUNK = 600 * 1024;
 // Endpoints whose content depends on the host scope are exported once per scope (key suffix "@human" etc.; no suffix = the server's
 // default scope). The read-only site picks the variant from the ?host= the dashboard sends. Everything else is exported once.
 export const SCOPES = ["human", "animal", "unknown", "all"];
-export const SCOPED_RE = /^(?:(?:sets|groups)(?:\/[^/]+)?|overview|host-scope|venn\/[^/]+)$/;
+export const SCOPED_RE = /^(?:(?:sets|groups)(?:\/[^/]+)?|overview|host-scope|venn\/[^/]+|mismatch-curve\/[^/]+)$/;
 const FIXED = ["profile", "diversity", "metadata", "metadata/table", "standards/representativeness",
   "standards/manifest", "primers/manifest", "changelog", "requirements", "params", "jobs/active", "pipeline/freshness", "ui-state",
   "final-results"];
@@ -65,6 +65,8 @@ export async function collect(project, get, progress = () => {}) {
       progress(`벤 다이어그램 ${seg}${sfx}`);
       const d = await json(`venn/${seg}`, scope);
       if (d) await addJson(`venn/${seg}${sfx}`, d);
+      const mc = await json(`mismatch-curve/${seg}`, scope);
+      if (mc) await addJson(`mismatch-curve/${seg}${sfx}`, mc);
     }
     if (Object.keys((data.profile || {}).segments || {}).length >= 2) {           // the segments together (draft strain link)
       progress(`벤 다이어그램 연결${sfx}`);

@@ -5,6 +5,12 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-10-27
+
+### Added
+- **프라이머 매핑지도 아래 커버리지 곡선(ROC 스타일)**: 고른 세트마다 "허용하는 mismatch k = 0, 1, 2, ...가 늘 때 통과하는 유전체의 비율"을 곡선으로 그립니다. 지도의 행과 같은 순서·색이고(드래그로 순서를 바꾸면 곡선·범례도 따라감), 빨간 점선이 파이프라인의 현재 기준(프라이머 허용 mismatch)이며 범례 숫자가 그 기준에서의 커버리지입니다. 곡선 기준을 고를 수 있습니다: **F·R만 k까지**(프로브는 파이프라인 기준 유지) / **F·R·프로브 모두 k까지**. 호스트 범위를 따릅니다. API `GET /api/mismatch-curve/<분절>`(세트 전부), 계산은 `scope_view.View.mismatch_curve`(결과 파일만 읽음, 캐시됨). Firebase 게시에 포함(호스트 범위별).
+- 테스트 `tests/test_mismatch_curve.py`.
+
 ## [0.34.3] - 2026-10-27
 
 ### Changed
