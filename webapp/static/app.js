@@ -2389,7 +2389,7 @@ function renderLineageBreakdownCompact(setData) {
   }).join("");
 }
 
-const MAIN_VIEW_IDS = ["engineView", "overview", "detail", "addForm", "paramsView", "changelogView", "guideView", "diversityView", "geneConsView", "redesignView", "vennView", "metadataView", "primersView", "litView", "standardsView", "metaTableView", "stdMgrView", "requirementsView"];
+const MAIN_VIEW_IDS = ["genomeMapView", "engineView", "overview", "detail", "addForm", "paramsView", "changelogView", "guideView", "diversityView", "geneConsView", "redesignView", "vennView", "metadataView", "primersView", "litView", "standardsView", "metaTableView", "stdMgrView", "requirementsView"];
 function showMainView(id) {
   for (const v of MAIN_VIEW_IDS) $(`#${v}`).hidden = (v !== id);
   navRecord(id);
@@ -2403,7 +2403,8 @@ const NAV_VIEW_BTN = { overview: "overviewBtn", addForm: "addSetBtn", paramsView
   primersView: "primersBtn", litView: "litBtn", standardsView: "standardsBtn", metaTableView: "metaTableBtn", stdMgrView: "stdMgrBtn", requirementsView: "reportBtn" };
 NAV_VIEW_BTN.requirementsView = "requirementsBtn";
 NAV_VIEW_BTN.engineView = "engineBtn";
-const NAV_TITLE = { engineView: "엔진 검증 (Go)", overview: "전체 대시보드", addForm: "새 프라이머 세트 분석", paramsView: "분석 파라미터", changelogView: "변경 이력", guideView: "파이프라인 개요 / 가이드",
+NAV_VIEW_BTN.genomeMapView = "genomeMapBtn";
+const NAV_TITLE = { genomeMapView: "유전체 지도", engineView: "엔진 검증 (Go)", overview: "전체 대시보드", addForm: "새 프라이머 세트 분석", paramsView: "분석 파라미터", changelogView: "변경 이력", guideView: "파이프라인 개요 / 가이드",
   diversityView: "리니지별 유전체 다양성", geneConsView: "유전자 보존영역", redesignView: "리니지별 재설계", vennView: "커버리지 벤 다이어그램", metadataView: "메타데이터 / 지도",
   primersView: "프라이머 입력 / 관리", litView: "문헌 프라이머", standardsView: "표준물질 대표성", metaTableView: "메타데이터 표", stdMgrView: "표준물질 입력 / 관리", requirementsView: "요구사항 기록" };
 function navTitle(d) {
@@ -2851,9 +2852,9 @@ function renderDetail(setData) {
   wireColumnSelection(msaCard);
   document.addEventListener("fullscreenchange", () => {
     const fsBtn = $("#msaFullscreenBtn");
-    if (fsBtn) fsBtn.innerHTML = document.fullscreenElement ? "&#9974; 전체화면 종료" : "&#9974; 전체화면";
+    if (fsBtn) fsBtn.innerHTML = fsActive() ? "&#9974; 전체화면 종료" : "&#9974; 전체화면";
     const tfsBtn = $("#treeFullscreenBtn");
-    if (tfsBtn) tfsBtn.innerHTML = document.fullscreenElement ? "&#9974; 전체화면 종료" : "&#9974; 전체화면";
+    if (tfsBtn) tfsBtn.innerHTML = fsActive() ? "&#9974; 전체화면 종료" : "&#9974; 전체화면";
   });
 
   const treeCard = detail.querySelector(".tree-card");
@@ -3609,16 +3610,28 @@ async function renderTreeSection(container, data, seg) {
 // Where a pop-up (dialog, detail window, lightbox) is attached: while a card is shown fullscreen only that
 // card's subtree is displayed, so a pop-up appended to <body> would open invisibly behind it.
 function modalHost() {
-  return document.fullscreenElement || document.body;
+  return document.fullscreenElement || document.querySelector(".fs-fallback") || document.body;
 }
 
-function toggleFullscreen(el) {
-  if (document.fullscreenElement) {
-    document.exitFullscreen();
-  } else {
-    (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el);
-  }
+// "Maximise" of a card / MSA / tree. The browser's Fullscreen API is tried, but it is silently refused in some embedded browsers (the
+// desktop app's browser pane, iframes without allowfullscreen), so the element is ALSO laid over the whole window with CSS (.fs-fallback):
+// that works everywhere. Esc, or the same button again, restores it.
+function fsActive() { return !!(document.fullscreenElement || document.querySelector(".fs-fallback")); }
+function exitMaximised() {
+  document.querySelectorAll(".fs-fallback").forEach((e) => e.classList.remove("fs-fallback"));
+  document.body.classList.remove("fs-open");
+  if (document.fullscreenElement) { try { document.exitFullscreen().catch(() => {}); } catch { /* not in fullscreen */ } }
+  document.dispatchEvent(new Event("fullscreenchange"));
 }
+function toggleFullscreen(el) {
+  if (fsActive()) { exitMaximised(); return; }
+  el.classList.add("fs-fallback");
+  document.body.classList.add("fs-open");
+  try { const p = (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el); if (p && p.catch) p.catch(() => {}); } catch { /* the CSS maximise stays */ }
+  document.dispatchEvent(new Event("fullscreenchange"));
+}
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && document.querySelector(".fs-fallback") && !document.querySelector(".detail-modal-overlay, .modal-overlay:not([hidden])")) exitMaximised(); });
+document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && document.querySelector(".fs-fallback") && document.__nativeFs) exitMaximised(); document.__nativeFs = !!document.fullscreenElement; });
 
 // ---------------------------------------------------------------------------------------
 // Minimize/maximize controls for every result panel (.card and its chart/stat-card
@@ -7463,7 +7476,7 @@ async function showRedesignPage() {
         <label class="note${RD.engine === "primerhunter" ? " rd-off" : ""}" title="${RD.engine === "primerhunter" ? "varVAMP 전용: PrimerHunter에는 적용되지 않습니다. " : ""}Probe 하나의 모호 염기 최대 수 (프라이머보다 엄격하게 1 적게가 권장)">Probe IUPAC <input id="rdPAmbig" type="number" min="0" max="6" value="${RD.pAmbig ?? 1}" style="width:48px;" ${RD.engine === "primerhunter" ? "disabled" : ""}></label>
         <label class="note" title="한 쌍(F+R)의 모호 염기 합이 이 값을 넘는 설계는 검증 전에 제외합니다. 0 = 제한 없음. varVAMP는 F·R 각각만 제한하므로 합계는 설계 뒤에 걸러냅니다">F+R 합계 최대 <input id="rdPairAmbig" type="number" min="0" max="16" value="${RD.pairAmbig ?? 0}" style="width:48px;"></label>
         ${RD.engine === "primerhunter" ? '<span class="note rd-off">F/R·Probe IUPAC 칸은 varVAMP 전용입니다(PrimerHunter에는 적용되지 않음).</span>' : ""}
-        <label class="note" ${RD.engine === "coverage" ? "" : "hidden"} title="커버리지 우선 전용: 등록된 표준물질(KDCA) 중 하나 이상이 같은 통과 규칙을 만족하는 조합만 고릅니다. 표준물질이 한 영역만 담고 있으면 설계 위치가 그 안으로 제한됩니다"><input id="rdStd" type="checkbox" ${RD.requireStd ? "checked" : ""}> 표준물질 일치 요구</label>
+        <label class="note" ${RD.engine === "coverage" ? "" : "hidden"} title="커버리지 우선 전용. 상관없음: 현장 유전체를 가장 넓게 덮는 설계. 가능하면: 표준물질(KDCA)을 통과시키는 세트를 우선하되(전체의 5%만큼 가산점), 넓게 덮는 세트가 크게 낫다면 그쪽을 고릅니다. 반드시: 표준물질 중 하나 이상이 통과하는 세트만(표준물질이 한 영역만 담으면 설계 위치가 그 안으로 제한됨)">표준물질 <select id="rdStd"><option value="off" ${(RD.stdMode || "off") === "off" ? "selected" : ""}>상관없음</option><option value="prefer" ${RD.stdMode === "prefer" ? "selected" : ""}>가능하면</option><option value="require" ${RD.stdMode === "require" ? "selected" : ""}>반드시</option></select></label>
         <label class="note" title="리니지마다 검증할 설계 수">설계 수 <input id="rdTop" type="number" min="1" max="8" value="${RD.top ?? 3}" style="width:48px;"></label>
         <label class="note" title="게놈이 이보다 적은 리니지는 건너뜁니다">최소 게놈 수 <input id="rdMinN" type="number" min="3" max="1000" value="${RD.minN ?? 5}" style="width:56px;"></label>
         <button id="rdRunBtn" class="btn btn-primary">&#9654; 재설계 실행</button>
@@ -7502,14 +7515,14 @@ async function showRedesignPage() {
   };
   runBtn.addEventListener("click", async () => {
     const num = (id) => Number(view.querySelector(id).value);
-    Object.assign(RD, { thr: num("#rdThr"), minThr: num("#rdMinThr"), ambig: num("#rdAmbig"), pAmbig: num("#rdPAmbig"), pairAmbig: num("#rdPairAmbig"), top: num("#rdTop"), minN: num("#rdMinN"), requireStd: !!view.querySelector("#rdStd")?.checked, all: view.querySelector("#rdAll").checked, sample: num("#rdSample"), minCov: num("#rdMinCov"), minTm: num("#rdMinTm") });
+    Object.assign(RD, { thr: num("#rdThr"), minThr: num("#rdMinThr"), ambig: num("#rdAmbig"), pAmbig: num("#rdPAmbig"), pairAmbig: num("#rdPairAmbig"), top: num("#rdTop"), minN: num("#rdMinN"), stdMode: view.querySelector("#rdStd")?.value || "off", all: view.querySelector("#rdAll").checked, sample: num("#rdSample"), minCov: num("#rdMinCov"), minTm: num("#rdMinTm") });
     RD.checked = Object.fromEntries([...view.querySelectorAll(".rd-lin")].map((x) => [x.value, x.checked]));
     const lineages = [...view.querySelectorAll(".rd-lin:checked")].map((x) => x.value);
     if (!lineages.length && !RD.all) { uiAlert("리니지를 하나 이상 고르세요."); return; }
     if (!(await uiConfirm(`${lineages.length}개 리니지${RD.all ? " + 전체" : ""}를 설계하고 설계마다 실제 검증을 돌립니다. ${RD.engine === "primerhunter" ? "PrimerHunter는 리니지당 수 분에서 수십 분이 걸리고 CPU를 여러 개 씁니다." : RD.engine === "coverage" ? "리니지당 수십 초(정렬 + 설계)와 설계마다 검증 시간이 걸립니다." : "리니지당 1분 안팎이 걸립니다."} 그동안 서버가 계산에 쓰입니다. 계속할까요?`, { title: "리니지별 재설계", okLabel: "시작" }))) return;
     try {
       const { job_id, error } = await fetchJSON("/api/redesign", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ segment: RD.seg.toLowerCase(), host: state.hostScope, lineages, include_all: RD.all, threshold: RD.thr, min_threshold: RD.minThr, ambig: RD.ambig, require_std: RD.engine === "coverage" && RD.requireStd, probe_ambig: RD.pAmbig, pair_ambig: RD.pairAmbig, top: RD.top, min_n: RD.minN, engine: RD.engine, ph_sample: RD.sample, ph_min_cov: RD.minCov, ph_min_tm: RD.minTm }) });
+        body: JSON.stringify({ segment: RD.seg.toLowerCase(), host: state.hostScope, lineages, include_all: RD.all, threshold: RD.thr, min_threshold: RD.minThr, ambig: RD.ambig, std_mode: RD.engine === "coverage" ? (RD.stdMode || "off") : "off", probe_ambig: RD.pAmbig, pair_ambig: RD.pairAmbig, top: RD.top, min_n: RD.minN, engine: RD.engine, ph_sample: RD.sample, ph_min_cov: RD.minCov, ph_min_tm: RD.minTm }) });
       if (error) throw new Error(error);
       poll(job_id);
     } catch (err) { uiAlert("재설계를 시작하지 못했습니다: " + err.message); }
@@ -9806,3 +9819,143 @@ function vnLinkedCardHtml(d) {
     ${rows ? `<details style="margin-top:6px;"><summary class="note">어긋난 쌍 ${c.conflicts}개</summary><ul>${rows}</ul></details>` : ""}
     ${amb ? `<details style="margin-top:6px;"><summary class="note">모호한 바이러스 ${c.ambiguous}개</summary><ul>${amb}</ul></details>` : ""}</div>`;
 }
+
+// ---------------- 유전체 지도: reference genome + genes, standard material (placed by alignment), and where the chosen primer sets bind ----------------
+const GM = { seg: null, data: null, range: null, filter: "" };
+const GM_COL = { F: "#4C78A8", P: "#F2A65A", R: "#54A24B" };
+
+function gmSelKey(seg) { return `lasv_gm_sel_${seg}`; }
+function gmSelected(seg, d) {
+  let sel = null;
+  try { sel = JSON.parse(localStorage.getItem(gmSelKey(seg)) || "null"); } catch { sel = null; }
+  const ids = new Set(d.sets.map((s) => s.set_id));
+  if (Array.isArray(sel)) return new Set(sel.filter((x) => ids.has(x)));
+  const g = d.groups.find((x) => x.members.length) || null;                     // first visit: the sets of the first group, else the first few
+  return new Set((g ? g.members : d.sets.slice(0, 4).map((s) => s.set_id)).filter((x) => ids.has(x)).slice(0, 6));
+}
+function gmSave(seg, sel) { try { localStorage.setItem(gmSelKey(seg), JSON.stringify([...sel])); } catch { /* private mode */ } }
+
+function gmTicks(a, b) {
+  const span = b - a + 1, steps = [10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000];
+  const step = steps.find((s) => span / s <= 12) || 5000, out = [];
+  for (let p = Math.ceil(a / step) * step; p <= b; p += step) out.push(p);
+  return out;
+}
+
+function gmSvg(d, sel, range) {
+  const [a, b] = range, W = 860, L = 168, R = 16, plotW = W - L - R;
+  const x = (p) => L + ((Math.min(Math.max(p, a), b + 1) - a) / (b - a + 1)) * plotW;
+  const inView = (s, e) => e >= a && s <= b;
+  let y = 8, parts = [];
+  // ruler
+  parts.push(`<line x1="${L}" x2="${W - R}" y1="${y + 22}" y2="${y + 22}" stroke="currentColor" opacity=".5"/>`);
+  gmTicks(a, b).forEach((p) => parts.push(`<line x1="${x(p).toFixed(1)}" x2="${x(p).toFixed(1)}" y1="${y + 17}" y2="${y + 27}" stroke="currentColor" opacity=".5"/><text x="${x(p).toFixed(1)}" y="${y + 12}" text-anchor="middle" font-size="10" fill="currentColor" opacity=".75">${p.toLocaleString()}</text>`));
+  parts.push(`<text x="${L - 8}" y="${y + 26}" text-anchor="end" font-size="11" font-weight="700" fill="currentColor">${escHtml(d.reference || "참조유전체")}</text>`);
+  y += 40;
+  // genes
+  parts.push(`<text x="${L - 8}" y="${y + 17}" text-anchor="end" font-size="11" font-weight="700" fill="currentColor">유전자</text>`);
+  d.genes.filter((g) => inView(g.start, g.end)).forEach((g) => {
+    const x1 = x(g.start), x2 = x(g.end), h = 22, tip = Math.min(10, (x2 - x1) / 3), fwd = g.strand !== "-";
+    const pts = fwd ? `${x1},${y} ${x2 - tip},${y} ${x2},${y + h / 2} ${x2 - tip},${y + h} ${x1},${y + h}` : `${x2},${y} ${x1 + tip},${y} ${x1},${y + h / 2} ${x1 + tip},${y + h} ${x2},${y + h}`;
+    parts.push(`<polygon points="${pts}" fill="${fwd ? "#7a8aa3" : "#a38a9b"}" opacity=".85"><title>${escHtml(g.gene)} ${g.start.toLocaleString()}–${g.end.toLocaleString()} (${fwd ? "+" : "−"} 가닥)</title></polygon>
+      ${x2 - x1 > 34 ? `<text x="${((x1 + x2) / 2).toFixed(1)}" y="${y + 15}" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">${escHtml(g.gene)}</text>` : ""}`);
+  });
+  y += 34;
+  // standards: greedy lanes so overlapping ones do not hide each other
+  const stds = d.standards.filter((s) => s.mapped && inView(s.start, s.end)).sort((p, q) => p.start - q.start), lanes = [];
+  stds.forEach((s) => { let k = lanes.findIndex((end) => end < s.start); if (k < 0) { k = lanes.length; lanes.push(0); } lanes[k] = s.end; s._lane = k; });
+  parts.push(`<text x="${L - 8}" y="${y + 15}" text-anchor="end" font-size="11" font-weight="700" fill="currentColor">표준물질</text>`);
+  stds.forEach((s) => {
+    const x1 = x(s.start), x2 = x(s.end), yy = y + s._lane * 24;
+    const tip = `${s.name}: ${s.start.toLocaleString()}–${s.end.toLocaleString()} (${s.length} nt${s.mapped_fraction != null && s.mapped_fraction < 1 ? `, 정렬된 비율 ${(s.mapped_fraction * 100).toFixed(0)}%` : ""}) · 일치도 ${s.identity != null ? (s.identity * 100).toFixed(1) + "%" : "—"}${s.reversed ? " · 반대 가닥" : ""} · 위치 결정: ${s.method === "blastn" ? "blastn" : "mafft 정렬(파이프라인)"}${s.matched_pct != null ? ` · 집단 통과 ${s.matched_pct}%` : ""}${s.pipeline_differs ? ` · ⚠ 파이프라인(mafft)은 ${s.pipeline_start}–${s.pipeline_end}로 정렬했지만 blastn 위치를 표시합니다` : ""}${s.reliable ? "" : " · ⚠ 정렬이 불확실해 위치를 믿기 어렵습니다"}`;
+    parts.push(s.reliable
+      ? `<rect x="${x1.toFixed(1)}" y="${yy}" width="${Math.max(3, x2 - x1).toFixed(1)}" height="18" rx="3" fill="#2a9d8f" opacity=".85"><title>${escHtml(tip)}</title></rect>`
+      : `<rect x="${x1.toFixed(1)}" y="${yy}" width="${Math.max(3, x2 - x1).toFixed(1)}" height="18" rx="3" fill="none" stroke="#2a9d8f" stroke-width="1.5" stroke-dasharray="4 3"><title>${escHtml(tip)}</title></rect>`,
+      `<text x="${((x1 + x2) / 2).toFixed(1)}" y="${yy + 13}" text-anchor="middle" font-size="11" font-weight="700" fill="${s.reliable ? "#fff" : "currentColor"}" style="pointer-events:none;">${escHtml(s.name)}${s.reversed ? " ↺" : ""}${s.reliable ? "" : " ?"}${s.pipeline_differs ? " ⚠" : ""}</text>`);
+  });
+  y += Math.max(1, lanes.length) * 24 + 10;
+  if (!stds.length) parts.push(`<text x="${L}" y="${y - 18}" font-size="11" fill="currentColor" opacity=".6">${d.standards.some((s) => s.mapped) ? "이 구간에는 표준물질이 없습니다" : "정렬된 표준물질이 없습니다"}</text>`);
+  // primer sets
+  parts.push(`<line x1="4" x2="${W - R}" y1="${y - 4}" y2="${y - 4}" stroke="currentColor" opacity=".15"/>`);
+  const shown = d.sets.filter((s) => sel.has(s.set_id));
+  shown.forEach((s) => {
+    const nm = s.name.length > 22 ? s.name.slice(0, 21) + "…" : s.name, missing = ["F", "P", "R"].filter((r) => !(s.hits[r] && s.hits[r].found));
+    parts.push(`<text x="${L - 8}" y="${y + 13}" text-anchor="end" font-size="11" fill="currentColor" class="gm-setlabel" data-set="${escHtml(s.set_id)}" style="cursor:pointer;"><title>${escHtml(s.name)} — 눌러서 세트 열기</title>${escHtml(nm)}${missing.length ? " ⚠" : ""}</text>
+      <line x1="${L}" x2="${W - R}" y1="${y + 9}" y2="${y + 9}" stroke="currentColor" opacity=".08"/>`);
+    if (s.amplicon && inView(s.amplicon[0], s.amplicon[1])) parts.push(`<rect x="${x(s.amplicon[0]).toFixed(1)}" y="${y + 7}" width="${Math.max(2, x(s.amplicon[1]) - x(s.amplicon[0])).toFixed(1)}" height="4" fill="currentColor" opacity=".28"><title>${escHtml(s.name)} amplicon ${s.amplicon[0].toLocaleString()}–${s.amplicon[1].toLocaleString()} (${s.amplicon[1] - s.amplicon[0] + 1} bp)</title></rect>`);
+    ["F", "P", "R"].forEach((role) => {
+      const h = s.hits[role];
+      if (!h || !h.found || !inView(h.start, h.end)) return;
+      const lo = Math.min(h.start, h.end), hi = Math.max(h.start, h.end), x1 = x(lo), x2 = Math.max(x(hi), x1 + 4), fwd = h.strand !== "-", tip = Math.min(6, (x2 - x1) / 2);
+      const pts = fwd ? `${x1},${y + 2} ${x2 - tip},${y + 2} ${x2},${y + 9} ${x2 - tip},${y + 16} ${x1},${y + 16}` : `${x2},${y + 2} ${x1 + tip},${y + 2} ${x1},${y + 9} ${x1 + tip},${y + 16} ${x2},${y + 16}`;
+      parts.push(`<polygon points="${pts}" fill="${GM_COL[role]}"><title>${escHtml(s.name)} ${role}: ${lo.toLocaleString()}–${hi.toLocaleString()} (${fwd ? "+" : "−"} 가닥) · mismatch ${h.mismatches ?? "?"}</title></polygon>`);
+    });
+    y += 24;
+  });
+  if (!shown.length) { parts.push(`<text x="${L}" y="${y + 12}" font-size="12" fill="currentColor" opacity=".6">왼쪽에서 프라이머 세트를 고르세요</text>`); y += 24; }
+  return `<svg id="gmSvg" viewBox="0 0 ${W} ${y + 6}" style="width:100%;height:auto;display:block;color:var(--fg);">${parts.join("")}</svg>`;
+}
+
+async function showGenomeMapPage() {
+  state.activeId = null; state.activeType = null;
+  renderSidebar();
+  showMainView("genomeMapView");
+  const view = $("#genomeMapView");
+  const segs = Object.keys((state.hostInfo || {}).segments || {}).map((x) => x.toUpperCase());
+  const allSegs = segs.length ? segs : ["S", "L"];
+  if (!GM.seg || !allSegs.includes(GM.seg)) GM.seg = allSegs[0];
+  view.innerHTML = "<p class='note'>불러오는 중...</p>";
+  let d;
+  try { d = GM.data = await fetchJSON(`/api/genome-map/${GM.seg.toLowerCase()}`); } catch (e) { view.innerHTML = `<p class="note">불러오기 실패: ${escHtml(e.message)}</p>`; return; }
+  const sel = gmSelected(GM.seg, d);
+  if (!GM.range || GM.rangeSeg !== GM.seg) { GM.range = [1, d.length || 1]; GM.rangeSeg = GM.seg; }
+  const q = (GM.filter || "").toLowerCase();
+  const byId = new Map(d.sets.map((s) => [s.set_id, s]));
+  const inGroup = new Set(d.groups.flatMap((g) => g.members));
+  const row = (s) => `<label class="vn-pick${sel.has(s.set_id) ? " on" : ""}" style="--c:var(--accent);"><input type="checkbox" class="gm-it" value="${escHtml(s.set_id)}" ${sel.has(s.set_id) ? "checked" : ""}> <span class="vn-name">${escHtml(s.name)}</span>${s.amplicon ? `<span class="vn-count" title="amplicon 위치">${s.amplicon[0]}–${s.amplicon[1]}</span>` : `<span class="vn-count" title="참조유전체에서 결합을 찾지 못함">결합 없음</span>`}</label>`;
+  const match = (s) => !q || s.name.toLowerCase().includes(q) || s.set_id.toLowerCase().includes(q);
+  const listHtml = d.groups.map((g) => {
+    const mem = g.members.map((m) => byId.get(m)).filter((s) => s && match(s));
+    return mem.length ? `<div class="vn-tree-group"><label class="vn-pick vn-pick-group"><input type="checkbox" class="gm-grp" value="${escHtml(g.group_id)}" ${mem.every((s) => sel.has(s.set_id)) ? "checked" : ""}> <span class="vn-name">&#9633; ${escHtml(g.label)}</span><span class="vn-count">${mem.length}</span></label><div class="vn-members">${mem.map(row).join("")}</div></div>` : "";
+  }).join("") + (() => { const loose = d.sets.filter((s) => !inGroup.has(s.set_id) && match(s)); return loose.length ? `<div class="vn-tree-group vn-tree-loose"><div class="vn-tree-vendor">그룹 없음</div><div class="vn-members">${loose.map(row).join("")}</div></div>` : ""; })();
+  const nStd = d.standards.length, nMapped = d.standards.filter((s) => s.mapped).length;
+  view.innerHTML = `<h2>🧭 유전체 지도</h2>
+    <p class="note">참조유전체 한 가닥 위에 <b>유전자</b>, <b>표준물질</b>(참조유전체에 정렬해 위치를 정한 것), 고른 <b>프라이머 세트</b>의 F · Probe · R 결합 위치를 겹쳐 봅니다. 좌표는 참조유전체 <b>${escHtml(d.reference)}</b>(${(d.length || 0).toLocaleString()} bp) 기준 1-based이고, 화살표 방향은 결합 가닥입니다.</p>
+    ${allSegs.length > 1 ? `<div class="seg-tab-row">${allSegs.map((x) => `<button class="seg-tab ${x === GM.seg ? "active" : ""}" data-gmseg="${x}">${x}</button>`).join("")}</div>` : ""}
+    <div class="gm-layout">
+      <div class="card gm-pick"><div class="vn-selector-head"><b>프라이머 세트</b> <span class="note">지금 ${sel.size}개 표시 · 전체 ${d.sets.length}개</span></div>
+        <div class="table-toolbar" style="gap:6px;margin:6px 0;"><input id="gmFilter" type="search" placeholder="이름 검색" value="${escHtml(GM.filter || "")}" style="flex:1;min-width:90px;">
+          <button type="button" class="btn btn-secondary" id="gmAll">모두</button><button type="button" class="btn btn-secondary" id="gmNone">해제</button></div>
+        <div class="vn-selector" style="max-height:62vh;grid-template-columns:1fr;">${listHtml || "<span class='note'>없음</span>"}</div></div>
+      <div class="card gm-main">
+        <div class="table-toolbar" style="gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+          <label class="note">구간 <input id="gmFrom" type="number" min="1" max="${d.length}" value="${GM.range[0]}" style="width:78px;"> – <input id="gmTo" type="number" min="1" max="${d.length}" value="${GM.range[1]}" style="width:78px;"></label>
+          <button type="button" class="btn btn-secondary" id="gmApply">적용</button><button type="button" class="btn btn-secondary" id="gmFull">전체</button>
+          <button type="button" class="btn btn-secondary" id="gmFit" title="고른 세트의 증폭산물이 모두 보이는 구간">고른 세트에 맞춤</button>
+          ${d.genes.map((g) => `<button type="button" class="btn btn-secondary gm-gene" data-a="${g.start}" data-b="${g.end}" title="${escHtml(g.gene)} ${g.start}–${g.end}">${escHtml(g.gene)}</button>`).join("")}
+          <button type="button" class="btn btn-secondary" id="gmPng" title="지도를 PNG 이미지로 저장">&#128247; 그림 저장</button></div>
+        <div id="gmCard">${gmSvg(d, sel, GM.range)}</div>
+        <div class="vn-legend" style="margin-top:6px;"><span class="vn-chip"><i style="background:${GM_COL.F}"></i>Forward</span><span class="vn-chip"><i style="background:${GM_COL.P}"></i>Probe</span><span class="vn-chip"><i style="background:${GM_COL.R}"></i>Reverse</span>
+          <span class="vn-chip"><i style="background:#2a9d8f"></i>표준물질 ${nMapped}/${nStd}개 위치 결정(blastn)${nStd - nMapped ? ` (못 찾은 ${nStd - nMapped}개는 그리지 않음)` : ""}${d.standards.some((s) => s.pipeline_differs) ? ` · ⚠ ${d.standards.filter((s) => s.pipeline_differs).map((s) => s.name).join(", ")}: 파이프라인(mafft) 위치와 다름` : ""}</span><span class="vn-chip"><i style="background:#7a8aa3"></i>+ 가닥 유전자</span><span class="vn-chip"><i style="background:#a38a9b"></i>− 가닥 유전자</span>
+          <span class="note">↺ = 표준물질이 반대 가닥 · 점선 ? = 정렬이 불확실 · ⚠ = F/P/R 중 참조유전체에서 결합을 못 찾은 것이 있음</span></div></div></div>`;
+  const redraw = () => { gmSave(GM.seg, sel); showGenomeMapPage(); };
+  view.querySelectorAll("[data-gmseg]").forEach((b) => b.addEventListener("click", () => { GM.seg = b.dataset.gmseg; GM.filter = ""; showGenomeMapPage(); }));
+  view.querySelectorAll(".gm-it").forEach((c) => c.addEventListener("change", () => { if (c.checked) sel.add(c.value); else sel.delete(c.value); redraw(); }));
+  view.querySelectorAll(".gm-grp").forEach((c) => c.addEventListener("change", () => { const g = d.groups.find((x) => x.group_id === c.value); (g ? g.members : []).forEach((m) => (c.checked ? sel.add(m) : sel.delete(m))); redraw(); }));
+  view.querySelector("#gmAll").addEventListener("click", () => { d.sets.filter((s) => !q || s.name.toLowerCase().includes(q)).forEach((s) => sel.add(s.set_id)); redraw(); });
+  view.querySelector("#gmNone").addEventListener("click", () => { sel.clear(); redraw(); });
+  view.querySelector("#gmFilter").addEventListener("change", (e) => { GM.filter = e.target.value; showGenomeMapPage(); });
+  const setRange = (lo, hi) => { lo = Math.max(1, Math.round(lo)); hi = Math.min(d.length, Math.round(hi)); if (hi - lo < 20) hi = Math.min(d.length, lo + 20); GM.range = [lo, hi]; showGenomeMapPage(); };
+  view.querySelector("#gmApply").addEventListener("click", () => setRange(Number(view.querySelector("#gmFrom").value) || 1, Number(view.querySelector("#gmTo").value) || d.length));
+  view.querySelector("#gmFull").addEventListener("click", () => setRange(1, d.length));
+  view.querySelector("#gmFit").addEventListener("click", () => {
+    const amps = d.sets.filter((s) => sel.has(s.set_id) && s.amplicon).map((s) => s.amplicon);
+    if (!amps.length) return uiAlert("구간을 맞출 증폭산물이 없습니다. 세트를 먼저 고르세요.");
+    const lo = Math.min(...amps.map((x) => x[0])), hi = Math.max(...amps.map((x) => x[1])), pad = Math.max(30, (hi - lo) * 0.1);
+    setRange(lo - pad, hi + pad);
+  });
+  view.querySelectorAll(".gm-gene").forEach((b) => b.addEventListener("click", () => { const lo = Number(b.dataset.a), hi = Number(b.dataset.b), pad = (hi - lo) * 0.03; setRange(lo - pad, hi + pad); }));
+  view.querySelector("#gmCard").addEventListener("click", (e) => { const t = e.target.closest(".gm-setlabel"); if (t) selectSet(t.dataset.set); });
+  view.querySelector("#gmPng").addEventListener("click", async () => { try { downloadBlob(await domToPngBlob(view.querySelector("#gmCard")), `genome_map_${GM.seg}.png`); } catch (err) { uiAlert(err.message); } });
+}
+$("#genomeMapBtn").addEventListener("click", showGenomeMapPage);

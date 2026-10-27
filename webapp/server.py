@@ -196,6 +196,7 @@ def save_fetch_baseline_from_remote():
 STATIC_DIR = Path(__file__).resolve().parent / "static"  # this package's own bundled assets
 sys.path.insert(0, str(ROOT / "scripts"))
 import scope_view  # noqa: E402 -- host-scope view of the results (webapp/scope_view.py)
+import genome_map  # noqa: E402 -- reference-genome map data (webapp/genome_map.py)
 import strain_link  # noqa: E402 -- draft S/L link by strain name (webapp/strain_link.py)
 import literature  # noqa: E402 -- literature primer lists (webapp/literature.py)
 
@@ -580,7 +581,7 @@ def run_redesign_job(job_id, seg, scope, ids, opts):
         base = _rd_dir(seg, scope, engine)
         base.mkdir(parents=True, exist_ok=True)
         run = {"engine": engine, "segment": seg.upper(), "host_scope": scope, "generated": time.strftime("%Y-%m-%d %H:%M:%S"),
-               "population_n": len(ids), "params": {k: opts[k] for k in ("threshold", "min_threshold", "ambig", "probe_ambig", "pair_ambig", "top", "min_n", "pass_mm", "tp_n", "require_std", "ph_sample", "ph_min_cov", "ph_min_tm") if k in opts},
+               "population_n": len(ids), "params": {k: opts[k] for k in ("threshold", "min_threshold", "ambig", "probe_ambig", "pair_ambig", "top", "min_n", "pass_mm", "tp_n", "std_mode", "std_prefer_pct", "ph_sample", "ph_min_cov", "ph_min_tm") if k in opts},
                "lineages": [], "done": False}
         (base / "run.json").write_text(json.dumps(run), encoding="utf-8")
         for gi, (L, members) in enumerate(groups, 1):
@@ -597,7 +598,8 @@ def run_redesign_job(job_id, seg, scope, ids, opts):
                     res = redesign_coverage.design_lineage(
                         {k: seqs[k] for k in members if k in seqs}, base / L, ambig=opts["ambig"], probe_ambig=opts["probe_ambig"], top=opts["top"],
                         pass_mm=opts.get("pass_mm", 2), tp_n=opts.get("tp_n", 2), threads=4, progress=lambda m, tag=tag: progress(tag + m),
-                        standards=_standard_seqs(seg) if opts.get("require_std") else None, require_std=bool(opts.get("require_std")))
+                        standards=_standard_seqs(seg) if opts.get("std_mode", "off") != "off" else None, require_std=opts.get("std_mode") == "require",
+                        std_prefer_pct=opts.get("std_prefer_pct", 5.0))
                 else:
                     res = redesign_varvamp.design_lineage(
                         {k: seqs[k] for k in members if k in seqs}, base / L, opts["threshold"], opts["min_threshold"],
@@ -1775,6 +1777,16 @@ def filter_pair_ambig(res, limit):
     return {**res, "designs": kept, "message": f"{res.get('message') or ''} {note}".strip()}
 
 
+def load_genome_map(seg):
+    """Reference genome + genes, the standard material placed on it by alignment, and where each primer set binds (webapp/genome_map.py)."""
+    prof = get_profile()
+    sets = [{"set_id": st["set_id"], "name": st.get("display_name") or st["set_id"]} for st in load_builtin_sets()
+            if str(st.get("segment", "")).lower() == seg]
+    groups = [{"group_id": g["group_id"], "label": g.get("label"), "members": [m for m in (g.get("member_ids") or "").split(";") if m]}
+              for g in load_groups_config() if str(g.get("segment", "")).lower() == seg]
+    return genome_map.build(ROOT, seg, (prof["segments"].get(seg) or {}).get("reference_accession", ""), sets, groups)
+
+
 def strain_link_data():
     """The draft strain link (see strain_link.py) for the analysed populations in the active host scope, or None for a one-segment virus."""
     segs = seg_keys()
@@ -2792,6 +2804,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send_json({"error": "bad segment"}, 400)
             data = load_genome_meta(seg, m.group(2))
             return self._send_json(data if data is not None else {"error": "메타데이터에 없는 유전체입니다."}, 200 if data is not None else 404)
+        m = re.match(r"^/api/genome-map/(\w+)$", path)
+        if m:
+            seg = m.group(1).lower()
+            if seg not in seg_keys():
+                return self._send_json({"error": "bad segment"}, 400)
+            return self._send_json(load_genome_map(seg))
         if path == "/api/venn/linked":
             data = load_venn_linked()
             return self._send_json(data if data is not None else {"error": "분절이 둘 이상인 바이러스만 지원합니다."}, 200 if data is not None else 404)
@@ -3803,7 +3821,7 @@ class Handler(BaseHTTPRequestHandler):
         opts = {"threshold": thr, "min_threshold": min(thr, num("min_threshold", 0.6, 0.3, 1.0)),
                 "ambig": num("ambig", 2, 0, 8, int), "probe_ambig": num("probe_ambig", 1, 0, 6, int), "pair_ambig": num("pair_ambig", 0, 0, 16, int),
                 "top": num("top", 3, 1, 8, int), "min_n": num("min_n", 5, 3, 1000, int),
-                "include_all": bool(o.get("include_all")), "engine": rd_engine(o.get("engine")), "require_std": bool(o.get("require_std")), "pass_mm": params_pass_mm(), "tp_n": params_tp_n(),
+                "include_all": bool(o.get("include_all")), "engine": rd_engine(o.get("engine")), "std_mode": (o.get("std_mode") if o.get("std_mode") in ("off", "prefer", "require") else ("require" if o.get("require_std") else "off")), "std_prefer_pct": num("std_prefer_pct", 5.0, 0.0, 50.0), "pass_mm": params_pass_mm(), "tp_n": params_tp_n(),
                 "ph_sample": num("ph_sample", 25, 5, 100, int), "ph_threads": num("ph_threads", 12, 1, 32, int),
                 "ph_min_cov": num("ph_min_cov", 80.0, 10.0, 100.0), "ph_min_tm": num("ph_min_tm", 56.0, 40.0, 70.0),
                 "lineages": [x for x in (o.get("lineages") or []) if isinstance(x, str) and re.fullmatch(r"[A-Za-z0-9_\-]+", x)]}

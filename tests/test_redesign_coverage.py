@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 import redesign_coverage as rc  # noqa: E402
+rc.POOL_BOUND, rc.POOL_KEEP = 500, 250                    # smaller candidate pools keep the synthetic tests quick
 
 
 def alignment(seed=1, n=40, length=420, rate=0.03):
@@ -88,3 +89,16 @@ def test_required_standard_limits_the_design_to_its_span():
     assert res["status"] == "none" and "표준물질" in res["message"]
     res = rc.design_from_alignment(ids, rows, std_rows=std_tiny, require_std=False, **kw)         # not required: designs come back, flagged
     assert res["status"] == "ok" and res["designs"][0]["std_est"] is False
+
+
+def test_preferring_the_standard_is_between_off_and_required():
+    ids, rows, ref = alignment(seed=11, n=50, length=480, rate=0.05)
+    kw = dict(top=1, primer_tm=(40.0, 80.0), probe_above=(-30.0, 30.0), max_dtm=30.0)
+    std = ["-" * 150 + ref[150:330] + "-" * 150]                   # the standard covers only the middle part of the sequence
+    off = rc.design_from_alignment(ids, rows, std_rows=std, **kw)["designs"][0]
+    req = rc.design_from_alignment(ids, rows, std_rows=std, require_std=True, **kw)["designs"][0]
+    pre = rc.design_from_alignment(ids, rows, std_rows=std, std_prefer_pct=100.0, **kw)["designs"][0]
+    assert req["std_est"] is True and pre["std_est"] is True       # a huge preference behaves like a requirement here
+    assert off["est_cov"] >= req["est_cov"]                        # the requirement can only cost coverage
+    small = rc.design_from_alignment(ids, rows, std_rows=std, std_prefer_pct=0.0, **kw)["designs"][0]
+    assert small["est_cov"] == off["est_cov"]                      # no preference = the unconstrained design

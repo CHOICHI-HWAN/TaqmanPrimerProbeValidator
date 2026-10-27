@@ -59,6 +59,7 @@
         <button id="geneConsBtn" class="btn btn-secondary btn-block">🧬 유전자 보존영역</button>
         <button id="standardsBtn" class="btn btn-secondary btn-block">🧪 표준물질 대표성</button>
         <button id="metaTableBtn" class="btn btn-secondary btn-block">📊 메타데이터 표</button>
+        <button id="genomeMapBtn" class="btn btn-secondary btn-block" title="참조유전체 위에 유전자, 표준물질(정렬로 위치 결정), 고른 프라이머 세트의 결합 위치를 한눈에 봅니다">🧭 유전체 지도</button>
         <button id="metadataBtn" class="btn btn-secondary btn-block">🗺 메타데이터 / 지도</button>
         <button id="guideBtn" class="btn btn-secondary btn-block">📖 파이프라인 개요 / 가이드</button>
         <button id="tourBtn" class="btn btn-secondary btn-block" title="화면 구성과 주요 기능을 단계별로 안내합니다">🧭 UI 사용 안내 (투어)</button>
@@ -87,7 +88,7 @@
       </div>
       <input id="searchBox" class="search-box" type="text" placeholder="세트 검색 (이름, 벤더)...">
       <div id="setList" class="set-list"></div>
-      <div class="sidebar-footer">&copy; 2026 Chihwan Choi &middot; GPL-3.0 &middot; v<span id="footerVersion">0.32.0</span><br><button id="skinToggleBtn" class="skin-toggle" title="화면 스타일 전환 (Vaadin Lumo / 기본)">스타일: Lumo</button></div>
+      <div class="sidebar-footer">&copy; 2026 Chihwan Choi &middot; GPL-3.0 &middot; v<span id="footerVersion">0.33.0</span><br><button id="skinToggleBtn" class="skin-toggle" title="화면 스타일 전환 (Vaadin Lumo / 기본)">스타일: Lumo</button></div>
     </aside>
 
     <main class="main">
@@ -105,6 +106,7 @@
       <div id="redesignView" class="diversity-view" hidden></div>
       <div id="engineView" class="diversity-view" hidden></div>
       <div id="vennView" class="diversity-view" hidden></div>
+      <div id="genomeMapView" class="diversity-view" hidden></div>
 
       <div id="metadataView" class="metadata-view" hidden></div>
 

@@ -1215,3 +1215,11 @@ a.pipe-pill:hover { border-color: var(--accent); color: var(--accent); }
 .gm-line.open .gm-caret { transform: rotate(180deg); }
 
 .rd-off { opacity: .55; }
+
+.gm-layout { display: grid; grid-template-columns: minmax(230px, 300px) minmax(0, 1fr); gap: 14px; align-items: start; }
+@media (max-width: 1000px) { .gm-layout { grid-template-columns: minmax(0, 1fr); } }
+.gm-setlabel:hover { text-decoration: underline; }
+
+/* maximise that does not need the browser's Fullscreen API (see toggleFullscreen) */
+.fs-fallback { position: fixed !important; inset: 0 !important; z-index: 8000; margin: 0 !important; width: auto !important; max-width: none !important; max-height: none !important; height: auto; overflow: auto; border-radius: 0 !important; background: var(--bg); padding: 22px; box-sizing: border-box; }
+body.fs-open { overflow: hidden; }
