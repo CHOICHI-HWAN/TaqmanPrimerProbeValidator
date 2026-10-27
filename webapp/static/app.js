@@ -575,13 +575,17 @@ function toast(msg, opts = {}) {
   let el = [...box.children].find((x) => x.dataset.id === id);
   if (!el) {
     el = document.createElement("div"); el.dataset.id = id;
-    el.innerHTML = '<span class="toast-ic"></span><span class="toast-msg"></span><button class="toast-x" type="button" aria-label="닫기">×</button>';
+    el.innerHTML = '<span class="toast-ic"></span><div class="toast-body"><span class="toast-msg"></span><div class="toast-bar" hidden><i></i></div></div><button class="toast-x" type="button" aria-label="닫기">×</button>';
     el.querySelector(".toast-x").addEventListener("click", () => toastClear(id));
     box.appendChild(el);
   }
   el.className = `toast toast-${type}`;
   el.querySelector(".toast-ic").textContent = type === "ok" ? "✓" : type === "err" ? "!" : type === "run" ? "" : "i";
   el.querySelector(".toast-msg").textContent = msg;
+  const bar = el.querySelector(".toast-bar");                    // progress: 0..1 = a filled bar, indeterminate = a sliding one, neither = no bar
+  bar.hidden = !(opts.progress != null || opts.indeterminate);
+  bar.classList.toggle("ind", !!opts.indeterminate && opts.progress == null);
+  if (opts.progress != null) bar.firstElementChild.style.width = `${Math.max(0, Math.min(1, opts.progress)) * 100}%`;
   clearTimeout(el._t);
   const ttl = opts.ttl ?? (type === "run" ? 0 : type === "err" ? 12000 : 4500);
   if (ttl) el._t = setTimeout(() => toastClear(id), ttl);
