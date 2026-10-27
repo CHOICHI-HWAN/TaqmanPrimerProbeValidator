@@ -47,6 +47,12 @@ Detailed documentation (pipeline steps, settings, dashboard features, directory 
 
 10) **Easy to navigate.** Group → set tree with variants folded into their parent and duplicate-sequence marks, collapsible sidebar, back/forward on every page, section jump bar in the set view, your own *adopt / hold / reject* mark per set, a LASV ⇄ NiV switch and the ICTV taxonomy (Realm … Genus, Species) of each virus.
 
+11) **Primer mapping map.** One reference genome with its genes, the **standard materials placed on it with blastn**, and the F / Probe / R binding of the sets you pick (drag a set to reorder the rows, Geneious-style colours), with a **coverage curve** under it: how many genomes pass as the tolerated number of mismatches grows, overall or per lineage.
+
+12) **Coverage-first re-design and genome details.** A re-design tool that picks F / R / Probe so that the genomes passing *this pipeline's own rule* are as many as possible (standard material: ignore / prefer / require), a metadata line (when · where · lineage · host) in the genome window, and — for segmented viruses — a draft **S + L link** by strain name so the segments can be read together.
+
+13) **Optional Go engines.** `go/probedesign` and `go/scan` reproduce the Python probe design and whole-genome scan result for result (checked on every set; the scan is ~12× faster). Switch with `scan_engine: python | go`; the **Engine check** page compares the two. Go is not required.
+
 ## Schematic
 
 ![Schematic](docs/schematic/pipeline_schematic.svg)
@@ -93,7 +99,7 @@ Detailed documentation (pipeline steps, settings, dashboard features, directory 
 
 ### Current version
 
-Code: **v0.35.0**   ·   Tested on Ubuntu 24.04, x86_64
+Code: **v0.36.0**   ·   Tested on Ubuntu 24.04, x86_64
 
 ### Requirements
 
@@ -103,6 +109,8 @@ Code: **v0.35.0**   ·   Tested on Ubuntu 24.04, x86_64
 | **mfeprimer 4.2.4** | **not included and not on conda — install it yourself (steps 3–4 below)** |
 | internet | genome download; the optional tree viewer |
 | Chrome (optional) | only for the PDF report export |
+| blastn (optional) | places the standard materials on the reference (mapping map, standard representativeness); without it the mafft placement is used |
+| Go ≥ 1.21 (optional) | builds `go/probedesign` and `go/scan` (the Go engines); not needed to run the pipeline |
 
 **1)  Get the code**
 
@@ -252,7 +260,7 @@ There is no publication for this tool yet. Please cite the software as below, **
   author  = {Choi, Chihwan},
   title   = {TaqMan Primer/Probe Validator},
   year    = {2026},
-  version = {0.35.0},
+  version = {0.36.0},
   url     = {https://github.com/CHOICHI-HWAN/TaqmanPrimerProbeValidator}
 }
 ```
