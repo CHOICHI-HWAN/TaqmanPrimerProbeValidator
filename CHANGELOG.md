@@ -5,6 +5,11 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.31.1] - 2026-10-27
+
+### Changed
+- 메뉴 이름 "리니지별 재설계 (varVAMP)" → "리니지별 재설계"(도구는 varVAMP·PrimerHunter·커버리지 우선 중에서 페이지 안에서 고름).
+
 ## [0.31.0] - 2026-10-27
 
 ### Added
