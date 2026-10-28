@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const src = fs.readFileSync(path.join(here, "../../webapp/static/app.js"), "utf8");
 const grab = (start) => { const i = src.indexOf(start); let d = 0; for (let k = src.indexOf("{", i); k < src.length; k++) { if (src[k] === "{") d++; if (src[k] === "}" && !--d) return src.slice(i, k + 1); } };
-const code = [grab("function verdictFor"), src.slice(src.indexOf("const PARTIAL_MM"), src.indexOf(";", src.indexOf("const PARTIAL_MM")) + 1),
+const code = ["const PASS = { mm: 1, pm: 0 };", grab("function verdictFor"), src.slice(src.indexOf("const PARTIAL_MM"), src.indexOf(";", src.indexOf("const PARTIAL_MM")) + 1),
   grab("function standardState"), grab("function nearBinding"), grab("function verdictClass")].join("\n");
 const { verdictFor, nearBinding, verdictClass, standardState } = new Function(code + "; return { verdictFor, nearBinding, verdictClass, standardState };")();
 const g = (f, p, r, extra = {}) => ({ f_mismatch: f, p_mismatch: p, r_mismatch: r, f_3p_ok: true, r_3p_ok: true, ...extra });

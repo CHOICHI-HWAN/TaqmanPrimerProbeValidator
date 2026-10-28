@@ -5,6 +5,13 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.36.2] - 2026-10-28
+
+### Fixed
+- **그룹 상세의 '리니지 분포'와 '커버리지 벤 다이어그램' 수치가 달랐던 문제**: 호스트 필터는 두 화면 모두 정상 적용되고 있었고(전체 게놈 수는 동일), 차이는 '교차 결합' 판정 기준에서 났습니다. 그룹 상세의 리니지 카드만 F/R mismatch ≤1 · 프로브 0이라는 옛 고정 기준을 따로 쓰고 있어, 설정(`primer_mismatch_pass`)을 바꾼 프로젝트에서는 요약·개요·벤 다이어그램(현재 기준)보다 적게 셌습니다(예: LASV-VendorB-S 사람 숙주 327 → 344). 이제 모든 화면이 한 곳(`group_cross_ids`)의 현재 기준을 씁니다.
+- 화면 속 판정 설명 문구(검증 통과 안내, 모달 부제, 교차 결합 설명, Nextstrain 갱신 창)와 게놈별 실패 사유가 설정값(`primer_mismatch_pass`, `probe_mismatch`)을 따라갑니다(전에는 "≤1"로 고정).
+- 테스트: `tests/test_cross_rule_single_source.py` 추가.
+
 ## [0.36.1] - 2026-10-28
 
 ### Changed
