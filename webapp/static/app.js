@@ -923,15 +923,15 @@ function countIupacMismatches(query, target) {
 function verdictFor(g) {
   const bad = [];
   if (g.f_mismatch === null || g.f_mismatch === undefined) bad.push("Forward 매치 안됨");
-  else if (g.f_mismatch > 1) bad.push(`Forward mismatch ${g.f_mismatch}개`);
+  else if (g.f_mismatch > PASS.mm) bad.push(`Forward mismatch ${g.f_mismatch}개`);
   else if (g.f_3p_ok === false) bad.push("Forward 3' 말단에 mismatch 있음");
   if (g.p_mismatch === null || g.p_mismatch === undefined) bad.push("Probe 매치 안됨");
   else if (g.p_mismatch > 0) bad.push(`Probe mismatch ${g.p_mismatch}개(완전일치 필요)`);
   if (g.r_mismatch === null || g.r_mismatch === undefined) bad.push("Reverse 매치 안됨");
-  else if (g.r_mismatch > 1) bad.push(`Reverse mismatch ${g.r_mismatch}개`);
+  else if (g.r_mismatch > PASS.mm) bad.push(`Reverse mismatch ${g.r_mismatch}개`);
   else if (g.r_3p_ok === false) bad.push("Reverse 3' 말단에 mismatch 있음");
   if (bad.length === 0) {
-    return { ok: true, text: "✅ 검증 통과 — F/R mismatch ≤1(3' 말단 완전일치), Probe 완전일치 조건을 모두 만족합니다." };
+    return { ok: true, text: `✅ 검증 통과 — F/R mismatch ≤${PASS.mm}(3' 말단 완전일치), Probe mismatch ≤${PASS.pm} 조건을 모두 만족합니다.` };
   }
   return { ok: false, text: `⚠️ 검증 실패 — ${bad.join(", ")}` };
 }
@@ -1213,7 +1213,7 @@ function openStandardModal(setData) {
   const part = sg.filter((g) => standardState(g) === "partial").length;
   return openDetailModal({
     title: `표준물질(KDCA) 매치 &mdash; ${escHtml(setData.display_name || setData.set_id)}`,
-    subtitle: sg.length ? `${sg.length}개 중 ${ok}개 일치${part ? ` · ${part}개 일부 매치` : ""} · 판정: F/R mismatch&le;1(3′ 끝 일치), Probe 완전일치` : "",
+    subtitle: sg.length ? `${sg.length}개 중 ${ok}개 일치${part ? ` · ${part}개 일부 매치` : ""} · 판정: F/R mismatch&le;${PASS.mm}(3′ 끝 일치), Probe mismatch&le;${PASS.pm}` : "",
     html: sg.length ? standardSummaryTable(sg) + renderStandardDetail(sg, setData, { skipUnmatched: true })
       : "<p class='note'>이 세트의 segment에는 등록된 표준물질이 없습니다 (표준물질은 선택 사항입니다).</p>",
   });
@@ -1241,7 +1241,7 @@ async function openStandardOverviewModal() {
   }).join("");
   return openDetailModal({
     title: "표준물질 매치 &mdash; 전체 세트",
-    subtitle: "O = F/R mismatch&le;1(3′ 끝 일치) 그리고 Probe 완전일치 · 한 세트의 자세한 결합 정렬은 그 세트의 \"표준물질(KDCA) 매치\" 카드를 누르세요",
+    subtitle: `O = F/R mismatch&le;${PASS.mm}(3′ 끝 일치) 그리고 Probe mismatch&le;${PASS.pm} · 한 세트의 자세한 결합 정렬은 그 세트의 "표준물질(KDCA) 매치" 카드를 누르세요`,
     html: `<div style="overflow:auto;"><table class="mini-reference-table">${head}${body}</table></div>`,
   });
 }
@@ -4038,7 +4038,7 @@ function renderGroupDetail(g) {
             <span class="v" style="color:var(--accent);">${g.summary.validated_with_cross ?? g.summary.validated} / ${g.summary.total_genomes} (${fmtPct(g.summary.validated_with_cross_pct ?? g.summary.validated_pct)})</span>
           </div>
         </div>
-        <div class="note" style="margin-top:6px;">교차 결합 포함: 세트 간 조합(예: 세트2의 F/R + 세트1의 프로브)이 F/R mismatch&le;1(3′ 끝 일치), 프로브 완전일치로 통과하는 게놈까지 센 수입니다. 개별 세트에서는 안 나와도 그룹으로 묶으면 통과하는 게놈이 여기 나타납니다.</div>
+        <div class="note" style="margin-top:6px;">교차 결합 포함: 세트 간 조합(예: 세트2의 F/R + 세트1의 프로브)이 F/R mismatch&le;${PASS.mm}(3′ 끝 일치), 프로브 mismatch&le;${PASS.pm}로 통과하는 게놈까지 센 수입니다. 개별 세트에서는 안 나와도 그룹으로 묶으면 통과하는 게놈이 여기 나타납니다.</div>
         <div class="note" style="margin-top:8px;">이 그룹의 세트 중 하나라도 통과(validated)하면 그 게놈은 합집합에 포함됩니다.</div>
       </div>
       <div class="card">
@@ -9063,7 +9063,7 @@ function renderOverviewHtml(data) {
   return `
     <h2>${escHtml(PROFILE.short_name || "LASV")} Primer/Probe 전체 대시보드</h2>
     ${ictvCrumbHtml()}
-    <div class="subtitle">Nextstrain(lassa/s, /l) 최신 데이터셋 &middot; 판정 기준: primer mismatch&le;1, probe mismatch=0(완전일치)</div>
+    <div class="subtitle">Nextstrain(lassa/s, /l) 최신 데이터셋 &middot; 판정 기준: primer mismatch&le;${PASS.mm}, probe mismatch&le;${PASS.pm}</div>
 
     <div class="stat-tiles">
       <div class="stat-tile"><div class="label">S segment 게놈</div><div class="value">${ds.S ?? "—"}</div></div>

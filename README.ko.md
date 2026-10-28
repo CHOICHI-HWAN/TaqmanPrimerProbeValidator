@@ -100,7 +100,7 @@ LASV 에디션은 두 분절(S, L)을 다루며, 유전체와 메타데이터는
 
 ### 현재 버전
 
-코드: **v0.36.1**   ·   Ubuntu 24.04, x86_64에서 테스트
+코드: **v0.36.2**   ·   Ubuntu 24.04, x86_64에서 테스트
 
 ### 필요한 것
 
@@ -261,7 +261,7 @@ python3 webapp/server.py --host 0.0.0.0 --port 8765
   author  = {Choi, Chihwan},
   title   = {TaqMan Primer/Probe Validator},
   year    = {2026},
-  version = {0.36.1},
+  version = {0.36.2},
   url     = {https://github.com/CHOICHI-HWAN/TaqmanPrimerProbeValidator}
 }
 ```

@@ -1378,11 +1378,8 @@ def load_group_detail(group_id):
     refgenome_combo = _load_group_combo_table(group_dir / "refgenome_combo_table.tsv")
 
     # A genome also counts for the group when ANY pairing of its oligos passes (set 1's F + set 2's R + a probe of either
-    # set: F/R mismatch <= 1 with intact 3' ends, probe perfect) -- the plain union of each set's own result cannot see that.
-    cross_ids = {r["genome_id"] for r in combo_genomes
-                 if r.get("f_mismatch") not in (None, "") and r.get("r_mismatch") not in (None, "") and r.get("p_mismatch") not in (None, "")
-                 and r["f_mismatch"] <= 1 and r["r_mismatch"] <= 1 and r["p_mismatch"] == 0
-                 and r.get("f_3p_ok") is not False and r.get("r_3p_ok") is not False}
+    # set: F/R mismatch within the configured limit with intact 3' ends, probe within its limit) -- the plain union of each set's own result cannot see that.
+    cross_ids = group_cross_ids(group_id)          # the same rule (current primer/probe mismatch limits) as the summary, the overview and the Venn page
     cross_ids &= keep_ids
     combo_genomes = view.tag_and_filter(seg.lower(), combo_genomes)      # only the genomes of the active host scope
     validated_with_cross = validated_ids | cross_ids
