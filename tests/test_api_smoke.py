@@ -19,10 +19,13 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 
-pytestmark = pytest.mark.skipif(
-    not (ROOT / "output" / "summary" / "summary.tsv").exists(),
-    reason="pipeline results not computed yet (run snakemake first)",
-)
+def _has_results():
+    f = ROOT / "output" / "summary" / "summary.tsv"
+    return (f.exists() and len(f.read_text(encoding="utf-8").splitlines()) > 1          # header only = no primer set analysed yet
+            and (ROOT / "output" / "diversity").exists() and (ROOT / "output" / "standards").exists())      # these checks assume a complete run
+
+
+pytestmark = pytest.mark.skipif(not _has_results(), reason="pipeline results not computed yet (run snakemake first)")
 
 
 def _free_port():
