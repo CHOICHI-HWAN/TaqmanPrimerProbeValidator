@@ -198,6 +198,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import scope_view  # noqa: E402 -- host-scope view of the results (webapp/scope_view.py)
 import genome_map  # noqa: E402 -- reference-genome map data (webapp/genome_map.py)
 import strain_link  # noqa: E402 -- draft S/L link by strain name (webapp/strain_link.py)
+import data_source  # noqa: E402 -- where the analysed genomes come from (webapp/data_source.py)
 import literature  # noqa: E402 -- literature primer lists (webapp/literature.py)
 
 from live_analyze import analyze_set  # noqa: E402
@@ -1744,7 +1745,7 @@ def load_genome_meta(seg, acc):
                                  lambda p: {r["accession"]: r for r in scope_view._read_tsv(p) if r.get("accession")}).get(acc)
     out = {"accession": acc, "segment": seg, "raw": {k: (x or "") for k, x in raw.items()}, "analysed": curated is not None,
            "analysis": {k: curated.get(k, "") for k in ("lineage", "date", "country", "region")} if curated else {},
-           "host_class": v.host_class(seg, acc), "linked": None}
+           "host_class": v.host_class(seg, acc), "source": data_source.record_source(raw, get_profile()), "linked": None}
     link = strain_link_data()
     if link:
         for x in link["viruses"]:
@@ -2355,7 +2356,7 @@ def _parse_filter_report_full(path: Path):
 
 METADATA_TABLE_COLUMNS = [
     # key, label, type ("text" | "num")
-    ("segment", "Seg", "text"), ("accession", "Accession", "text"), ("data_qc", "데이터 QC", "text"), ("qc_reason", "QC 사유", "text"),
+    ("segment", "Seg", "text"), ("accession", "Accession", "text"), ("source", "데이터 출처", "text"), ("data_qc", "데이터 QC", "text"), ("qc_reason", "QC 사유", "text"),
     ("lineage", "Lineage", "text"), ("strain", "Strain", "text"),
     ("isolate", "Isolate", "text"), ("sub_lineage", "Sub-lineage", "text"),
     ("date", "Date", "text"), ("year", "Year", "num"), ("country", "Country", "text"),
@@ -2441,6 +2442,7 @@ def load_metadata_table():
                 "diversity_qc": dq, "identity_to_ref": g["identity"] if g else None,
                 "coverage": g["coverage"] if g else None, "date_released": r.get("date_released", ""),
                 "authors": r.get("abbr_authors") or r.get("authors", ""), "institution": r.get("institution", ""),
+                "source": data_source.record_source(r or {"accession": acc}, get_profile()),
             })
     lineage_label = get_profile()["lineage"]["label"]
     return {"columns": [{"key": k, "label": (lineage_label if k == "lineage" else l), "type": t} for k, l, t in METADATA_TABLE_COLUMNS], "rows": rows}
@@ -2868,7 +2870,7 @@ class Handler(BaseHTTPRequestHandler):
                 version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
             except OSError:
                 version = ""
-            return self._send_json(dict(get_profile(), version=version))        # the footer shows the VERSION file, not a typed-in number
+            return self._send_json(dict(get_profile(), version=version, data_source=data_source.info(get_profile(), ROOT, read_tsv, seg_keys())))        # the footer shows the VERSION file, not a typed-in number
 
         if path == "/api/diversity":
             return self._send_json(load_diversity())
