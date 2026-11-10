@@ -71,7 +71,7 @@ def test_shipped_profile_pathoplexus_source_and_country_lineage():
     from virus_profile import source_urls
     p = load_profile(ROOT / "profiles" / "mpxv.json")
     assert segment_keys(p) == ['genome']
-    assert source_urls(p, "genome") == ("https://lapis.pathoplexus.org", "mpox@clade")
+    assert source_urls(p, "genome") == ("https://lapis.pathoplexus.org", "mpox@clade:lineage")
     assert p["lineage"]["mode"] == "metadata_column" and p["segments"]["genome"]["lineage_col"] == "country_lineage"
     assert chrom_name(p, "genome") == "MPXV_GENOME" and p["qc"]["max_n_fraction"] == 0.01
     q = load_profile(ROOT / "profiles" / "lassa.json")
