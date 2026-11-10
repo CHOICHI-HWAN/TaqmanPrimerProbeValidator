@@ -1,0 +1,111 @@
+{
+  "profile_version": 1,
+  "id": "cchfv",
+  "name": "Orthonairovirus haemorrhagiae (Crimean-Congo hemorrhagic fever orthonairovirus)",
+  "short_name": "CCHFV",
+  "taxonomy": {
+    "source": "ICTV Master Species List (2023-2025 releases). Names and ranks change between releases -- check https://ictv.global/taxonomy",
+    "virus": "Crimean-Congo hemorrhagic fever virus (CCHFV)",
+    "ranks": [
+      [
+        "Realm",
+        "Riboviria"
+      ],
+      [
+        "Kingdom",
+        "Orthornavirae"
+      ],
+      [
+        "Phylum",
+        "Negarnaviricota"
+      ],
+      [
+        "Subphylum",
+        "Polyploviricotina"
+      ],
+      [
+        "Class",
+        "Ellioviricetes"
+      ],
+      [
+        "Order",
+        "Hareavirales"
+      ],
+      [
+        "Family",
+        "Nairoviridae"
+      ],
+      [
+        "Genus",
+        "Orthonairovirus"
+      ],
+      [
+        "Species",
+        "Orthonairovirus haemorrhagiae"
+      ]
+    ],
+    "former_species": "Crimean-Congo hemorrhagic fever orthonairovirus"
+  },
+  "source": {
+    "type": "pathoplexus",
+    "base_url": "https://lapis.pathoplexus.org",
+    "organism": "cchf",
+    "segment_subdirs": true
+  },
+  "segments": {
+    "s": {
+      "label": "S",
+      "min_len": 1500,
+      "lineage_col": "country_lineage",
+      "reference_accession": "NC_005302"
+    },
+    "m": {
+      "label": "M",
+      "min_len": 5000,
+      "lineage_col": "country_lineage",
+      "reference_accession": "NC_005300"
+    },
+    "l": {
+      "label": "L",
+      "min_len": 11000,
+      "lineage_col": "country_lineage",
+      "reference_accession": "NC_005301"
+    }
+  },
+  "metadata": {
+    "accession": "accession",
+    "lineage_fallback": "country_lineage",
+    "date": "date",
+    "country": "country",
+    "region": "region",
+    "host": "host",
+    "lab_host": "is_lab_host"
+  },
+  "lineage": {
+    "label": "Genotype",
+    "mode": "metadata_column",
+    "missing": "unclassified"
+  },
+  "qc": {
+    "max_n_fraction": 0.01,
+    "exclude_list": null
+  },
+  "population": {
+    "pooled_label": "ALL_CCHFV",
+    "chrom_prefix": "CCHFV"
+  },
+  "diversity": {
+    "window_size": 1,
+    "min_coverage": 0.95,
+    "min_identity": 0.65,
+    "min_lineage_n": 10
+  },
+  "ui": {
+    "name_ko": "크리미안-콩고 출혈열 바이러스",
+    "web_url": "https://pathoplexus.org/cchf/search",
+    "lineage_ko": "유전형(S 분절)",
+    "lineage_examples": "I, II, III, IV, V, VI",
+    "lineage_def": "CCHFV는 S 분절의 계통 분류(유전형 I~VI, IV.1/IV.2 등)를 리니지로 쓴다(Pathoplexus lineage_S). M·L 분절은 재조합이 잦아 같은 기록의 S 유전형을 따르지 않으므로 S 유전형이 없는 기록은 unclassified로 둔다.",
+    "orientation_note": ""
+  }
+}

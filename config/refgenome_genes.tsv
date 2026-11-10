@@ -1,0 +1,4 @@
+segment	accession	genome_len	gene	start	end	strand
+s	NC_005302	1672	NP	56	1504	+
+m	NC_005300	5366	GPC	93	5147	+
+l	NC_005301	12108	L	77	11914	+
