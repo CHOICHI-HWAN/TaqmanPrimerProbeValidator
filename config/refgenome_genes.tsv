@@ -1,0 +1,8 @@
+segment	accession	genome_len	gene	start	end	strand
+genome	NC_001608	19112	NP	49	2844	+
+genome	NC_001608	19112	VP35	2854	4410	+
+genome	NC_001608	19112	VP40	4415	5819	+
+genome	NC_001608	19112	GP	5825	8670	+
+genome	NC_001608	19112	VP30	8768	10016	+
+genome	NC_001608	19112	VP24	9999	11285	+
+genome	NC_001608	19112	L	11291	19036	+
