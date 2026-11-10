@@ -76,7 +76,7 @@ TAFV 에디션은 Orthoebolavirus taiense의 비분절 유전체를 다룹니다
 
 ### 현재 버전
 
-코드: **v0.1.1 (TAFV 에디션)**   ·   Ubuntu 24.04, x86_64에서 테스트
+코드: **v0.1.2 (TAFV 에디션)**   ·   Ubuntu 24.04, x86_64에서 테스트
 
 ### 필요한 것
 
@@ -238,7 +238,7 @@ python3 webapp/server.py --host 0.0.0.0 --port 8767
   author  = {Choi, Chihwan},
   title   = {TaqMan Primer/Probe Validator (TAFV edition)},
   year    = {2026},
-  version = {0.1.1},
+  version = {0.1.2},
   url     = {https://github.com/CHOICHI-HWAN/TaqmanPrimerProbeValidator/tree/tafv}
 }
 ```
