@@ -1,0 +1,8 @@
+segment	accession	genome_len	gene	start	end	strand
+genome	NC_006432	18875	NP	56	3007	+
+genome	NC_006432	18875	VP35	3013	4382	+
+genome	NC_006432	18875	VP40	4365	5875	+
+genome	NC_006432	18875	GP	5883	8241	+
+genome	NC_006432	18875	VP30	8224	9697	+
+genome	NC_006432	18875	VP24	9826	11474	+
+genome	NC_006432	18875	L	11457	18494	+

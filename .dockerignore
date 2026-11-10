@@ -1,0 +1,7 @@
+.git
+data
+output
+bin
+node_modules
+**/__pycache__
+.snakemake
