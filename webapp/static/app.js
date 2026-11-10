@@ -7453,7 +7453,9 @@ $("#redesignBtn").addEventListener("click", showRedesignPage);
     openBtn.hidden = !collapsed;
     edgeBtn.innerHTML = collapsed ? "&rsaquo;" : "&lsaquo;";
     placeEdge(collapsed);
-    try { localStorage.setItem("lasv_sidebar_collapsed", collapsed ? "1" : "0"); } catch (e) { /* private mode */ }
+    if (!window.matchMedia("(max-width: 760px)").matches) {
+      try { localStorage.setItem("lasv_sidebar_collapsed", collapsed ? "1" : "0"); } catch (e) { /* private mode */ }
+    }
   };
   closeBtn.addEventListener("click", () => apply(true));
   edgeBtn.addEventListener("click", () => apply(!app.classList.contains("sidebar-collapsed")));
@@ -7463,9 +7465,15 @@ $("#redesignBtn").addEventListener("click", showRedesignPage);
       e.preventDefault(); apply(!app.classList.contains("sidebar-collapsed"));
     }
   });
+  const phone = window.matchMedia("(max-width: 760px)");      // on a phone the sidebar is a drawer: closed at start, closes after a choice, never remembered
+  document.querySelector(".sidebar").addEventListener("click", (e) => {
+    if (!phone.matches || !e.target.closest("button.btn, .set-item, .group-item, a.rel-link")) return;
+    if (e.target.closest("#hostScopeBox, #pipelineSwitch, #menuToggleBtn, summary, .set-item-checkbox, input, select")) return;
+    setTimeout(() => apply(true), 0);
+  });
   let saved = null;
   try { saved = localStorage.getItem("lasv_sidebar_collapsed"); } catch (e) { /* ignore */ }
-  apply(saved === "1");
+  apply(phone.matches || saved === "1");
 })();
 
 // parent / variants / identical-sequence facts of a set (computed by the server, see annotate_set_relations)
