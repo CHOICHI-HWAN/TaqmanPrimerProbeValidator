@@ -1,0 +1,8 @@
+segment	accession	genome_len	gene	start	end	strand
+genome	NC_004161	18891	NP	56	3013	+
+genome	NC_004161	18891	VP35	3019	4413	+
+genome	NC_004161	18891	VP40	4396	5893	+
+genome	NC_004161	18891	GP	5901	8256	+
+genome	NC_004161	18891	VP30	8262	9701	+
+genome	NC_004161	18891	VP24	9832	11481	+
+genome	NC_004161	18891	L	11464	18866	+
