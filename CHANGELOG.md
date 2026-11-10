@@ -5,6 +5,13 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.36.4] - 2026-11-10
+
+### Added
+- **모든 분석용 게놈에 데이터 출처 표기**: 개요 화면 제목 아래에 "데이터 출처: Pathoplexus (organism …) · 받은 날짜 · 기록별 출처(GenBank/RefSeq 등)" 줄이 생기고(`/api/profile`의 `data_source`), 메타데이터 표에 **데이터 출처** 열이, 게놈 메타데이터 카드(식별)에 출처 항목이 생겼습니다. 기록별 출처는 Nextstrain·Pathoplexus·NCBI Datasets 중 어디서 받았는지와 원본 DB(GenBank / RefSeq / 자체 등록)입니다. (`webapp/data_source.py`, 테스트 `tests/test_data_source.py`)
+- 출처 줄에는 **받은 날**과 원본의 **최신 갱신일·최신 등록일**(기록의 `date_updated`·`date_released` 중 가장 최근)도 함께 표시합니다.
+- 방향 판별(`scripts/orientation.py`)은 6만 염기가 넘는 게놈(두창류 약 197 kb)에서는 **가운데 2만 염기**만 비교합니다. 전체를 비교하면 1.5만 건에 몇 시간이 걸립니다. 그 미만의 게놈(기존 모든 바이러스)은 결과가 그대로입니다.
+
 ## [0.36.3] - 2026-11-10
 
 ### Changed

@@ -1917,7 +1917,7 @@ function genomeMetaHtml(g, d) {
     <div class="gm-col"><h4>어디서</h4>${row("국가", pick("country") || "미상")}${row("지역(대륙)", pick("region"))}${row("세부 위치", [pick("division"), pick("location")].filter(Boolean).join(" · "))}${row("제출 국가", pick("submitter_country"))}</div>
     <div class="gm-col"><h4>클레이드 / 리니지</h4>${row("분석에 쓴 값", used || "미상")}${lins.length ? row("원본 열", lins.join(" · ")) : ""}${linked ? row("연결된 레코드", linked) : ""}</div>
     <div class="gm-col"><h4>호스트</h4>${row("숙주", hostRaw || "미상")}${row("분류", cls ? (GM_HOST_LABEL[cls] || cls) : "")}${row("실험 숙주", String(raw.is_lab_host || "").trim() ? "예" : "")}${row("시료", pick("sample_type", "isolation_source"))}</div>
-    <div class="gm-col gm-wide"><h4>식별</h4>${row("계정번호", pick("accession_version") || acc, true)}${row("strain", pick("strain"))}${row("isolate", pick("isolate"))}${row("길이", pick("length") ? pick("length") + " bp" : "")}${row("기관", pick("institution"))}${row("저자", pick("abbr_authors", "authors"))}${row("SRA", pick("sra_accessions"))}${row("메모", pick("note"))}
+    <div class="gm-col gm-wide"><h4>식별</h4>${row("계정번호", pick("accession_version") || acc, true)}${row("데이터 출처", (d && d.source) || "")}${row("strain", pick("strain"))}${row("isolate", pick("isolate"))}${row("길이", pick("length") ? pick("length") + " bp" : "")}${row("기관", pick("institution"))}${row("저자", pick("abbr_authors", "authors"))}${row("SRA", pick("sra_accessions"))}${row("메모", pick("note"))}
       ${acc ? `<div class="gm-row"><span class="gm-k">링크</span><span class="gm-v"><a href="https://www.ncbi.nlm.nih.gov/nuccore/${encodeURIComponent(acc)}" target="_blank" rel="noopener">NCBI에서 열기</a></span></div>` : ""}</div>
     ${allRows ? `<details class="gm-all"><summary class="note">원본 메타데이터 전체 (${Object.keys(raw).filter((k) => String(raw[k]).trim()).length}개 열)</summary><table class="data-table"><tbody>${allRows}</tbody></table></details>` : ""}</div>`;
 }
@@ -6384,6 +6384,15 @@ async function loadProfile() {
   } catch { /* keep the defaults */ }
 }
 
+// ---- where the analysed genomes come from (the server's /api/profile "data_source"): one line under the title ----
+function dataSourceHtml() {
+  const d = PROFILE.data_source;
+  if (!d) return "";
+  const by = Object.entries(d.by_record || {}).slice(0, 4).map(([k, n]) => `${escHtml(k)} ${Number(n).toLocaleString()}`).join(" &middot; ");
+  const when = (d.fetched_at ? ` &middot; 받은 날 ${escHtml(String(d.fetched_at).slice(0, 10))}` : "") + (d.latest_update ? ` &middot; 원본 최신 갱신 ${escHtml(d.latest_update)}` : "") + (d.latest_release ? ` &middot; 최신 등록 ${escHtml(d.latest_release)}` : "");
+  return `<div class="ictv-crumb data-source-line" title="${escHtml(d.upstream || "")}">데이터 출처: <a href="${escHtml(d.url)}" target="_blank" rel="noopener"><b>${escHtml(d.name)}</b></a> (${escHtml(d.detail)})${when}${by ? ` &middot; 기록별: ${by}` : ""}</div>`;
+}
+
 // ---- ICTV taxonomy (profiles/<id>.json "taxonomy"): species under the title, the full rank list in a pop-up ----
 function ictvCrumbHtml() {
   const t = PROFILE.taxonomy;
@@ -9071,6 +9080,7 @@ function renderOverviewHtml(data) {
   return `
     <h2>${escHtml(PROFILE.short_name || "LASV")} Primer/Probe 전체 대시보드</h2>
     ${ictvCrumbHtml()}
+    ${dataSourceHtml()}
     <div class="subtitle">Nextstrain(lassa/s, /l) 최신 데이터셋 &middot; 판정 기준: primer mismatch&le;${PASS.mm}, probe mismatch&le;${PASS.pm}</div>
 
     <div class="stat-tiles">
