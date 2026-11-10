@@ -1,0 +1,8 @@
+segment	accession	genome_len	gene	start	end	strand
+genome	NC_002549	18959	NP	56	3026	+
+genome	NC_002549	18959	VP35	3032	4407	+
+genome	NC_002549	18959	VP40	4390	5894	+
+genome	NC_002549	18959	GP	5900	8305	+
+genome	NC_002549	18959	VP30	8288	9740	+
+genome	NC_002549	18959	VP24	9885	11518	+
+genome	NC_002549	18959	L	11501	18282	+
