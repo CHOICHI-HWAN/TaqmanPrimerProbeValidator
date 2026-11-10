@@ -15,7 +15,7 @@ CANONICAL_METADATA = ("accession", "lineage_fallback", "date", "country", "regio
 LINEAGE_MODES = ("metadata_column", "auspice_clades")
 QC_DEFAULTS = {"max_n_fraction": 0.0, "exclude_list": None}
 DIVERSITY_DEFAULTS = {"window_size": 1, "min_coverage": 0.95, "min_identity": 0.65, "min_lineage_n": 10}
-SOURCE_TYPES = ("nextstrain", "pathoplexus")
+SOURCE_TYPES = ("nextstrain", "pathoplexus", "ncbi")
 
 
 class ProfileError(ValueError):
@@ -38,7 +38,9 @@ def validate(p):
     _need(isinstance(src.get("base_url"), str) and src["base_url"].startswith("http"), "source.base_url must be a URL")
     if src["type"] == "pathoplexus":                      # LAPIS organism of https://pathoplexus.org (e.g. ebola-sudan); one genome per organism
         _need(isinstance(src.get("organism"), str) and src["organism"].strip(), "source.organism is required for source.type=pathoplexus")
-    src["segment_subdirs"] = bool(src.get("segment_subdirs", True))
+    if src["type"] == "ncbi":                              # NCBI Datasets API, one virus taxon (e.g. 186539 = Reston ebolavirus)
+        _need(str(src.get("taxon") or "").isdigit(), "source.taxon (NCBI taxonomy id) is required for source.type=ncbi")
+    src["segment_subdirs"] = bool(src.get("segment_subdirs", src["type"] == "nextstrain"))        # pathoplexus: True only for a segmented organism (cchf)
     for f in ("sequences_file", "metadata_file"):
         src.setdefault(f, "sequences.fasta.zst" if f == "sequences_file" else "metadata.tsv.zst")
     p["source"] = src
@@ -107,7 +109,9 @@ def source_urls(p, seg):
     """(sequences_url, metadata_url) for one segment, honouring source.segment_subdirs."""
     s = p["source"]
     if s["type"] == "pathoplexus":
-        return s["base_url"].rstrip("/"), s["organism"]            # (LAPIS url, organism): see scripts/fetch_pathoplexus.py
+        return s["base_url"].rstrip("/"), s["organism"] + (f"@{s['lineage_field']}" if s.get("lineage_field") else "") + (f"/{seg.upper()}" if s["segment_subdirs"] else "")   # (LAPIS url, organism[/SEGMENT]): see scripts/fetch_pathoplexus.py
+    if s["type"] == "ncbi":
+        return s["base_url"].rstrip("/"), str(s["taxon"])            # (Datasets API url, taxon id): see scripts/fetch_ncbi_virus.py
     prefix = s["base_url"].rstrip("/") + (f"/{seg}" if s["segment_subdirs"] else "")
     return f"{prefix}/{s['sequences_file']}", f"{prefix}/{s['metadata_file']}"
 
