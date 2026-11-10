@@ -5,6 +5,9 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+- Pathoplexus 출처에 **세부 계통 열**(`source.sublineage_field`, 예: mpox `lineage`)을 `sub_lineage`로 함께 받습니다. 그룹(리니지) 열은 그대로이고, 메타데이터 표의 Sub-lineage 열과 게놈 카드에 표시만 됩니다. 계통 값이 `unassigned`·`unknown`·`none`이면 `unclassified`로 통일합니다.
+
 ## [0.1.2] - 2026-11-10
 
 ### Added
