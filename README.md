@@ -75,7 +75,7 @@ Detailed documentation (pipeline steps, settings, dashboard features, directory 
 
 ### Current version
 
-Code: **v0.1.0 (CCHFV edition)**   ·   Tested on Ubuntu 24.04, x86_64
+Code: **v0.1.1 (CCHFV edition)**   ·   Tested on Ubuntu 24.04, x86_64
 
 ### Requirements
 
@@ -237,7 +237,7 @@ There is no publication for this tool yet. Please cite the software as below, **
   author  = {Choi, Chihwan},
   title   = {TaqMan Primer/Probe Validator (CCHFV edition)},
   year    = {2026},
-  version = {0.1.0},
+  version = {0.1.1},
   url     = {https://github.com/CHOICHI-HWAN/TaqmanPrimerProbeValidator/tree/cchfv}
 }
 ```
