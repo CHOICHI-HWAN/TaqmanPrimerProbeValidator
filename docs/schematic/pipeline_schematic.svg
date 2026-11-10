@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1064 330" font-family="Helvetica, Arial, sans-serif">
+<defs><marker id="a" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M0,0 L10,4 L0,8 z" fill="#667788"/></marker></defs>
+<rect width="1064" height="330" fill="#ffffff" rx="12"/>
+<rect x="20" y="30" width="172" height="112" rx="10" fill="#eef3fa" stroke="#4c78a8" stroke-width="1.6"/>
+<text x="106.0" y="55" text-anchor="middle" font-size="14" font-weight="700" fill="#1f2d3d">1  Genomes</text>
+<text x="106.0" y="78" text-anchor="middle" font-size="12" fill="#44556a">Sequences + metadata</text>
+<text x="106.0" y="95" text-anchor="middle" font-size="12" fill="#44556a">(Nextstrain / NCBI)</text>
+<text x="106.0" y="112" text-anchor="middle" font-size="12" fill="#44556a">host · country · lineage</text>
+<rect x="228" y="30" width="172" height="112" rx="10" fill="#eef3fa" stroke="#4c78a8" stroke-width="1.6"/>
+<text x="314.0" y="55" text-anchor="middle" font-size="14" font-weight="700" fill="#1f2d3d">2  QC + orientation</text>
+<text x="314.0" y="78" text-anchor="middle" font-size="12" fill="#44556a">length / ambiguous-base</text>
+<text x="314.0" y="95" text-anchor="middle" font-size="12" fill="#44556a">filter; every genome on</text>
+<text x="314.0" y="112" text-anchor="middle" font-size="12" fill="#44556a">the reference strand</text>
+<rect x="436" y="30" width="172" height="112" rx="10" fill="#eef3fa" stroke="#4c78a8" stroke-width="1.6"/>
+<text x="522.0" y="55" text-anchor="middle" font-size="14" font-weight="700" fill="#1f2d3d">3  Search</text>
+<text x="522.0" y="78" text-anchor="middle" font-size="12" fill="#44556a">mfeprimer + genome scan;</text>
+<text x="522.0" y="95" text-anchor="middle" font-size="12" fill="#44556a">mismatches recounted on</text>
+<text x="522.0" y="112" text-anchor="middle" font-size="12" fill="#44556a">the genome bases</text>
+<rect x="644" y="30" width="172" height="112" rx="10" fill="#eef3fa" stroke="#4c78a8" stroke-width="1.6"/>
+<text x="730.0" y="55" text-anchor="middle" font-size="14" font-weight="700" fill="#1f2d3d">4  Pass / fail</text>
+<text x="730.0" y="78" text-anchor="middle" font-size="12" fill="#44556a">F/R ≤ 1 mismatch, 3′ end</text>
+<text x="730.0" y="95" text-anchor="middle" font-size="12" fill="#44556a">intact; probe exact and</text>
+<text x="730.0" y="112" text-anchor="middle" font-size="12" fill="#44556a">inside the amplicon</text>
+<rect x="852" y="30" width="172" height="112" rx="10" fill="#eef3fa" stroke="#4c78a8" stroke-width="1.6"/>
+<text x="938.0" y="55" text-anchor="middle" font-size="14" font-weight="700" fill="#1f2d3d">5  Dashboard</text>
+<text x="938.0" y="78" text-anchor="middle" font-size="12" fill="#44556a">coverage by lineage / clade,</text>
+<text x="938.0" y="95" text-anchor="middle" font-size="12" fill="#44556a">host scope, alignment,</text>
+<text x="938.0" y="112" text-anchor="middle" font-size="12" fill="#44556a">standards, groups, π</text>
+<line x1="192" y1="86.0" x2="225" y2="86.0" stroke="#667788" stroke-width="2" marker-end="url(#a)"/>
+<line x1="400" y1="86.0" x2="433" y2="86.0" stroke="#667788" stroke-width="2" marker-end="url(#a)"/>
+<line x1="608" y1="86.0" x2="641" y2="86.0" stroke="#667788" stroke-width="2" marker-end="url(#a)"/>
+<line x1="816" y1="86.0" x2="849" y2="86.0" stroke="#667788" stroke-width="2" marker-end="url(#a)"/>
+<rect x="430" y="198" width="184" height="70" rx="10" fill="#fff4e6" stroke="#e39a45" stroke-width="1.6"/>
+<text x="522.0" y="223" text-anchor="middle" font-size="13" font-weight="700" fill="#1f2d3d">Your primer / probe sets</text>
+<text x="522.0" y="246" text-anchor="middle" font-size="12" fill="#44556a">config/primers.tsv or</text>
+<text x="522.0" y="263" text-anchor="middle" font-size="12" fill="#44556a">the dashboard input page</text>
+<rect x="650" y="198" width="184" height="70" rx="10" fill="#fff4e6" stroke="#e39a45" stroke-width="1.6"/>
+<text x="742.0" y="223" text-anchor="middle" font-size="13" font-weight="700" fill="#1f2d3d">Standard materials</text>
+<text x="742.0" y="246" text-anchor="middle" font-size="12" fill="#44556a">optional; same rule,</text>
+<text x="742.0" y="263" text-anchor="middle" font-size="12" fill="#44556a">partial matches shown</text>
+<rect x="850" y="198" width="176" height="70" rx="10" fill="#eaf6ec" stroke="#54a24b" stroke-width="1.6"/>
+<text x="938.0" y="223" text-anchor="middle" font-size="13" font-weight="700" fill="#1f2d3d">Host scope</text>
+<text x="938.0" y="246" text-anchor="middle" font-size="12" fill="#44556a">human (default) · animal ·</text>
+<text x="938.0" y="263" text-anchor="middle" font-size="12" fill="#44556a">unknown · all; lab hosts out</text>
+<line x1="522" y1="197" x2="522" y2="144" stroke="#667788" stroke-width="2" marker-end="url(#a)"/>
+<line x1="742" y1="197" x2="742" y2="144" stroke="#667788" stroke-width="2" marker-end="url(#a)"/>
+<line x1="938" y1="197" x2="938" y2="144" stroke="#667788" stroke-width="2" marker-end="url(#a)"/>
+<text x="532.0" y="316" text-anchor="middle" font-size="12" fill="#44556a">Snakemake runs steps 1–4 and re-runs only what changed; the dashboard re-counts the results for the chosen host scope.</text>
+</svg>
