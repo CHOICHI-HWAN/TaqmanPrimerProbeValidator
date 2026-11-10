@@ -5,6 +5,14 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.36.3] - 2026-11-10
+
+### Changed
+- **모바일(폰) 화면**: 사이드바가 화면 위쪽 절반을 차지하던 것을 **전체 화면 서랍**으로 바꿨습니다. 처음에는 닫혀 있고(왼쪽 위 ☰ 메뉴), 항목을 고르면 자동으로 닫힙니다(폰에서는 열림/닫힘을 기억하지 않음). 뒤로/앞으로 막대는 폰 여백에 맞추고 스크롤해도 위에 붙어 있으며, 가로로 넘치던 표·긴 경로·두 칼럼 배치(문헌·설계 화면)는 칸 안에서 스크롤되거나 한 칸으로 쌓입니다. 데스크톱 화면은 그대로입니다.
+
+### Added
+- **데이터 출처 `pathoplexus`**: 프로파일 `source.type = "pathoplexus"`(+ `source.organism`)이면 `scripts/fetch_pathoplexus.py`가 Pathoplexus(LAPIS)에서 공개 데이터(최신 버전, 철회 제외)의 서열과 메타데이터를 받아 기존 Nextstrain 출처와 같은 모양(accession·date·country·region·host·is_lab_host …)으로 씁니다. 에볼라 3종(EBOV/SUDV/BDBV) 에디션이 이 출처를 씁니다. 기존 nextstrain 출처 동작은 그대로입니다.
+
 ## [0.36.2] - 2026-10-28
 
 ### Fixed

@@ -11,9 +11,9 @@ rule fetch_raw:
         meta_url=lambda wc: source_urls(PROFILE, wc.seg)[1],
     log:
         "logs/fetch_raw_{seg}.log",
-    shell:
-        "bash scripts/fetch_one.sh {params.seq_url} {params.meta_url} {output.fasta} {output.meta} "
-        "> {log} 2>&1"
+    run:
+        cmd = {"nextstrain": "bash scripts/fetch_one.sh", "pathoplexus": "python3 scripts/fetch_pathoplexus.py", "ncbi": "python3 scripts/fetch_ncbi_virus.py"}[PROFILE["source"]["type"]]
+        shell("{cmd} {params.seq_url} {params.meta_url} {output.fasta} {output.meta} > {log} 2>&1")
 
 
 # Clade/lineage from a locally built Auspice JSON (profile lineage.mode = "auspice_clades"): one

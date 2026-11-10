@@ -98,3 +98,30 @@ def test_ui_wording_block_has_defaults_and_shipped_values():
     n = load_profile(ROOT / "profiles" / "nipah.json")["ui"]
     assert n["lineage_ko"] == "클레이드" and n["web_url"].startswith("https://nextstrain.org/") and not n["orientation_note"]
     assert load_profile(ROOT / "profiles" / "lassa.json")["ui"]["lineage_ko"] == "리니지"
+
+
+def test_pathoplexus_source_needs_an_organism_and_yields_lapis_target():
+    from virus_profile import source_urls
+    p = copy.deepcopy(_good())
+    p["source"] = {"type": "pathoplexus", "base_url": "https://lapis.pathoplexus.org"}
+    with pytest.raises(ProfileError, match="source.organism"):
+        validate(p)
+    p["source"]["organism"] = "ebola-sudan"
+    assert source_urls(validate(p), "genome" if "genome" in p["segments"] else next(iter(p["segments"]))) == ("https://lapis.pathoplexus.org", "ebola-sudan")
+
+
+def test_ncbi_source_needs_a_taxon():
+    from virus_profile import source_urls
+    p = copy.deepcopy(_good())
+    p["source"] = {"type": "ncbi", "base_url": "https://api.ncbi.nlm.nih.gov/datasets/v2"}
+    with pytest.raises(ProfileError, match="source.taxon"):
+        validate(p)
+    p["source"]["taxon"] = 186539
+    assert source_urls(validate(p), next(iter(p["segments"]))) == ("https://api.ncbi.nlm.nih.gov/datasets/v2", "186539")
+
+
+def test_pathoplexus_segmented_organism_gets_the_segment_in_its_target():
+    from virus_profile import source_urls
+    p = copy.deepcopy(_good())
+    p["source"] = {"type": "pathoplexus", "base_url": "https://lapis.pathoplexus.org", "organism": "cchf", "segment_subdirs": True}
+    assert source_urls(validate(p), next(iter(p["segments"])))[1].startswith("cchf/")
