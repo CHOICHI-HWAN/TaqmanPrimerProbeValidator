@@ -25,6 +25,16 @@ AFRICA = {"Democratic Republic of the Congo", "Uganda", "Sierra Leone", "Guinea"
           "Kenya", "Nigeria", "Mali", "Senegal", "Ivory Coast", "Cote d'Ivoire", "Cameroon", "Central African Republic", "Tanzania", "Angola", "Ethiopia", "Rwanda"}
 
 
+def _clean(v):
+    v = (v or "").strip()
+    return "unclassified" if v.lower() in ("", "unassigned", "unknown", "none") else v
+
+
+def _blank(v):
+    v = (v or "").strip()
+    return "" if v.lower() in ("none", "null", "nan") else v
+
+
 def _get(url, tries=3):
     last = None
     for _ in range(tries):
@@ -42,10 +52,11 @@ SEG_FIELDS = ("insdcAccessionBase", "insdcAccessionFull", "length", "completenes
 def main(base, organism, out_fa, out_meta):
     organism, _, seg = organism.partition("/")
     organism, _, lf = organism.partition("@")                  # organism@clade: that metadata column becomes the lineage column (mpox)
+    lf, _, sub = lf.partition(":")                             # organism@clade:lineage: a second, finer column is kept as `sub_lineage` (not used for grouping)
     sfx = f"_{seg}" if seg else ""
     q = urllib.parse.urlencode(BASE_FILTER)
     root = f"{base.rstrip('/')}/{organism}/sample"
-    fields = [f + sfx if f in SEG_FIELDS else f for f in FIELDS] + (["lineage_S"] if seg else []) + ([lf] if lf else [])
+    fields = [f + sfx if f in SEG_FIELDS else f for f in FIELDS] + (["lineage_S"] if seg else []) + ([lf] if lf else []) + ([sub] if sub else [])
     det = _get(f"{root}/details?{q}&dataFormat=tsv&fields={','.join(fields)}").decode("utf-8")
     rows = [dict(r) for r in csv.DictReader(io.StringIO(det), delimiter="\t")]
     for r in rows:                                             # one canonical column set whatever the organism's segment layout
@@ -88,7 +99,7 @@ def main(base, organism, out_fa, out_meta):
             offset += page
             print(f"  {organism}: {offset} sequences read ...", flush=True)
     cols = ["accession", "strain", "date", "date_released", "date_updated", "region", "country", "division", "location", "length", "host", "taxid",
-            "is_lab_host", "completeness", "authors", "institution", "submitter_country", "sample_type", "country_lineage", "url"]
+            "is_lab_host", "completeness", "authors", "institution", "submitter_country", "sample_type", "country_lineage", "url"] + (["sub_lineage"] if sub else [])
     with open(out_meta, "w", encoding="utf-8", newline="") as fh:
         w = csv.writer(fh, delimiter="\t", lineterminator="\n")
         w.writerow(cols)
@@ -100,8 +111,8 @@ def main(base, organism, out_fa, out_meta):
                         "Africa" if c in AFRICA else "", c, r.get("geoLocAdmin1") or "", r.get("geoLocAdmin2") or "", r.get("length") or "",
                         (r.get("hostNameScientific") or r.get("hostNameCommon") or "").strip(), r.get("hostTaxonId") or "",
                         "true" if lab in ("true", "1", "yes") else "false", r.get("completeness") or "", r.get("authors") or "",
-                        r.get("authorAffiliations") or "", r.get("ncbiSubmitterCountry") or "", r.get("sampleType") or "", ((r.get(lf) or "unclassified") if lf else (r.get("lineage_S") or "unclassified") if seg else (c or "unknown")),
-                        f"https://pathoplexus.org/seq/{r['accessionVersion']}"])
+                        r.get("authorAffiliations") or "", r.get("ncbiSubmitterCountry") or "", r.get("sampleType") or "", ((_clean(r.get(lf))) if lf else (r.get("lineage_S") or "unclassified") if seg else (c or "unknown")),
+                        f"https://pathoplexus.org/seq/{r['accessionVersion']}"] + ([_blank(r.get(sub))] if sub else []))
     print(f"{organism}: {len(rows)} genomes in the table, {n} sequences written")
 
 
