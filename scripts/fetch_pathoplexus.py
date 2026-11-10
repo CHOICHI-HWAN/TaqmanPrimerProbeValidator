@@ -3,7 +3,7 @@
 a FASTA with one record per genome (header = accession) and a metadata TSV with the columns the virus profile maps (accession, date,
 country, region, host, is_lab_host, ...). Only open-access, latest, non-revoked versions are requested (what the API serves without a login).
 
-usage: fetch_pathoplexus.py <lapis_url> <organism>[/<SEGMENT>] <out.fasta> <out_metadata.tsv>      e.g. https://lapis.pathoplexus.org ebola-sudan ...
+usage: fetch_pathoplexus.py <lapis_url> <organism>[@<lineage column>][/<SEGMENT>] <out.fasta> <out_metadata.tsv>      e.g. https://lapis.pathoplexus.org ebola-sudan ...
 A segmented organism (cchf) is fetched one segment at a time: `cchf/S` takes the S sequences and the per-segment columns (insdcAccessionBase_S, length_S,
 lineage_S ...); the lineage_S column (S-segment genotype) becomes the `country_lineage` column of every segment of that record is not possible
 (reassortment), so for segmented organisms `country_lineage` holds the genotype of the S segment when the record has one, else "unclassified".
@@ -19,6 +19,7 @@ import urllib.request
 FIELDS = ["accession", "accessionVersion", "insdcAccessionBase", "insdcAccessionFull", "sampleCollectionDate", "geoLocCountry", "geoLocAdmin1",
           "geoLocAdmin2", "hostNameScientific", "hostNameCommon", "hostTaxonId", "isLabHost", "length", "authors", "authorAffiliations",
           "ncbiSubmitterCountry", "releasedDate", "ncbiUpdateDate", "sampleType", "completeness", "displayName"]
+PAGE, PAGE_ABOVE = 1000, 2500          # sequences per request / row count from which the sequences are fetched in pages
 BASE_FILTER = {"versionStatus": "LATEST_VERSION", "isRevocation": "false"}
 AFRICA = {"Democratic Republic of the Congo", "Uganda", "Sierra Leone", "Guinea", "Liberia", "Gabon", "Republic of the Congo", "Sudan", "South Sudan",
           "Kenya", "Nigeria", "Mali", "Senegal", "Ivory Coast", "Cote d'Ivoire", "Cameroon", "Central African Republic", "Tanzania", "Angola", "Ethiopia", "Rwanda"}
@@ -40,10 +41,11 @@ SEG_FIELDS = ("insdcAccessionBase", "insdcAccessionFull", "length", "completenes
 
 def main(base, organism, out_fa, out_meta):
     organism, _, seg = organism.partition("/")
+    organism, _, lf = organism.partition("@")                  # organism@clade: that metadata column becomes the lineage column (mpox)
     sfx = f"_{seg}" if seg else ""
     q = urllib.parse.urlencode(BASE_FILTER)
     root = f"{base.rstrip('/')}/{organism}/sample"
-    fields = [f + sfx if f in SEG_FIELDS else f for f in FIELDS] + (["lineage_S"] if seg else [])
+    fields = [f + sfx if f in SEG_FIELDS else f for f in FIELDS] + (["lineage_S"] if seg else []) + ([lf] if lf else [])
     det = _get(f"{root}/details?{q}&dataFormat=tsv&fields={','.join(fields)}").decode("utf-8")
     rows = [dict(r) for r in csv.DictReader(io.StringIO(det), delimiter="\t")]
     for r in rows:                                             # one canonical column set whatever the organism's segment layout
@@ -60,19 +62,31 @@ def main(base, organism, out_fa, out_meta):
         seen.add(a)
         ids[r["accession"]] = a
         r["_id"] = a
-    fa = _get(f"{root}/unalignedNucleotideSequences{'/' + seg if seg else ''}?{q}").decode("utf-8")
+    seq_url = f"{root}/unalignedNucleotideSequences{'/' + seg if seg else ''}?{q}"
     n = 0
     with open(out_fa, "w", encoding="utf-8") as fh:
-        keep, name = False, None
-        for ln in fa.splitlines():
-            if ln.startswith(">"):
-                name = ids.get(ln[1:].strip().split()[0].split("|")[0].rsplit(".", 1)[0])
-                keep = name is not None
-                if keep:
-                    fh.write(f">{name}\n")
-                    n += 1
-            elif keep:
-                fh.write(ln + "\n")
+        # a big organism (mpox: ~15 000 genomes of ~197 kb) is fetched page by page in a fixed order, so no single answer is gigabytes
+        # (one request for everything stalled and timed out); a small one stays a single request
+        page = PAGE if len(rows) > PAGE_ABOVE else None
+        offset = 0
+        while True:
+            fa = _get(seq_url + (f"&orderBy=accessionVersion&limit={page}&offset={offset}" if page else "")).decode("utf-8")
+            got = 0
+            keep = False
+            for ln in fa.splitlines():
+                if ln.startswith(">"):
+                    got += 1
+                    name = ids.get(ln[1:].strip().split()[0].split("|")[0].rsplit(".", 1)[0])
+                    keep = name is not None
+                    if keep:
+                        fh.write(f">{name}\n")
+                        n += 1
+                elif keep:
+                    fh.write(ln + "\n")
+            if not page or got < page:
+                break
+            offset += page
+            print(f"  {organism}: {offset} sequences read ...", flush=True)
     cols = ["accession", "strain", "date", "date_released", "date_updated", "region", "country", "division", "location", "length", "host", "taxid",
             "is_lab_host", "completeness", "authors", "institution", "submitter_country", "sample_type", "country_lineage", "url"]
     with open(out_meta, "w", encoding="utf-8", newline="") as fh:
@@ -86,7 +100,7 @@ def main(base, organism, out_fa, out_meta):
                         "Africa" if c in AFRICA else "", c, r.get("geoLocAdmin1") or "", r.get("geoLocAdmin2") or "", r.get("length") or "",
                         (r.get("hostNameScientific") or r.get("hostNameCommon") or "").strip(), r.get("hostTaxonId") or "",
                         "true" if lab in ("true", "1", "yes") else "false", r.get("completeness") or "", r.get("authors") or "",
-                        r.get("authorAffiliations") or "", r.get("ncbiSubmitterCountry") or "", r.get("sampleType") or "", ((r.get("lineage_S") or "unclassified") if seg else (c or "unknown")),
+                        r.get("authorAffiliations") or "", r.get("ncbiSubmitterCountry") or "", r.get("sampleType") or "", ((r.get(lf) or "unclassified") if lf else (r.get("lineage_S") or "unclassified") if seg else (c or "unknown")),
                         f"https://pathoplexus.org/seq/{r['accessionVersion']}"])
     print(f"{organism}: {len(rows)} genomes in the table, {n} sequences written")
 

@@ -125,3 +125,10 @@ def test_pathoplexus_segmented_organism_gets_the_segment_in_its_target():
     p = copy.deepcopy(_good())
     p["source"] = {"type": "pathoplexus", "base_url": "https://lapis.pathoplexus.org", "organism": "cchf", "segment_subdirs": True}
     assert source_urls(validate(p), next(iter(p["segments"])))[1].startswith("cchf/")
+
+
+def test_pathoplexus_lineage_field_is_part_of_the_target():
+    from virus_profile import source_urls
+    p = copy.deepcopy(_good())
+    p["source"] = {"type": "pathoplexus", "base_url": "https://lapis.pathoplexus.org", "organism": "mpox", "lineage_field": "clade"}
+    assert source_urls(validate(p), next(iter(p["segments"])))[1] == "mpox@clade"
