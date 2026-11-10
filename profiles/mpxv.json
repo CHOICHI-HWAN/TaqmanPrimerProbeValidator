@@ -1,0 +1,100 @@
+{
+  "profile_version": 1,
+  "id": "mpxv",
+  "name": "Orthopoxvirus monkeypox (Monkeypox virus)",
+  "short_name": "MPXV",
+  "taxonomy": {
+    "source": "ICTV Master Species List (2023-2025 releases). Names and ranks change between releases -- check https://ictv.global/taxonomy",
+    "virus": "Monkeypox virus",
+    "ranks": [
+      [
+        "Realm",
+        "Varidnaviria"
+      ],
+      [
+        "Kingdom",
+        "Bamfordvirae"
+      ],
+      [
+        "Phylum",
+        "Nucleocytoviricota"
+      ],
+      [
+        "Class",
+        "Pokkesviricetes"
+      ],
+      [
+        "Order",
+        "Chitovirales"
+      ],
+      [
+        "Family",
+        "Poxviridae"
+      ],
+      [
+        "Subfamily",
+        "Chordopoxvirinae"
+      ],
+      [
+        "Genus",
+        "Orthopoxvirus"
+      ],
+      [
+        "Species",
+        "Orthopoxvirus monkeypox"
+      ]
+    ],
+    "former_species": "Monkeypox virus"
+  },
+  "source": {
+    "type": "pathoplexus",
+    "base_url": "https://lapis.pathoplexus.org",
+    "organism": "mpox",
+    "segment_subdirs": false,
+    "lineage_field": "clade"
+  },
+  "segments": {
+    "genome": {
+      "label": "Genome",
+      "min_len": 180000,
+      "lineage_col": "country_lineage",
+      "reference_accession": "NC_063383"
+    }
+  },
+  "metadata": {
+    "accession": "accession",
+    "lineage_fallback": "country_lineage",
+    "date": "date",
+    "country": "country",
+    "region": "region",
+    "host": "host",
+    "lab_host": "is_lab_host"
+  },
+  "lineage": {
+    "label": "Clade",
+    "mode": "metadata_column",
+    "missing": "unclassified"
+  },
+  "qc": {
+    "max_n_fraction": 0.01,
+    "exclude_list": null
+  },
+  "population": {
+    "pooled_label": "ALL_MPXV",
+    "chrom_prefix": "MPXV"
+  },
+  "diversity": {
+    "window_size": 1,
+    "min_coverage": 0.95,
+    "min_identity": 0.65,
+    "min_lineage_n": 10
+  },
+  "ui": {
+    "name_ko": "엠폭스 바이러스(원숭이두창)",
+    "web_url": "https://pathoplexus.org/mpox/search",
+    "lineage_ko": "클레이드",
+    "lineage_examples": "I, Ia, Ib, IIa, IIb",
+    "lineage_def": "엠폭스 바이러스는 Pathoplexus 메타데이터의 클레이드(I, Ia, Ib, IIa, IIb)를 리니지로 쓴다. 클레이드가 없는 기록은 unclassified로 둔다.",
+    "orientation_note": ""
+  }
+}
