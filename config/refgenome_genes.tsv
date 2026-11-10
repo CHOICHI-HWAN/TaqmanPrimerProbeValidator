@@ -1,0 +1,8 @@
+segment	accession	genome_len	gene	start	end	strand
+genome	NC_014373	18940	NP	56	3014	+
+genome	NC_014373	18940	VP35	3020	4389	+
+genome	NC_014373	18940	VP40	4372	5875	+
+genome	NC_014373	18940	GP	5882	8286	+
+genome	NC_014373	18940	VP30	8269	9728	+
+genome	NC_014373	18940	VP24	9869	11504	+
+genome	NC_014373	18940	L	11487	18465	+

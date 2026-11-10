@@ -1,0 +1,98 @@
+{
+  "profile_version": 1,
+  "id": "bdbv",
+  "name": "Orthoebolavirus bundibugyoense (Bundibugyo ebolavirus)",
+  "short_name": "BDBV",
+  "taxonomy": {
+    "source": "ICTV Master Species List (2023-2025 releases). Names and ranks change between releases -- check https://ictv.global/taxonomy",
+    "virus": "Bundibugyo ebolavirus",
+    "ranks": [
+      [
+        "Realm",
+        "Riboviria"
+      ],
+      [
+        "Kingdom",
+        "Orthornavirae"
+      ],
+      [
+        "Phylum",
+        "Negarnaviricota"
+      ],
+      [
+        "Subphylum",
+        "Haploviricotina"
+      ],
+      [
+        "Class",
+        "Monjiviricetes"
+      ],
+      [
+        "Order",
+        "Mononegavirales"
+      ],
+      [
+        "Family",
+        "Filoviridae"
+      ],
+      [
+        "Genus",
+        "Orthoebolavirus"
+      ],
+      [
+        "Species",
+        "Orthoebolavirus bundibugyoense"
+      ]
+    ],
+    "former_species": "Bundibugyo ebolavirus"
+  },
+  "source": {
+    "type": "pathoplexus",
+    "base_url": "https://lapis.pathoplexus.org",
+    "organism": "ebola-bdbv",
+    "segment_subdirs": false
+  },
+  "segments": {
+    "genome": {
+      "label": "Genome",
+      "min_len": 17500,
+      "lineage_col": "country_lineage",
+      "reference_accession": "NC_014373"
+    }
+  },
+  "metadata": {
+    "accession": "accession",
+    "lineage_fallback": "country_lineage",
+    "date": "date",
+    "country": "country",
+    "region": "region",
+    "host": "host",
+    "lab_host": "is_lab_host"
+  },
+  "lineage": {
+    "label": "Country",
+    "mode": "metadata_column"
+  },
+  "qc": {
+    "max_n_fraction": 0.01,
+    "exclude_list": null
+  },
+  "population": {
+    "pooled_label": "ALL_BDBV",
+    "chrom_prefix": "BDBV"
+  },
+  "diversity": {
+    "window_size": 1,
+    "min_coverage": 0.95,
+    "min_identity": 0.65,
+    "min_lineage_n": 10
+  },
+  "ui": {
+    "name_ko": "에볼라 바이러스(분디부교)",
+    "web_url": "https://pathoplexus.org/ebola-bdbv/search",
+    "lineage_ko": "발생 국가",
+    "lineage_examples": "COD, UGA, ...",
+    "lineage_def": "에볼라 바이러스는 공식 클레이드 체계가 없어, 게놈을 채집된 나라(발생 국가)별로 묶어 리니지 대신 사용한다(Pathoplexus 메타데이터의 geoLocCountry).",
+    "orientation_note": ""
+  }
+}
