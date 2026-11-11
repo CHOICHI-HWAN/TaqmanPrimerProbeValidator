@@ -39,7 +39,8 @@ def validate(p):
     if src["type"] == "pathoplexus":                      # LAPIS organism of https://pathoplexus.org (e.g. ebola-sudan); one genome per organism
         _need(isinstance(src.get("organism"), str) and src["organism"].strip(), "source.organism is required for source.type=pathoplexus")
     if src["type"] == "ncbi":                              # NCBI Datasets API, one virus taxon (e.g. 186539 = Reston ebolavirus)
-        _need(str(src.get("taxon") or "").isdigit(), "source.taxon (NCBI taxonomy id) is required for source.type=ncbi")
+        taxa = src.get("taxon") if isinstance(src.get("taxon"), list) else [src.get("taxon")]
+        _need(bool(taxa) and all(str(t or "").isdigit() for t in taxa), "source.taxon (NCBI taxonomy id, or a list of them) is required for source.type=ncbi")
     src["segment_subdirs"] = bool(src.get("segment_subdirs", src["type"] == "nextstrain"))        # pathoplexus: True only for a segmented organism (cchf)
     for f in ("sequences_file", "metadata_file"):
         src.setdefault(f, "sequences.fasta.zst" if f == "sequences_file" else "metadata.tsv.zst")
@@ -111,7 +112,13 @@ def source_urls(p, seg):
     if s["type"] == "pathoplexus":
         return s["base_url"].rstrip("/"), s["organism"] + (f"@{s['lineage_field']}" + (f":{s['sublineage_field']}" if s.get("sublineage_field") else "") if s.get("lineage_field") else "") + (f"/{seg.upper()}" if s["segment_subdirs"] else "")   # (LAPIS url, organism[/SEGMENT]): see scripts/fetch_pathoplexus.py
     if s["type"] == "ncbi":
-        return s["base_url"].rstrip("/"), str(s["taxon"]) + (f"/{seg.upper()}" if s["segment_subdirs"] else "")     # (Datasets API url, taxon id[/SEGMENT]): see scripts/fetch_ncbi_virus.py
+        taxa = s["taxon"] if isinstance(s["taxon"], list) else [s["taxon"]]
+        sd = p["segments"].get(seg, {})
+        spec = ",".join(str(t) for t in taxa) + (f"/{sd['ncbi_segment']}" if sd.get("ncbi_segment") else f"/{seg.upper()}" if s["segment_subdirs"] else "")
+        q = ([f"since={s['since']}"] if s.get("since") else []) + (["host=" + ",".join(f"{k}:{v}" for k, v in s["host_filter"].items())] if s.get("host_filter") else []) \
+            + ([f"sub={sd['ncbi_subtype']}"] if sd.get("ncbi_subtype") else []) + ([f"group={s['group_by']}"] if s.get("group_by") else []) + (["classify=1"] if s.get("classify_subtype") else []) \
+            + ([f"cap={s['cap_per_group']}"] if s.get("cap_per_group") else [])
+        return s["base_url"].rstrip("/"), spec + ("?" + "&".join(q) if q else "")      # (Datasets API url, taxa[/SEGMENT][?filters]): see scripts/fetch_ncbi_virus.py
     prefix = s["base_url"].rstrip("/") + (f"/{seg}" if s["segment_subdirs"] else "")
     return f"{prefix}/{s['sequences_file']}", f"{prefix}/{s['metadata_file']}"
 
