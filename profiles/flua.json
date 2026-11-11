@@ -1,0 +1,185 @@
+{
+  "profile_version": 1,
+  "id": "flua",
+  "name": "Alphainfluenzavirus influenzae (Influenza A virus)",
+  "short_name": "FLUA",
+  "taxonomy": {
+    "source": "ICTV Master Species List (2023-2025 releases). Names and ranks change between releases -- check https://ictv.global/taxonomy",
+    "virus": "Influenza A virus",
+    "ranks": [
+      [
+        "Realm",
+        "Riboviria"
+      ],
+      [
+        "Kingdom",
+        "Orthornavirae"
+      ],
+      [
+        "Phylum",
+        "Negarnaviricota"
+      ],
+      [
+        "Subphylum",
+        "Polyploviricotina"
+      ],
+      [
+        "Class",
+        "Insthoviricetes"
+      ],
+      [
+        "Order",
+        "Articulavirales"
+      ],
+      [
+        "Family",
+        "Orthomyxoviridae"
+      ],
+      [
+        "Genus",
+        "Alphainfluenzavirus"
+      ],
+      [
+        "Species",
+        "Alphainfluenzavirus influenzae"
+      ]
+    ],
+    "former_species": "Influenza A virus"
+  },
+  "source": {
+    "type": "ncbi",
+    "base_url": "https://api.ncbi.nlm.nih.gov/datasets/v2",
+    "taxon": [
+      11320,
+      102793
+    ],
+    "segment_subdirs": true,
+    "since": 2015,
+    "host_filter": {
+      "11320": 9606
+    },
+    "group_by": "subtype",
+    "classify_subtype": true,
+    "cap_per_group": 800
+  },
+  "segments": {
+    "pb2": {
+      "label": "PB2",
+      "min_len": 2000,
+      "lineage_col": "country_lineage",
+      "reference_accession": "NC_007373",
+      "ncbi_segment": "1"
+    },
+    "pb1": {
+      "label": "PB1",
+      "min_len": 2000,
+      "lineage_col": "country_lineage",
+      "reference_accession": "NC_007372",
+      "ncbi_segment": "2"
+    },
+    "pa": {
+      "label": "PA",
+      "min_len": 1900,
+      "lineage_col": "country_lineage",
+      "reference_accession": "NC_007371",
+      "ncbi_segment": "3"
+    },
+    "np": {
+      "label": "NP",
+      "min_len": 1350,
+      "lineage_col": "country_lineage",
+      "reference_accession": "NC_007369",
+      "ncbi_segment": "5"
+    },
+    "m": {
+      "label": "M",
+      "min_len": 900,
+      "lineage_col": "country_lineage",
+      "reference_accession": "NC_007367",
+      "ncbi_segment": "7"
+    },
+    "ns": {
+      "label": "NS",
+      "min_len": 750,
+      "lineage_col": "country_lineage",
+      "reference_accession": "NC_007370",
+      "ncbi_segment": "8"
+    },
+    "hah1": {
+      "label": "HA (H1)",
+      "min_len": 1500,
+      "lineage_col": "country_lineage",
+      "reference_accession": "NC_026433",
+      "ncbi_segment": "4",
+      "ncbi_subtype": "H1"
+    },
+    "hah3": {
+      "label": "HA (H3)",
+      "min_len": 1500,
+      "lineage_col": "country_lineage",
+      "reference_accession": "NC_007366",
+      "ncbi_segment": "4",
+      "ncbi_subtype": "H3"
+    },
+    "hah5": {
+      "label": "HA (H5)",
+      "min_len": 1500,
+      "lineage_col": "country_lineage",
+      "reference_accession": "NC_007362",
+      "ncbi_segment": "4",
+      "ncbi_subtype": "H5"
+    },
+    "nan1": {
+      "label": "NA (N1)",
+      "min_len": 1200,
+      "lineage_col": "country_lineage",
+      "reference_accession": "NC_026434",
+      "ncbi_segment": "6",
+      "ncbi_subtype": "N1"
+    },
+    "nan2": {
+      "label": "NA (N2)",
+      "min_len": 1200,
+      "lineage_col": "country_lineage",
+      "reference_accession": "NC_007368",
+      "ncbi_segment": "6",
+      "ncbi_subtype": "N2"
+    }
+  },
+  "metadata": {
+    "accession": "accession",
+    "lineage_fallback": "country_lineage",
+    "date": "date",
+    "country": "country",
+    "region": "region",
+    "host": "host",
+    "lab_host": "is_lab_host"
+  },
+  "lineage": {
+    "label": "Subtype",
+    "mode": "metadata_column",
+    "missing": "unclassified"
+  },
+  "qc": {
+    "max_n_fraction": 0.01,
+    "exclude_list": null
+  },
+  "population": {
+    "pooled_label": "ALL_FLUA",
+    "chrom_prefix": "FLUA"
+  },
+  "diversity": {
+    "window_size": 1,
+    "min_coverage": 0.95,
+    "min_identity": 0.65,
+    "min_lineage_n": 10
+  },
+  "ui": {
+    "name_ko": "인플루엔자 A형 바이러스",
+    "web_url": "https://www.ncbi.nlm.nih.gov/datasets/taxonomy/[11320, 102793]/",
+    "lineage_ko": "아형",
+    "lineage_examples": "H1N1, H3N2, H5N1",
+    "lineage_def": "인플루엔자 A형은 표면 단백질 HA·NA의 조합(아형)으로 나눈다. 이 에디션은 사람 유래 H1N1·H3N2와 H5N1(아형 이름이 붙은 기록)을 2015년 이후 수집분으로 보며, 아형 이름이 없는 최근 기록은 HA를 참조 서열과 BLAST로 비교해 아형을 정한다. 연도·아형당 최대 800 균주를 뽑는다. 검증은 아형 단위로 본다. HA·NA는 아형끼리 서열이 크게 달라 아형별 분절(HA H1/H3/H5, NA N1/N2)로 따로 분석한다.",
+    "orientation_note": ""
+  }
+}
