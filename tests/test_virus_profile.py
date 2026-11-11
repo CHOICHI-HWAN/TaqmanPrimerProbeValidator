@@ -139,3 +139,10 @@ def test_pathoplexus_sublineage_field_is_appended_to_the_target():
     p = copy.deepcopy(_good())
     p["source"] = {"type": "pathoplexus", "base_url": "https://lapis.pathoplexus.org", "organism": "mpox", "lineage_field": "clade", "sublineage_field": "lineage"}
     assert source_urls(validate(p), next(iter(p["segments"])))[1] == "mpox@clade:lineage"
+
+
+def test_ncbi_segmented_virus_gets_the_segment_in_its_target():
+    from virus_profile import source_urls
+    p = copy.deepcopy(_good())
+    p["source"] = {"type": "ncbi", "base_url": "https://api.ncbi.nlm.nih.gov/datasets/v2", "taxon": 11588, "segment_subdirs": True}
+    assert source_urls(validate(p), "s")[1] == "11588/S"
