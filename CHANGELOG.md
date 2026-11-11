@@ -6,6 +6,10 @@ All notable changes to this project are documented here. Format follows
 ## [Unreleased]
 
 ### Added
+- **한 생물종에 참조 게놈이 여러 개일 때**: 프로파일 분절(`segments.<단위>`)에 `lineage_in: [값…]`을 쓰면 전체를 한 번 받아(`data/raw/_all_*`) 라이니지 열 값으로 분석 단위를 나눕니다(규칙 `fetch_all`·`split_raw`, `scripts/split_raw_by_lineage.py`). 각 단위는 자기 `reference_accession`을 씁니다. 엠폭스 clade I/Ia·Ib·II 참조 3개에 쓰입니다.
+- NCBI 출처에서 **여러 분류군·필터**(`taxon` 목록, `since`, `host_filter`, `group_by`, 분절·아형별 요청, 아형 이름이 없는 기록을 HA의 BLAST로 판정하는 `classify_subtype`, 연도·아형당 균주 상한 `cap_per_group`) 지원: 인플루엔자 A형용. 수신 규칙은 URL 인자를 따옴표로 감쌉니다.
+
+### Added
 - NCBI Datasets 출처(`source.type = "ncbi"`)가 **분절 바이러스**를 지원합니다(`segment_subdirs: true`, 분절별 `taxon/SEG` 요청). 기록에 `segment`가 있으면 그것으로, 없으면 길이가 한 분절 전장에 가까울 때 길이로 분절을 정합니다(리프트밸리열 바이러스, 분절별 `SEG_LEN`).
 
 ## [0.1.3] - 2026-11-10
