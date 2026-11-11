@@ -2,7 +2,9 @@
 """Fetch every genome of one virus taxon from the NCBI Datasets API (public, no key) and write them in the shape the pipeline's other fetch steps
 produce: a FASTA (header = accession without version) and a metadata TSV (accession, date, country, region, host, is_lab_host, ...).
 
-usage: fetch_ncbi_virus.py <datasets_api_url> <taxon_id> <out.fasta> <out_metadata.tsv>      e.g. https://api.ncbi.nlm.nih.gov/datasets/v2 186539 ...
+usage: fetch_ncbi_virus.py <datasets_api_url> <taxon_id>[/<SEGMENT>] <out.fasta> <out_metadata.tsv>      e.g. https://api.ncbi.nlm.nih.gov/datasets/v2 186539 ...
+A segmented virus is fetched one segment at a time (`11588/S`): the record's `segment` field decides; a record without it is placed by its length when that
+is close to a full segment (SEG_LEN), so unlabeled complete segments are not lost.
 The extra column `country_lineage` (= country) lets a virus without a clade scheme group its genomes by the country they were collected in.
 """
 import csv
@@ -27,8 +29,12 @@ def _get(url, tries=3):
     raise SystemExit(f"fetch failed: {url[:120]}: {last}")
 
 
+SEG_LEN = {"11588": {"S": (1600, 1800), "M": (3750, 4050), "L": (6250, 6550)}}      # Rift Valley fever virus: full-length windows of an unlabeled record
+
+
 def main(base, taxon, out_fa, out_meta):
     base = base.rstrip("/")
+    taxon, _, seg = taxon.partition("/")
     reports, token = [], ""
     while True:
         d = json.loads(_get(f"{base}/virus/taxon/{taxon}/dataset_report?page_size=1000" + (f"&page_token={token}" if token else "")))
@@ -55,6 +61,11 @@ def main(base, taxon, out_fa, out_meta):
             acc = r["accession"].split(".")[0]
             if acc not in seqs:
                 continue
+            if seg:
+                lo, hi = SEG_LEN.get(taxon, {}).get(seg, (0, 0))
+                have = (r.get("segment") or "").strip().upper()
+                if have != seg and not (not have and lo <= int(r.get("length") or 0) <= hi):
+                    continue
             fa.write(f">{acc}\n" + "\n".join(seqs[acc]) + "\n")
             n += 1
             iso, loc, host = r.get("isolate") or {}, r.get("location") or {}, r.get("host") or {}
