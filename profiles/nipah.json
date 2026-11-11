@@ -6,12 +6,50 @@
   "taxonomy": {
     "source": "ICTV Master Species List (2024-2025 releases). Names and ranks change between releases -- check https://ictv.global/taxonomy",
     "virus": "Nipah virus (NiV)",
-    "ranks": [["Realm", "Riboviria"], ["Kingdom", "Orthornavirae"], ["Phylum", "Negarnaviricota"], ["Subphylum", "Haploviricotina"],
-              ["Class", "Monjiviricetes"], ["Order", "Mononegavirales"], ["Family", "Paramyxoviridae"], ["Subfamily", "Orthoparamyxovirinae"],
-              ["Genus", "Henipavirus"], ["Species", "Henipavirus nipahense"]],
+    "ranks": [
+      [
+        "Realm",
+        "Riboviria"
+      ],
+      [
+        "Kingdom",
+        "Orthornavirae"
+      ],
+      [
+        "Phylum",
+        "Negarnaviricota"
+      ],
+      [
+        "Subphylum",
+        "Haploviricotina"
+      ],
+      [
+        "Class",
+        "Monjiviricetes"
+      ],
+      [
+        "Order",
+        "Mononegavirales"
+      ],
+      [
+        "Family",
+        "Paramyxoviridae"
+      ],
+      [
+        "Subfamily",
+        "Orthoparamyxovirinae"
+      ],
+      [
+        "Genus",
+        "Henipavirus"
+      ],
+      [
+        "Species",
+        "Henipavirus nipahense"
+      ]
+    ],
     "former_species": "Nipah henipavirus"
   },
-
   "source": {
     "type": "nextstrain",
     "base_url": "https://data.nextstrain.org/files/workflows/nipah",
@@ -19,11 +57,14 @@
     "sequences_file": "sequences.fasta.zst",
     "metadata_file": "metadata.tsv.zst"
   },
-
   "segments": {
-    "genome": {"label": "Genome", "min_len": 17000, "lineage_col": "clade", "reference_accession": "NC_002728"}
+    "genome": {
+      "label": "Genome",
+      "min_len": 17000,
+      "lineage_col": "clade",
+      "reference_accession": "NC_002728"
+    }
   },
-
   "metadata": {
     "accession": "accession",
     "lineage_fallback": "clade",
@@ -31,7 +72,6 @@
     "country": "country",
     "region": "region"
   },
-
   "lineage": {
     "label": "Clade",
     "mode": "auspice_clades",
@@ -39,30 +79,135 @@
     "attr": "clade_membership",
     "missing": "unclassified"
   },
-
   "qc": {
     "max_n_fraction": 0.01,
     "exclude_list": "data/nextstrain/exclude.txt"
   },
-
   "population": {
     "pooled_label": "ALL_NIV",
     "chrom_prefix": "NIV"
   },
-
   "diversity": {
     "window_size": 1,
     "min_coverage": 0.95,
     "min_identity": 0.65,
     "min_lineage_n": 10
   },
-
   "ui": {
-      "name_ko": "니파 바이러스",
-      "web_url": "https://nextstrain.org/staging/nipah/all",
-      "lineage_ko": "클레이드",
-      "lineage_examples": "I, Ia, Ib, II",
-      "lineage_def": "계통수 상에서 공통 조상을 공유하는 게놈들의 그룹 — 니파 바이러스는 Nextstrain nipah 워크플로가 정의한 I, Ia, Ib, II 클레이드로 분류된다(이 도구에서는 로컬 nextstrain build 결과의 clade_membership를 사용).",
-      "orientation_note": ""
+    "name_ko": "니파 바이러스",
+    "web_url": "https://nextstrain.org/staging/nipah/all",
+    "lineage_ko": "클레이드",
+    "lineage_examples": "I, Ia, Ib, II",
+    "lineage_def": "계통수 상에서 공통 조상을 공유하는 게놈들의 그룹 — 니파 바이러스는 Nextstrain nipah 워크플로가 정의한 I, Ia, Ib, II 클레이드로 분류된다(이 도구에서는 로컬 nextstrain build 결과의 clade_membership를 사용).",
+    "orientation_note": ""
+  },
+  "disease": {
+    "title": "니파 바이러스 감염증 (Nipah virus infection)",
+    "summary": "박쥐에서 사람으로 전파되는 인수공통감염병으로, 급성 뇌염과 호흡기 증상을 일으키며 치명률이 높습니다.",
+    "facts": [
+      {
+        "k": "병원체",
+        "v": "니파 바이러스 (Henipavirus nipahense), 파라믹소바이러스과"
+      },
+      {
+        "k": "게놈",
+        "v": "약 18.2 kb 단일가닥 (−)RNA, 비분절. N–P–M–F–G–L"
+      },
+      {
+        "k": "자연 숙주",
+        "v": "과일박쥐(날여우박쥐, Pteropus속)"
+      },
+      {
+        "k": "분포",
+        "v": "방글라데시·인도(거의 매년), 1998~99년 말레이시아·싱가포르(돼지 매개)"
+      },
+      {
+        "k": "잠복기",
+        "v": "보통 4~14일(드물게 더 길다)"
+      },
+      {
+        "k": "치명률",
+        "v": "약 40~75% (발생마다 다름)"
+      },
+      {
+        "k": "백신·치료",
+        "v": "허가된 백신·특이 치료제 없음. 지지요법"
+      }
+    ],
+    "sections": [
+      {
+        "h": "전파",
+        "p": [
+          "박쥐의 침·배설물에 오염된 대추야자 수액을 날것으로 마시거나, 감염된 동물(돼지 등)과 접촉해 감염됩니다.",
+          "사람 사이에도 환자의 호흡기 분비물·체액 접촉으로 전파됩니다(가족·간병인, 의료기관)."
+        ]
+      },
+      {
+        "h": "증상",
+        "p": [
+          "발열·두통·근육통·구토에서 시작해 어지러움·의식 저하·급성 뇌염으로 진행할 수 있습니다.",
+          "호흡곤란 등 호흡기 증상이 먼저 나타나는 경우도 있습니다."
+        ]
+      },
+      {
+        "h": "비고",
+        "p": [
+          "WHO가 연구개발 우선순위로 꼽는 병원체 가운데 하나입니다."
+        ]
+      }
+    ],
+    "refs": [
+      {
+        "label": "WHO 니파 바이러스 팩트시트",
+        "url": "https://www.who.int/news-room/fact-sheets/detail/nipah-virus"
+      },
+      {
+        "label": "ICTV 분류",
+        "url": "https://ictv.global/taxonomy"
+      }
+    ],
+    "note": "일반에 공개된 자료(WHO·CDC·ICTV 등)를 요약한 개요입니다. 수치는 대략적인 값이고 발생·연구마다 다릅니다. 임상·방역 판단에는 쓰지 말고 최신 정보는 아래 링크에서 확인하세요.",
+    "updated": "2026-11-11"
+  },
+  "course": {
+    "unit": "일",
+    "incubation": [
+      4,
+      14
+    ],
+    "onset": 7,
+    "detect": [
+      0,
+      14
+    ],
+    "peak": [
+      2,
+      8
+    ],
+    "igm": 5,
+    "igg": 10,
+    "specimens": [
+      {
+        "name": "인후·비강 도찰물",
+        "note": "급성기 RNA 검출에 쓰임"
+      },
+      {
+        "name": "소변",
+        "note": "급성기에 검출될 수 있음"
+      },
+      {
+        "name": "뇌척수액",
+        "note": "뇌염 환자에서 검출"
+      },
+      {
+        "name": "혈액",
+        "note": "RNA가 낮거나 음성인 경우가 많아 단독으로는 불충분"
+      }
+    ],
+    "notes": [
+      "잠복기가 길게는 한 달 이상이었던 보고가 있습니다.",
+      "혈액보다 호흡기·소변·뇌척수액 검체가 중요하다고 알려져 있습니다."
+    ],
+    "note": "문헌에서 보고되는 대략적인 시기를 모아 그린 모식도입니다(실측 곡선이 아님). 개인·검체·검사법에 따라 크게 다르며, 검출 시기는 발병일(증상 시작) 기준 상대값입니다."
   }
 }

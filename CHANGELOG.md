@@ -5,6 +5,11 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.36.5] - 2026-11-10
+
+### Added
+- **🦠 감염병 정보** 메뉴: 이 바이러스가 일으키는 감염병의 간단한 정보(병원체·게놈·숙주·분포·잠복기·치명률·백신/치료, 전파·증상)와 WHO 참고 링크. **⏱ 감염 경과 · 바이러스량** 메뉴: 노출 후 발병 시기, 바이러스(RNA/DNA)량이 높아지는 시기(모식도), IgM/IgG 출현 시기, 검체별 검출 시기. 내용은 프로파일 JSON(`disease`, `course`)에 있어 고칠 수 있습니다. 일반 공개 자료의 대략적인 요약이며 임상·방역 판단용이 아닙니다.
+
 ### Added
 - Pathoplexus 출처에 **세부 계통 열**(`source.sublineage_field`, 예: mpox `lineage`)을 `sub_lineage`로 함께 받습니다. 그룹(리니지) 열은 그대로이고, 메타데이터 표의 Sub-lineage 열과 게놈 카드에 표시만 됩니다. 계통 값이 `unassigned`·`unknown`·`none`이면 `unclassified`로 통일합니다.
 

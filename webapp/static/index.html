@@ -38,6 +38,8 @@
       <div id="activeJobsBanner" class="active-jobs-banner" hidden></div>
       <div id="hostScopeBox" class="host-scope-box" hidden></div>
       <button id="overviewBtn" class="btn btn-secondary btn-block">전체 대시보드</button>
+      <button id="diseaseBtn" class="btn btn-secondary btn-block" title="이 바이러스가 일으키는 감염병의 간단한 정보">🦠 감염병 정보</button>
+      <button id="courseBtn" class="btn btn-secondary btn-block" title="발병 시기와 바이러스량이 오르는 시기, 검체별 검출 시기">⏱ 감염 경과 · 바이러스량</button>
       <button type="button" id="menuToggleBtn" class="menu-toggle-btn" title="위쪽 메뉴 버튼만 접고 아래 프라이머 그룹·세트 목록을 넓게 봅니다">&#9776; 메뉴 접기 &#9652;</button>
       <div id="sidebarMenu" class="sidebar-menu">
       <button id="addSetBtn" class="btn btn-primary btn-block">+ 새 프라이머 세트 분석</button>
@@ -88,7 +90,7 @@
       </div>
       <input id="searchBox" class="search-box" type="text" placeholder="세트 검색 (이름, 벤더)...">
       <div id="setList" class="set-list"></div>
-      <div class="sidebar-footer">&copy; 2026 Chihwan Choi &middot; GPL-3.0 &middot; v<span id="footerVersion">0.36.4</span><br><button id="skinToggleBtn" class="skin-toggle" title="화면 스타일 전환 (Vaadin Lumo / 기본)">스타일: Lumo</button></div>
+      <div class="sidebar-footer">&copy; 2026 Chihwan Choi &middot; GPL-3.0 &middot; v<span id="footerVersion">0.36.5</span><br><button id="skinToggleBtn" class="skin-toggle" title="화면 스타일 전환 (Vaadin Lumo / 기본)">스타일: Lumo</button></div>
     </aside>
 
     <main class="main">
@@ -116,6 +118,8 @@
       <div id="stdMgrView" class="primers-view" hidden></div>
 
       <div id="requirementsView" class="requirements-view" hidden></div>
+      <div id="diseaseView" class="disease-view" hidden></div>
+      <div id="courseView" class="disease-view" hidden></div>
 
       <div id="standardsView" class="standards-view" hidden></div>
 
