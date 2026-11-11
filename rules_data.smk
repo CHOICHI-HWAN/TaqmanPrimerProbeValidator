@@ -13,7 +13,45 @@ rule fetch_raw:
         "logs/fetch_raw_{seg}.log",
     run:
         cmd = {"nextstrain": "bash scripts/fetch_one.sh", "pathoplexus": "python3 scripts/fetch_pathoplexus.py", "ncbi": "python3 scripts/fetch_ncbi_virus.py"}[PROFILE["source"]["type"]]
-        shell("{cmd} {params.seq_url} {params.meta_url} {output.fasta} {output.meta} > {log} 2>&1")
+        shell("{cmd} '{params.seq_url}' '{params.meta_url}' {output.fasta} {output.meta} > {log} 2>&1")
+
+
+# Several reference genomes for one organism (e.g. mpox clades I/Ia, Ib and II): the population is downloaded once as "_all" and split by the lineage
+# column into analysis units. A profile segment with `lineage_in: [values]` is such a unit and keeps its own reference_accession.
+SPLIT_SEGS = [k for k, v in PROFILE["segments"].items() if v.get("lineage_in")]
+
+if SPLIT_SEGS:
+    rule fetch_all:
+        output:
+            fasta="data/raw/_all_sequences.fasta",
+            meta="data/raw/_all_metadata.tsv",
+        params:
+            seq_url=lambda wc: source_urls(PROFILE, SPLIT_SEGS[0])[0],
+            meta_url=lambda wc: source_urls(PROFILE, SPLIT_SEGS[0])[1],
+        log:
+            "logs/fetch_all.log",
+        run:
+            cmd = {"nextstrain": "bash scripts/fetch_one.sh", "pathoplexus": "python3 scripts/fetch_pathoplexus.py", "ncbi": "python3 scripts/fetch_ncbi_virus.py"}[PROFILE["source"]["type"]]
+            shell("{cmd} '{params.seq_url}' '{params.meta_url}' {output.fasta} {output.meta} > {log} 2>&1")
+
+    rule split_raw:
+        input:
+            fasta="data/raw/_all_sequences.fasta",
+            meta="data/raw/_all_metadata.tsv",
+        output:
+            fasta="data/raw/{seg}_sequences.fasta",
+            meta="data/raw/{seg}_metadata.tsv",
+        wildcard_constraints:
+            seg="|".join(SPLIT_SEGS),
+        params:
+            values=lambda wc: PROFILE["segments"][wc.seg]["lineage_in"],
+            col=PROFILE["metadata"]["lineage_fallback"],
+        log:
+            "logs/split_raw_{seg}.log",
+        script:
+            "scripts/split_raw_by_lineage.py"
+
+    ruleorder: split_raw > fetch_raw
 
 
 # Clade/lineage from a locally built Auspice JSON (profile lineage.mode = "auspice_clades"): one
