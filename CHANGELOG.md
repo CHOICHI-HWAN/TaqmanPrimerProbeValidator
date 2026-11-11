@@ -5,6 +5,11 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-11
+
+### Changed
+- **참조 게놈 3개, 분석 단위 3개**: 엠폭스를 clade 묶음별 세 분석 단위로 나눴습니다 — **Clade I/Ia**(참조 NC_003310), **Clade Ib**(참조 PP601219; C3L(OPG032) 결실), **Clade II**(IIa·IIb; 참조 NC_063383; C3L 없음). 전체를 한 번 받아(`data/raw/_all_*`) 라이니지 열로 나눕니다(`scripts/split_raw_by_lineage.py`, 프로파일 `segments.<단위>.lineage_in`). Ib/IIb 혼재는 Ib로 읽고 클레이드 미지정 기록은 뺍니다. 기존 프라이머 세트 6개는 Clade II에 그대로 두고 Clade I/Ia·Ib에 복사했습니다(P007~P018).
+
 ### Added
 - NCBI Datasets 출처(`source.type = "ncbi"`)가 **분절 바이러스**를 지원합니다(`segment_subdirs: true`, 분절별 `taxon/SEG` 요청). 기록에 `segment`가 있으면 그것으로, 없으면 길이가 한 분절 전장에 가까울 때 길이로 분절을 정합니다(리프트밸리열 바이러스, 분절별 `SEG_LEN`).
 

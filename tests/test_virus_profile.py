@@ -67,15 +67,14 @@ def test_profile_is_found_from_config_yaml(tmp_path):
     assert find_profile_path(tmp_path) == tmp_path / "profiles" / "lassa.json"
 
 
-def test_shipped_profile_pathoplexus_source_and_country_lineage():
+def test_shipped_profile_three_reference_units_split_by_clade():
     from virus_profile import source_urls
     p = load_profile(ROOT / "profiles" / "mpxv.json")
-    assert segment_keys(p) == ['genome']
-    assert source_urls(p, "genome") == ("https://lapis.pathoplexus.org", "mpox@clade:lineage")
-    assert p["lineage"]["mode"] == "metadata_column" and p["segments"]["genome"]["lineage_col"] == "country_lineage"
-    assert chrom_name(p, "genome") == "MPXV_GENOME" and p["qc"]["max_n_fraction"] == 0.01
-    q = load_profile(ROOT / "profiles" / "lassa.json")
-    assert source_urls(q, "s")[0].endswith("/lassa/s/sequences.fasta.zst") and q["lineage"]["mode"] == "metadata_column"
+    assert segment_keys(p) == ["ci", "ib", "ii"]
+    assert [p["segments"][k]["reference_accession"] for k in ("ci", "ib", "ii")] == ["NC_003310", "PP601219", "NC_063383"]
+    assert p["segments"]["ib"]["lineage_in"] == ["Ib"] and "IIb" in p["segments"]["ii"]["lineage_in"]
+    assert source_urls(p, "ii")[1] == "mpox@clade:lineage"                 # one download of the whole organism; the units are cut from it
+    assert chrom_name(p, "ci") == "MPXV_CI" and p["qc"]["max_n_fraction"] == 0.01
 
 
 def test_auspice_mode_needs_a_path():

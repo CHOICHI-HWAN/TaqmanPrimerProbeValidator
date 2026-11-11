@@ -55,11 +55,35 @@
     "sublineage_field": "lineage"
   },
   "segments": {
-    "genome": {
-      "label": "Genome",
+    "ci": {
+      "label": "Clade I/Ia",
       "min_len": 180000,
       "lineage_col": "country_lineage",
-      "reference_accession": "NC_063383"
+      "reference_accession": "NC_003310",
+      "lineage_in": [
+        "I",
+        "Ia"
+      ]
+    },
+    "ib": {
+      "label": "Clade Ib",
+      "min_len": 180000,
+      "lineage_col": "country_lineage",
+      "reference_accession": "PP601219",
+      "lineage_in": [
+        "Ib"
+      ]
+    },
+    "ii": {
+      "label": "Clade II",
+      "min_len": 180000,
+      "lineage_col": "country_lineage",
+      "reference_accession": "NC_063383",
+      "lineage_in": [
+        "II",
+        "IIa",
+        "IIb"
+      ]
     }
   },
   "metadata": {
@@ -95,7 +119,7 @@
     "web_url": "https://pathoplexus.org/mpox/search",
     "lineage_ko": "클레이드",
     "lineage_examples": "I, Ia, Ib, IIa, IIb",
-    "lineage_def": "엠폭스 바이러스는 Pathoplexus 메타데이터의 클레이드(I, Ia, Ib, IIa, IIb)를 리니지로 쓴다. 클레이드가 없는 기록은 unclassified로 둔다. 프라이머 검증은 이 subclade(Ia, Ib, IIa, IIb) 단위로 보고, 그 아래 세부 계통(IIb의 B.1·C.1…, Ib의 A·A.1…)은 메타데이터 표의 Sub-lineage 열에 표시만 한다.",
+    "lineage_def": "엠폭스는 Pathoplexus 메타데이터의 클레이드(I, Ia, Ib, IIa, IIb)를 리니지로 쓰고, 참조 게놈이 서로 달라 세 분석 단위로 나눈다: Clade I/Ia(참조 NC_003310), Clade Ib(참조 PP601219, C3L(OPG032) 결실), Clade II(IIa·IIb, 참조 NC_063383, C3L 없음). 클레이드가 없는 기록(unassigned 등)은 분석에서 뺀다. 그 아래 세부 계통(IIb의 B.1·C.1…, Ib의 A·A.1…)은 메타데이터 표의 Sub-lineage 열에 표시만 한다.",
     "orientation_note": ""
   },
   "disease": {
