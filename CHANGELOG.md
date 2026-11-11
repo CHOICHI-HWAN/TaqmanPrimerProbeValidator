@@ -5,6 +5,9 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+- NCBI Datasets 출처(`source.type = "ncbi"`)가 **분절 바이러스**를 지원합니다(`segment_subdirs: true`, 분절별 `taxon/SEG` 요청). 기록에 `segment`가 있으면 그것으로, 없으면 길이가 한 분절 전장에 가까울 때 길이로 분절을 정합니다(리프트밸리열 바이러스, 분절별 `SEG_LEN`).
+
 ## [0.1.3] - 2026-11-10
 
 ### Added
