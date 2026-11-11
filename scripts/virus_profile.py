@@ -111,7 +111,7 @@ def source_urls(p, seg):
     if s["type"] == "pathoplexus":
         return s["base_url"].rstrip("/"), s["organism"] + (f"@{s['lineage_field']}" + (f":{s['sublineage_field']}" if s.get("sublineage_field") else "") if s.get("lineage_field") else "") + (f"/{seg.upper()}" if s["segment_subdirs"] else "")   # (LAPIS url, organism[/SEGMENT]): see scripts/fetch_pathoplexus.py
     if s["type"] == "ncbi":
-        return s["base_url"].rstrip("/"), str(s["taxon"])            # (Datasets API url, taxon id): see scripts/fetch_ncbi_virus.py
+        return s["base_url"].rstrip("/"), str(s["taxon"]) + (f"/{seg.upper()}" if s["segment_subdirs"] else "")     # (Datasets API url, taxon id[/SEGMENT]): see scripts/fetch_ncbi_virus.py
     prefix = s["base_url"].rstrip("/") + (f"/{seg}" if s["segment_subdirs"] else "")
     return f"{prefix}/{s['sequences_file']}", f"{prefix}/{s['metadata_file']}"
 
