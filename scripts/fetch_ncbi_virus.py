@@ -133,6 +133,12 @@ def _year(r):
     return int(rd) if rd.isdigit() else 0
 
 
+def subtype_has(subtype, part):
+    """Does a subtype name such as H3N2 have this HA part (H3) or NA part (N2)?"""
+    ha, na = re.match(r"(H\d+)", subtype), re.search(r"(N\d+)$", subtype)
+    return part in ((ha.group(1) if ha else ""), (na.group(1) if na else ""))
+
+
 def _cached_reports(base, taxa, hostmap, since, cache_dir):
     """All dataset reports of the taxa (host filter per taxon, released since the year), cached for 12 h so the per-segment jobs share one download."""
     key = hashlib.sha1(json.dumps([base, taxa, sorted(hostmap.items()), since]).encode()).hexdigest()[:12]
@@ -288,10 +294,16 @@ def main_multi(base, spec, out_fa, out_meta):
         if r["accession"] in seen or (seg and (r.get("segment") or "") != seg) or (since and r["_year"] < since):
             continue
         st = r["_subtype"]
-        if sub and sub not in (re.match(r"(H\d+)", st) or [None, ""])[1:] + (re.search(r"(N\d+)$", st) or [None, ""])[1:]:
+        if sub and not subtype_has(st, sub):
             continue
         seen.add(r["accession"])
         rows.append(r)
+    ref = par.get("ref") or ""                                   # the segment's reference genome is always part of the data (it is cut out of it later)
+    if ref and ref not in {r["accession"].split(".")[0] for r in rows}:
+        for x in json.loads(_get(f"{base}/virus/accession/{ref}.1/dataset_report")).get("reports", []):
+            r = {k: x[k] for k in REPORT_KEEP if k in x}
+            r["_subtype"], r["_year"] = _subtype(x), _year(x)
+            rows.append(r)
     seqs = {}
     for i in range(0, len(rows), 2000):
         z = zipfile.ZipFile(io.BytesIO(_post_zip(f"{base}/virus/genome/download", {"accessions": [r["accession"] for r in rows[i:i + 2000]], "include_sequence": ["GENOME"]})))
