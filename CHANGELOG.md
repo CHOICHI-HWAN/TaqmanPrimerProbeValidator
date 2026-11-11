@@ -5,6 +5,9 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Changed
+- **기본 스캔 엔진을 Go로** (`scan_engine: "go"`): 전체 유전체 스캔이 Go 엔진으로 돕니다. NiV(세트 4개 + 임시 그룹 2개)와 LASV(세트 43개 + 그룹 8개)를 Python·Go로 각각 전체 분석해 비교한 결과, 세트·그룹 판정 표가 모두 같았습니다(MFEprimer 원본 보고서만 실행마다 달라짐). 스캔을 쓰는 단계는 `alignment_table` 약 9~20배, 그룹 교차 결합 약 1.2~3.8배 빨라졌고 전체 파이프라인은 MFEprimer·MAFFT·pixy가 지배해 약 1.1~1.7배입니다. Go가 없으면 Python 스캔으로 자동 전환됩니다.
+
 ### Fixed
 - NCBI 다중 분류군 수신: 아형 부분 필터(`sub=H3`/`N2`)의 오류를 고치고(`subtype_has`, 테스트 추가), 분절의 **참조 계정을 항상 데이터에 포함**합니다(`ref=`; 연도·샘플 조건에 걸려 참조가 빠지면 참조 게놈을 잘라 낼 수 없었음).
 
