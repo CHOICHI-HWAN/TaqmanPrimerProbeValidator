@@ -5,6 +5,9 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Changed
+- **기본 스캔 엔진을 Go로** (`scan_engine: "go"`): 전체 유전체 스캔이 Go 엔진으로 돕니다. 같은 입력을 Python·Go로 각각 전체 분석해 비교한 결과 세트·그룹 판정 표가 모두 같았습니다(NiV, LASV, EBOV, SUDV, BDBV, RESTV, TAFV, MPXV 축소본). 스캔을 쓰는 `alignment_table` 단계는 약 9~60배 빨라졌습니다. Go가 없으면 Python 스캔으로 자동 전환됩니다.
+
 ## [0.1.0] - 2026-11-10
 
 ### Added
