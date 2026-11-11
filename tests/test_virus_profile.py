@@ -146,3 +146,13 @@ def test_ncbi_segmented_virus_gets_the_segment_in_its_target():
     p = copy.deepcopy(_good())
     p["source"] = {"type": "ncbi", "base_url": "https://api.ncbi.nlm.nih.gov/datasets/v2", "taxon": 11588, "segment_subdirs": True}
     assert source_urls(validate(p), "s")[1] == "11588/S"
+
+
+def test_ncbi_several_taxa_with_filters_build_one_spec_per_segment():
+    from virus_profile import source_urls
+    p = copy.deepcopy(_good())
+    seg = next(iter(p["segments"]))
+    p["segments"][seg].update(ncbi_segment="4", ncbi_subtype="H3")
+    p["source"] = {"type": "ncbi", "base_url": "https://api.ncbi.nlm.nih.gov/datasets/v2", "taxon": [114727, 119210], "since": 2015, "host_filter": {"114727": 9606},
+                   "group_by": "subtype", "segment_subdirs": True}
+    assert source_urls(validate(p), seg)[1] == "114727,119210/4?since=2015&host=114727:9606&sub=H3&group=subtype"
