@@ -40,8 +40,9 @@ def info(profile, root, read_tsv, seg_keys):
         url = f"https://pathoplexus.org/{s['organism']}/search"
         upstream = "INSDC (GenBank / ENA / DDBJ) + Pathoplexus submissions"
     elif kind == "ncbi":
-        detail = f"taxon {s['taxon']}"
-        url = f"https://www.ncbi.nlm.nih.gov/datasets/taxonomy/{s['taxon']}/"
+        taxa = s["taxon"] if isinstance(s["taxon"], list) else [s["taxon"]]
+        detail = "taxon " + ", ".join(str(t) for t in taxa) + (f" (collected since {s['since']})" if s.get("since") else "")
+        url = f"https://www.ncbi.nlm.nih.gov/datasets/taxonomy/{taxa[0]}/"
         upstream = "NCBI GenBank / RefSeq"
     else:
         detail = s["base_url"].replace("https://", "")

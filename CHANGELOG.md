@@ -5,6 +5,9 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+### Fixed
+- NCBI 다중 분류군 수신: 아형 부분 필터(`sub=H3`/`N2`)의 오류를 고치고(`subtype_has`, 테스트 추가), 분절의 **참조 계정을 항상 데이터에 포함**합니다(`ref=`; 연도·샘플 조건에 걸려 참조가 빠지면 참조 게놈을 잘라 낼 수 없었음).
+
 ## [0.1.2] - 2026-11-11
 
 ### Changed
