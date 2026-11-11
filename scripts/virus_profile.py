@@ -116,7 +116,7 @@ def source_urls(p, seg):
         sd = p["segments"].get(seg, {})
         spec = ",".join(str(t) for t in taxa) + (f"/{sd['ncbi_segment']}" if sd.get("ncbi_segment") else f"/{seg.upper()}" if s["segment_subdirs"] else "")
         q = ([f"since={s['since']}"] if s.get("since") else []) + (["host=" + ",".join(f"{k}:{v}" for k, v in s["host_filter"].items())] if s.get("host_filter") else []) \
-            + ([f"sub={sd['ncbi_subtype']}"] if sd.get("ncbi_subtype") else []) + ([f"group={s['group_by']}"] if s.get("group_by") else []) + (["classify=1"] if s.get("classify_subtype") else []) \
+            + ([f"sub={sd['ncbi_subtype']}"] if sd.get("ncbi_subtype") else []) + ([f"group={s['group_by']}"] if s.get("group_by") else []) + (["classify=1"] if s.get("classify_subtype") else []) + ([f"ref={sd['reference_accession']}"] if s.get("classify_subtype") and sd.get("reference_accession") else []) \
             + ([f"cap={s['cap_per_group']}"] if s.get("cap_per_group") else [])
         return s["base_url"].rstrip("/"), spec + ("?" + "&".join(q) if q else "")      # (Datasets API url, taxa[/SEGMENT][?filters]): see scripts/fetch_ncbi_virus.py
     prefix = s["base_url"].rstrip("/") + (f"/{seg}" if s["segment_subdirs"] else "")
