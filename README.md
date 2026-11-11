@@ -75,7 +75,7 @@ Detailed documentation (pipeline steps, settings, dashboard features, directory 
 
 ### Current version
 
-Code: **v0.1.2 (MARV edition)**   ·   Tested on Ubuntu 24.04, x86_64
+Code: **v0.1.3 (MARV edition)**   ·   Tested on Ubuntu 24.04, x86_64
 
 ### Requirements
 
@@ -237,7 +237,7 @@ There is no publication for this tool yet. Please cite the software as below, **
   author  = {Choi, Chihwan},
   title   = {TaqMan Primer/Probe Validator (MARV edition)},
   year    = {2026},
-  version = {0.1.2},
+  version = {0.1.3},
   url     = {https://github.com/CHOICHI-HWAN/TaqmanPrimerProbeValidator/tree/marv}
 }
 ```
