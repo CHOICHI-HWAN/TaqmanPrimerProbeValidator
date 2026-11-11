@@ -99,7 +99,7 @@ Detailed documentation (pipeline steps, settings, dashboard features, directory 
 
 ### Current version
 
-Code: **v0.36.4**   ·   Tested on Ubuntu 24.04, x86_64
+Code: **v0.36.5**   ·   Tested on Ubuntu 24.04, x86_64
 
 ### Requirements
 
@@ -260,7 +260,7 @@ There is no publication for this tool yet. Please cite the software as below, **
   author  = {Choi, Chihwan},
   title   = {TaqMan Primer/Probe Validator},
   year    = {2026},
-  version = {0.36.4},
+  version = {0.36.5},
   url     = {https://github.com/CHOICHI-HWAN/TaqmanPrimerProbeValidator}
 }
 ```

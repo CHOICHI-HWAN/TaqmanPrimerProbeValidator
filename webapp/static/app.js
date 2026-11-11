@@ -2334,7 +2334,7 @@ function renderLineageBreakdownCompact(setData) {
   }).join("");
 }
 
-const MAIN_VIEW_IDS = ["genomeMapView", "engineView", "overview", "detail", "addForm", "paramsView", "changelogView", "guideView", "diversityView", "geneConsView", "redesignView", "vennView", "metadataView", "primersView", "litView", "standardsView", "metaTableView", "stdMgrView", "requirementsView"];
+const MAIN_VIEW_IDS = ["genomeMapView", "engineView", "overview", "detail", "addForm", "paramsView", "changelogView", "guideView", "diversityView", "geneConsView", "redesignView", "vennView", "metadataView", "primersView", "litView", "standardsView", "metaTableView", "stdMgrView", "requirementsView", "diseaseView", "courseView"];
 function showMainView(id) {
   for (const v of MAIN_VIEW_IDS) $(`#${v}`).hidden = (v !== id);
   navRecord(id);
@@ -2352,6 +2352,70 @@ NAV_VIEW_BTN.genomeMapView = "genomeMapBtn";
 const NAV_TITLE = { genomeMapView: "프라이머 매핑지도", engineView: "엔진 검증 (Go)", overview: "전체 대시보드", addForm: "새 프라이머 세트 분석", paramsView: "분석 파라미터", changelogView: "변경 이력", guideView: "파이프라인 개요 / 가이드",
   diversityView: "리니지별 유전체 다양성", geneConsView: "유전자 보존영역", redesignView: "리니지별 재설계", vennView: "커버리지 벤 다이어그램", metadataView: "메타데이터 / 지도",
   primersView: "프라이머 입력 / 관리", litView: "문헌 프라이머", standardsView: "표준물질 대표성", metaTableView: "메타데이터 표", stdMgrView: "표준물질 입력 / 관리", requirementsView: "요구사항 기록" };
+// ---- 감염병 정보 / 감염 경과 · 바이러스량: the text lives in the virus profile (profiles/<id>.json "disease" and "course") ----
+function diseaseRefsHtml(d) {
+  const refs = ((d && d.refs) || []).filter((r) => /^https?:\/\//.test(r.url || ""));
+  return refs.length ? `<h3>참고 자료</h3><ul class="disease-refs">${refs.map((r) => `<li><a href="${escHtml(r.url)}" target="_blank" rel="noopener">${escHtml(r.label)}</a></li>`).join("")}</ul>` : "";
+}
+function showDiseasePage() {
+  state.activeId = null; state.activeType = null;
+  renderSidebar();
+  showMainView("diseaseView");
+  const d = PROFILE.disease, view = $("#diseaseView");
+  if (!d) { view.innerHTML = "<h2>감염병 정보</h2><p class='note'>이 에디션에는 아직 감염병 정보가 없습니다 (profiles 폴더의 프로파일 JSON에 \"disease\" 블록을 추가하세요).</p>"; return; }
+  const facts = (d.facts || []).map((f) => `<tr><th>${escHtml(f.k)}</th><td>${escHtml(f.v)}</td></tr>`).join("");
+  const secs = (d.sections || []).map((s) => `<h3>${escHtml(s.h)}</h3>${(s.p || []).map((t) => `<p>${escHtml(t)}</p>`).join("")}`).join("");
+  view.innerHTML = `<h2>${escHtml(d.title || "감염병 정보")}</h2><p class="disease-lead">${escHtml(d.summary || "")}</p>
+    ${facts ? `<table class="disease-facts"><tbody>${facts}</tbody></table>` : ""}${secs}${diseaseRefsHtml(d)}
+    <p class="note disease-note">${escHtml(d.note || "")}${d.updated ? ` (작성 ${escHtml(d.updated)})` : ""}</p>`;
+}
+// schematic of the infection course: days after exposure on x; incubation window, onset, viral-load curve (a model, not data), antibody rise
+function courseSvg(c) {
+  const onset = c.onset, t0 = onset + c.detect[0], t1 = onset + c.detect[1], pc = onset + (c.peak[0] + c.peak[1]) / 2;
+  const xmax = Math.ceil((Math.max(t1, onset + c.igg + 7, c.incubation[1]) + 3) / 5) * 5;
+  const W = 760, H = 330, L = 130, R = 20, T = 18, B = 40, pw = W - L - R, X = (d) => L + (pw * d) / xmax;
+  const curveTop = T + 6, curveBot = T + 128;
+  const gauss = (x) => { const s = x < pc ? Math.max((pc - t0) / 2.2, 0.8) : Math.max((t1 - pc) / 2.2, 0.8); return Math.exp(-((x - pc) ** 2) / (2 * s * s)); };
+  const pts = []; for (let x = t0; x <= t1 + 0.001; x += 0.5) pts.push([X(x), curveBot - (curveBot - curveTop) * gauss(x)]);
+  const area = pts.length ? `M${X(t0)},${curveBot} L${pts.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" L")} L${X(t1)},${curveBot} Z` : "";
+  const row = (y, label, from, to, cls, tip) => `<text x="${L - 8}" y="${y + 11}" text-anchor="end" class="cs-lbl">${label}</text>` +
+    `<rect x="${X(from).toFixed(1)}" y="${y}" width="${Math.max(2, X(to) - X(from)).toFixed(1)}" height="14" rx="3" class="${cls}"><title>${escHtml(tip)}</title></rect>`;
+  const ticks = []; for (let d = 0; d <= xmax; d += 5) ticks.push(`<line x1="${X(d)}" x2="${X(d)}" y1="${T}" y2="${H - B}" class="cs-grid"/><text x="${X(d)}" y="${H - B + 16}" text-anchor="middle" class="cs-lbl">${d}</text>`);
+  const yI = curveBot + 24, yM = yI + 28, yG = yM + 24;
+  return `<svg viewBox="0 0 ${W} ${H}" class="course-svg" role="img" aria-label="감염 경과 모식도">
+    ${ticks.join("")}
+    <text x="${L - 8}" y="${curveTop + 14}" text-anchor="end" class="cs-lbl">바이러스량</text><text x="${L - 8}" y="${curveTop + 28}" text-anchor="end" class="cs-sub">(모식도)</text>
+    ${area ? `<path d="${area}" class="cs-load"/>` : ""}
+    <line x1="${X(onset)}" x2="${X(onset)}" y1="${T}" y2="${H - B}" class="cs-onset"/><text x="${X(onset) + 4}" y="${T + 10}" class="cs-onset-t">발병(증상 시작) 약 ${onset}일</text>
+    ${row(yI, "잠복기", c.incubation[0], c.incubation[1], "cs-inc", `노출 후 ${c.incubation[0]}~${c.incubation[1]}일에 발병하는 경우가 많음`)}
+    ${row(yM, "IgM 항체", onset + c.igm, xmax, "cs-igm", `발병 후 약 ${c.igm}일부터 검출`)}
+    ${row(yG, "IgG 항체", onset + c.igg, xmax, "cs-igg", `발병 후 약 ${c.igg}일부터 검출`)}
+    <text x="${(L + W - R) / 2}" y="${H - 6}" text-anchor="middle" class="cs-lbl">노출(감염) 후 일수</text></svg>`;
+}
+function showCoursePage() {
+  state.activeId = null; state.activeType = null;
+  renderSidebar();
+  showMainView("courseView");
+  const c = PROFILE.course, d = PROFILE.disease || {}, view = $("#courseView");
+  const title = `감염 경과 · 바이러스량${d.title ? ` — ${escHtml(d.title)}` : ""}`;
+  if (!c) { view.innerHTML = `<h2>${title}</h2><p class="note">사람에서의 임상 경과·바이러스량 자료가 거의 없어 이 바이러스는 제공하지 않습니다(profiles 폴더의 프로파일 JSON에 \"course\" 블록을 추가하면 표시됩니다).</p>`; return; }
+  const rel = (a, b) => `발병 후 ${a}~${b}일`;
+  const key = [["잠복기", `노출 후 ${c.incubation[0]}~${c.incubation[1]}일`], ["발병(증상 시작) 시기", `노출 후 약 ${c.onset}일(그림의 기준)`], ["RNA/DNA 검출 구간", `${rel(c.detect[0], c.detect[1])}`],
+    ["바이러스량 최고", `${rel(c.peak[0], c.peak[1])} 무렵`], ["IgM 항체", `발병 후 약 ${c.igm}일부터`], ["IgG 항체", `발병 후 약 ${c.igg}일부터`]];
+  const spec = (c.specimens || []).map((s) => `<tr><th>${escHtml(s.name)}</th><td>${escHtml(s.note)}</td></tr>`).join("");
+  view.innerHTML = `<h2>${title}</h2>
+    <p class="disease-lead">발병이 노출 후 언제쯤 일어나고, 바이러스(RNA/DNA)량이 언제 높아지는지 보여 주는 개념도입니다. 검체를 언제 채취하느냐에 따라 프라이머·프로브 검증(분자 진단)의 의미가 달라집니다.</p>
+    <div class="course-box">${courseSvg(c)}<div class="course-legend"><span class="lg lg-load"></span>바이러스량(모식도) <span class="lg lg-inc"></span>잠복기 <span class="lg lg-igm"></span>IgM <span class="lg lg-igg"></span>IgG</div></div>
+    <table class="disease-facts"><tbody>${key.map(([k, v]) => `<tr><th>${k}</th><td>${escHtml(v)}</td></tr>`).join("")}</tbody></table>
+    ${spec ? `<h3>검체별 검출</h3><table class="disease-facts"><tbody>${spec}</tbody></table>` : ""}
+    ${(c.notes || []).length ? `<h3>참고</h3><ul>${c.notes.map((t) => `<li>${escHtml(t)}</li>`).join("")}</ul>` : ""}
+    ${diseaseRefsHtml(d)}<p class="note disease-note">${escHtml(c.note || "")}</p>`;
+}
+$("#diseaseBtn").addEventListener("click", showDiseasePage);
+$("#courseBtn").addEventListener("click", showCoursePage);
+NAV_VIEW_BTN.diseaseView = "diseaseBtn"; NAV_VIEW_BTN.courseView = "courseBtn";
+NAV_TITLE.diseaseView = "감염병 정보"; NAV_TITLE.courseView = "감염 경과 · 바이러스량";
+
 function navTitle(d) {
   if (!d) return "";
   if (d.v === "detail") {

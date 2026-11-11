@@ -6,22 +6,64 @@
   "taxonomy": {
     "source": "ICTV Master Species List (2024-2025 releases). Names and ranks change between releases -- check https://ictv.global/taxonomy",
     "virus": "Lassa virus (LASV)",
-    "ranks": [["Realm", "Riboviria"], ["Kingdom", "Orthornavirae"], ["Phylum", "Negarnaviricota"], ["Subphylum", "Polyploviricotina"],
-              ["Class", "Bunyaviricetes"], ["Order", "Hareavirales"], ["Family", "Arenaviridae"], ["Genus", "Mammarenavirus"],
-              ["Species", "Mammarenavirus lassaense"]],
+    "ranks": [
+      [
+        "Realm",
+        "Riboviria"
+      ],
+      [
+        "Kingdom",
+        "Orthornavirae"
+      ],
+      [
+        "Phylum",
+        "Negarnaviricota"
+      ],
+      [
+        "Subphylum",
+        "Polyploviricotina"
+      ],
+      [
+        "Class",
+        "Bunyaviricetes"
+      ],
+      [
+        "Order",
+        "Hareavirales"
+      ],
+      [
+        "Family",
+        "Arenaviridae"
+      ],
+      [
+        "Genus",
+        "Mammarenavirus"
+      ],
+      [
+        "Species",
+        "Mammarenavirus lassaense"
+      ]
+    ],
     "former_species": "Lassa mammarenavirus"
   },
-
   "source": {
     "type": "nextstrain",
     "base_url": "https://data.nextstrain.org/files/workflows/lassa"
   },
-
   "segments": {
-    "s": {"label": "S", "min_len": 3000, "lineage_col": "s_lineage", "reference_accession": "AY628203"},
-    "l": {"label": "L", "min_len": 6000, "lineage_col": "l_lineage", "reference_accession": "AY628202"}
+    "s": {
+      "label": "S",
+      "min_len": 3000,
+      "lineage_col": "s_lineage",
+      "reference_accession": "AY628203"
+    },
+    "l": {
+      "label": "L",
+      "min_len": 6000,
+      "lineage_col": "l_lineage",
+      "reference_accession": "AY628202"
+    }
   },
-
   "metadata": {
     "accession": "accession",
     "lineage_fallback": "sub_lineage",
@@ -29,16 +71,119 @@
     "country": "country",
     "region": "region"
   },
-
   "population": {
     "pooled_label": "ALL_LASV",
     "chrom_prefix": "LASV"
   },
-
   "diversity": {
     "window_size": 1,
     "min_coverage": 0.95,
     "min_identity": 0.65,
     "min_lineage_n": 10
+  },
+  "disease": {
+    "title": "라사열 (Lassa fever)",
+    "summary": "서아프리카에서 풍토병으로 발생하는 급성 바이러스성 출혈열입니다. 감염자의 대다수는 경증이거나 증상이 없습니다.",
+    "facts": [
+      {
+        "k": "병원체",
+        "v": "라사 바이러스 (Mammarenavirus lassaense), 아레나바이러스과"
+      },
+      {
+        "k": "게놈",
+        "v": "2분절 단일가닥 RNA(ambisense): S 약 3.4 kb, L 약 7.2 kb"
+      },
+      {
+        "k": "자연 숙주",
+        "v": "설치류(다유두쥐, Mastomys natalensis)"
+      },
+      {
+        "k": "분포",
+        "v": "서아프리카(나이지리아·시에라리온·라이베리아·기니 등)"
+      },
+      {
+        "k": "잠복기",
+        "v": "6~21일"
+      },
+      {
+        "k": "치명률",
+        "v": "감염자 전체로는 약 1% 안팎, 입원 환자는 더 높게 보고(약 15% 안팎)"
+      },
+      {
+        "k": "백신·치료",
+        "v": "허가된 백신 없음(개발 중). 조기 리바비린과 지지요법"
+      }
+    ],
+    "sections": [
+      {
+        "h": "전파",
+        "p": [
+          "감염된 설치류의 배설물·소변에 오염된 음식·집기 접촉이나 흡입이 주된 경로입니다.",
+          "사람 사이에는 환자의 혈액·체액 접촉으로 전파되며 병원 내 감염이 보고됩니다."
+        ]
+      },
+      {
+        "h": "증상",
+        "p": [
+          "약 80%는 무증상이거나 경증(발열·두통·권태)입니다.",
+          "약 20%는 중증으로 진행해 출혈·장기 부전이 올 수 있고, 회복 후 청력 손실이 흔한 후유증입니다."
+        ]
+      },
+      {
+        "h": "이 도구와의 관련",
+        "p": [
+          "라사 바이러스는 유전적 다양성이 매우 커서(계통 LI~LVII) 프라이머·프로브의 mismatch가 검출 실패의 주된 원인이 됩니다. 계통별 커버리지를 보는 이유입니다."
+        ]
+      }
+    ],
+    "refs": [
+      {
+        "label": "WHO 라사열 팩트시트",
+        "url": "https://www.who.int/news-room/fact-sheets/detail/lassa-fever"
+      },
+      {
+        "label": "ICTV 분류",
+        "url": "https://ictv.global/taxonomy"
+      }
+    ],
+    "note": "일반에 공개된 자료(WHO·CDC·ICTV 등)를 요약한 개요입니다. 수치는 대략적인 값이고 발생·연구마다 다릅니다. 임상·방역 판단에는 쓰지 말고 최신 정보는 아래 링크에서 확인하세요.",
+    "updated": "2026-11-11"
+  },
+  "course": {
+    "unit": "일",
+    "incubation": [
+      6,
+      21
+    ],
+    "onset": 10,
+    "detect": [
+      0,
+      14
+    ],
+    "peak": [
+      3,
+      8
+    ],
+    "igm": 7,
+    "igg": 14,
+    "specimens": [
+      {
+        "name": "혈액",
+        "note": "발병 초기부터 RNA 검출. 중증·사망 환자에서 바이러스량이 더 높다고 알려짐"
+      },
+      {
+        "name": "소변",
+        "note": "회복 후에도 수 주간 바이러스가 배출될 수 있음"
+      },
+      {
+        "name": "정액",
+        "note": "회복 후 수 개월까지 검출된 보고"
+      }
+    ],
+    "notes": [
+      "발병은 서서히 시작합니다(발열·권태 → 두통·인후통 → 중증).",
+      "계통 다양성 때문에 RT-PCR이 위음성이 될 수 있어 여러 표적을 함께 쓰는 것이 권장됩니다."
+    ],
+    "note": "문헌에서 보고되는 대략적인 시기를 모아 그린 모식도입니다(실측 곡선이 아님). 개인·검체·검사법에 따라 크게 다르며, 검출 시기는 발병일(증상 시작) 기준 상대값입니다."
   }
 }

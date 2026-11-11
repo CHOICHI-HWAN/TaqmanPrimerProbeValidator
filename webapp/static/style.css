@@ -1245,3 +1245,27 @@ body.fs-open { overflow: hidden; }
   .nav-bar { flex-wrap: wrap; top: 0; margin: -56px -12px 10px; padding: 56px 12px 8px; }
   .main .card, .main .detail-section { overflow-x: auto; }
 }
+
+/* ---- 감염병 정보 / 감염 경과 pages ---- */
+.disease-view h3 { margin: 18px 0 6px; font-size: var(--fs-md); }
+.disease-lead { font-size: var(--fs-md); margin: 6px 0 14px; max-width: 70ch; }
+.disease-facts { border-collapse: collapse; width: 100%; max-width: 860px; margin: 8px 0 4px; }
+.disease-facts th { text-align: left; vertical-align: top; width: 9.5em; padding: 6px 12px 6px 0; color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--border); }
+.disease-facts td { padding: 6px 0; border-bottom: 1px solid var(--border); }
+.disease-view p, .disease-view li { max-width: 78ch; }
+.disease-note { margin-top: 18px; }
+.course-box { margin: 8px 0 12px; max-width: 800px; }
+.course-svg { width: 100%; height: auto; display: block; }
+.course-svg .cs-lbl { font-size: 11px; fill: var(--muted); }
+.course-svg .cs-sub { font-size: 10px; fill: var(--muted); opacity: .8; }
+.course-svg .cs-grid { stroke: var(--border); stroke-width: 1; opacity: .55; }
+.course-svg .cs-onset { stroke: var(--bad, #d9534f); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.course-svg .cs-onset-t { font-size: 11px; fill: var(--bad, #d9534f); font-weight: 600; }
+.course-svg .cs-load { fill: var(--accent); opacity: .35; stroke: var(--accent); stroke-width: 1.5; }
+.course-svg .cs-inc { fill: #8a9bb5; opacity: .75; }
+.course-svg .cs-igm { fill: #e0a030; opacity: .8; }
+.course-svg .cs-igg { fill: #4aa66a; opacity: .8; }
+.course-legend { font-size: var(--fs-sm); color: var(--muted); display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+.course-legend .lg { display: inline-block; width: 14px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
+.lg-load { background: var(--accent); opacity: .5; } .lg-inc { background: #8a9bb5; } .lg-igm { background: #e0a030; } .lg-igg { background: #4aa66a; }
+@media (max-width: 760px) { .disease-facts th { width: 6.5em; } }
