@@ -5,6 +5,11 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-11-10
+
+### Added
+- **자동 설계 훑기**: `scripts/design_sweep.py`(분절별로 IUPAC 허용 개수·프라이머 mismatch·증폭산물 길이·Tm 창·올리고 길이를 바꿔 가며 커버리지 우선 설계 엔진을 수백 번 실행), `scripts/design_sweep_select.py`(다양한 상위 후보 선별, `--register`로 `config/primers.tsv`에 AUTO-DESIGN 세트로 등록), `scripts/design_sweep_report.py`(결과 요약). 설계는 파이프라인 판정 규칙(프라이머 mismatch ≤ 설정값·3′ 끝 유지·프로브 완전일치)을 목적함수로 씁니다. 결과는 `output/design_sweep/`(커밋되지 않음)에 저장됩니다.
+
 ### Changed
 - **기본 스캔 엔진을 Go로** (`scan_engine: "go"`): 전체 유전체 스캔이 Go 엔진으로 돕니다. 같은 입력을 Python·Go로 각각 전체 분석해 비교한 결과 세트·그룹 판정 표가 모두 같았습니다(NiV, LASV, EBOV, SUDV, BDBV, RESTV, TAFV, MPXV 축소본). 스캔을 쓰는 `alignment_table` 단계는 약 9~60배 빨라졌습니다. Go가 없으면 Python 스캔으로 자동 전환됩니다.
 
