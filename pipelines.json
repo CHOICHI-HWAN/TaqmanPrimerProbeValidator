@@ -1,0 +1,114 @@
+{
+  "title": "병원체 Primer/Probe 검증 파이프라인",
+  "pipelines": [
+    {
+      "id": "lasv",
+      "name": "LASV",
+      "sci": "Mammarenavirus lassaense (Lassa virus)",
+      "path": "LASV/pipeline_snakemake_v0.19.0",
+      "port": 8765,
+      "desc": "분절 유전체(S / L segment). 리니지(LI~LVII)별 population 커버리지, 표준물질 대표성, pixy 다양성(π)까지 포함한 전체 검증 대시보드.",
+      "short": "LASV"
+    },
+    {
+      "id": "nipah",
+      "name": "NiV",
+      "sci": "Henipavirus nipahense (Nipah virus)",
+      "path": "NIPAH/pipeline_nipah",
+      "port": 8767,
+      "desc": "비분절 유전체(단일 게놈). 로컬 Nextstrain 빌드로 얻은 클레이드(I / Ia / Ib / II), 부분서열 QC FAIL 표시, 표준물질·프라이머 세트 검증.",
+      "short": "NiV"
+    },
+    {
+      "id": "ebov",
+      "name": "EBOV",
+      "sci": "Orthoebolavirus zairense (Zaire ebolavirus)",
+      "path": "EBOLA/EBOV/pipeline_ebov",
+      "port": 8768,
+      "desc": "에볼라 자이르 — 비분절 유전체. Pathoplexus 공개 데이터, 발생 국가별 묶음.",
+      "short": "EBOV"
+    },
+    {
+      "id": "sudv",
+      "name": "SUDV",
+      "sci": "Orthoebolavirus sudanense (Sudan ebolavirus)",
+      "path": "EBOLA/SUDV/pipeline_sudv",
+      "port": 8769,
+      "desc": "에볼라 수단 — 비분절 유전체. Pathoplexus 공개 데이터, 발생 국가별 묶음.",
+      "short": "SUDV"
+    },
+    {
+      "id": "bdbv",
+      "name": "BDBV",
+      "sci": "Orthoebolavirus bundibugyoense (Bundibugyo virus)",
+      "path": "EBOLA/BDBV/pipeline_bdbv",
+      "port": 8770,
+      "desc": "에볼라 분디부교 — 비분절 유전체. Pathoplexus 공개 데이터, 발생 국가별 묶음.",
+      "short": "BDBV"
+    },
+    {
+      "id": "restv",
+      "name": "RESTV",
+      "sci": "Orthoebolavirus restonense (Reston virus)",
+      "path": "EBOLA/RESTV/pipeline_restv",
+      "port": 8771,
+      "desc": "에볼라 레스턴 — 비분절 유전체. NCBI 공개 데이터(Pathoplexus에 없음), 채집 국가별 묶음.",
+      "short": "RESTV"
+    },
+    {
+      "id": "tafv",
+      "name": "TAFV",
+      "sci": "Orthoebolavirus taiense (Tai Forest virus)",
+      "path": "EBOLA/TAFV/pipeline_tafv",
+      "port": 8772,
+      "desc": "에볼라 타이 포레스트 — 비분절 유전체. NCBI 공개 데이터(Pathoplexus에 없음), 채집 국가별 묶음.",
+      "short": "TAFV"
+    },
+    {
+      "id": "marv",
+      "name": "MARV",
+      "sci": "Orthomarburgvirus marburgense (Marburg virus)",
+      "path": "MARV/pipeline_marv",
+      "port": 8773,
+      "desc": "마버그 — 비분절 유전체. Pathoplexus 공개 데이터, 채집 국가별 묶음.",
+      "short": "MARV"
+    },
+    {
+      "id": "cchfv",
+      "name": "CCHFV",
+      "sci": "Orthonairovirus haemorrhagiae (Crimean-Congo hemorrhagic fever virus)",
+      "path": "CCHFV/pipeline_cchfv",
+      "port": 8774,
+      "desc": "3분절(S / M / L) 유전체. Pathoplexus 공개 데이터, S 분절 유전형(I~VI)을 리니지로 사용.",
+      "short": "CCHFV"
+    },
+    {
+      "id": "mpxv",
+      "name": "MPXV",
+      "sci": "Orthopoxvirus monkeypox (Monkeypox virus)",
+      "path": "MPXV/pipeline_mpxv",
+      "port": 8775,
+      "desc": "비분절 dsDNA 유전체(약 197 kb). Pathoplexus 공개 데이터, 클레이드(I / Ia / Ib / IIa / IIb)별 커버리지.",
+      "short": "MPXV"
+    },
+    {
+      "id": "rvfv",
+      "name": "RVFV",
+      "sci": "Phlebovirus riftense (Rift Valley fever virus)",
+      "path": "RVFV/pipeline_rvfv",
+      "port": 8776,
+      "desc": "3분절(S / M / L) 유전체. NCBI 공개 데이터(Pathoplexus에 없음), 채집 국가별 묶음.",
+      "short": "RVFV"
+    },
+    {
+      "id": "flua",
+      "name": "FLUA",
+      "sci": "Alphainfluenzavirus influenzae (Influenza A virus)",
+      "path": "FLUA/pipeline_flua",
+      "port": 8777,
+      "desc": "8분절 유전체(HA·NA는 아형별). NCBI 공개 데이터, 아형(H1N1·H3N2·H5N1)별 커버리지.",
+      "short": "FLUA"
+    }
+  ],
+  "planned": []
+}

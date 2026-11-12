@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>병원체 Primer/Probe 검증 파이프라인</title>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1a1d23; --muted: #6b7280; --border: #e5e7eb;
+    --card: #f8fafc; --accent: #4C78A8; --accent2: #F2A65A;
+    --ok: #54A24B; --warn: #F2A65A; --bad: #E45756;
+    --font-mono: Consolas, Menlo, "Liberation Mono", "DejaVu Sans Mono", "Courier New", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #14161a; --fg: #e7e9ee; --muted: #9aa3af; --border: #2a2e35; --card: #1b1e24; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font-family: -apple-system, "Segoe UI", Pretendard, sans-serif;
+    line-height: 1.5; padding: 32px 20px 60px;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  header h1 { font-size: 22px; margin: 0 0 6px; }
+  header .subtitle { color: var(--muted); font-size: 13.5px; max-width: 68ch; }
+  .grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px; margin-top: 26px;
+  }
+  .card {
+    border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px;
+    background: var(--card); display: flex; flex-direction: column; gap: 10px;
+  }
+  .card.disabled { opacity: 0.62; }
+  .card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .card-title { font-size: 16px; font-weight: 700; }
+  .card-title .sci { font-weight: 400; font-style: italic; color: var(--muted); font-size: 12.5px; display: block; margin-top: 1px; }
+  .badge { font-size: 10.5px; font-weight: 700; letter-spacing: .03em; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+  .badge.active { background: rgba(84,162,74,.16); color: #2f7a27; }
+  .badge.soon { background: rgba(107,114,128,.16); color: var(--muted); }
+  @media (prefers-color-scheme: dark) { .badge.active { color: #7fd074; } }
+  .card-desc { font-size: 12.5px; color: var(--muted); flex: 1; }
+  .card-desc b { color: var(--fg); font-weight: 600; }
+  .card-note { font-size: 11.5px; color: var(--muted); border-top: 1px dashed var(--border); padding-top: 8px; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--accent); color: #fff; font-size: 13px; font-weight: 600;
+    text-decoration: none; cursor: pointer;
+  }
+  .btn:hover { filter: brightness(1.07); }
+  .btn.secondary { background: transparent; color: var(--fg); }
+  .cmd-row { display: flex; align-items: center; gap: 6px; }
+  .cmd {
+    flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap;
+    font-family: var(--font-mono); font-size: 11px; background: var(--bg);
+    border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px;
+  }
+  .copy-btn {
+    flex: none; font-size: 11px; padding: 6px 9px; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--bg); color: var(--fg); cursor: pointer;
+  }
+  .copy-btn.copied { color: var(--ok); border-color: var(--ok); }
+  footer { margin-top: 36px; color: var(--muted); font-size: 11.5px; }
+  .badge.running { background: rgba(84,162,74,.16); color: #2f7a27; }
+  .badge.stopped { background: rgba(107,114,128,.16); color: var(--muted); }
+  .badge.busy { background: rgba(228,87,86,.14); color: var(--bad); }
+  @media (prefers-color-scheme: dark) { .badge.running { color: #7fd074; } }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 8px; }
+  .stat { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 7px 9px; }
+  .stat b { display: block; font-size: 17px; line-height: 1.2; }
+  .stat span { font-size: 11px; color: var(--muted); }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn.danger { background: transparent; color: var(--bad); border-color: var(--bad); }
+  .btn[disabled] { opacity: .55; cursor: default; }
+  .msg { font-size: 12px; color: var(--bad); min-height: 1em; }
+  .meta { font-size: 11.5px; color: var(--muted); }
+  .section-title { margin: 30px 0 0; font-size: 13px; color: var(--muted); font-weight: 600; letter-spacing: .02em; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>🧬 병원체 Primer/Probe 검증 파이프라인</h1>
+      <div class="subtitle">
+        병원체마다 독립된 Snakemake 파이프라인 + 대시보드입니다. 여기서 실행 상태를 확인하고, 대시보드를 열거나
+        시작·중지할 수 있습니다. 숫자는 각 프로젝트의 결과 파일에서 읽으므로 대시보드가 꺼져 있어도 보입니다.
+      </div>
+    </header>
+
+    <div class="grid" id="active"><div class="card"><div class="card-desc">불러오는 중...</div></div></div>
+    <div class="section-title" id="plannedTitle" hidden>준비 중</div>
+    <div class="grid" id="planned"></div>
+
+    <footer>&copy; 2026 Chihwan Choi &middot; MIT License</footer>
+  </div>
+
+  <script>
+    const $ = (s) => document.querySelector(s);
+    const esc = (t) => String(t == null ? "" : t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    const busy = new Set();            // pipelines with a start/stop in flight
+    const notes = {};                  // last error message per pipeline
+    const appUrl = (p) => `${location.protocol}//${location.hostname}:${p.port}/`;
+
+    function stat(v, label) { return v == null ? "" : `<div class="stat"><b>${esc(v)}</b><span>${esc(label)}</span></div>`; }
+
+    function card(p) {
+      const st = p.stats || {};
+      const up = p.state === "running";
+      const badge = up ? `<span class="badge running">실행 중${p.managed ? "" : " (외부)"}</span>`
+        : p.state === "port_busy" ? `<span class="badge busy">포트 ${p.port} 사용 중</span>` : `<span class="badge stopped">중지됨</span>`;
+      const seg = (st.segments || []).length > 1 ? st.segments.join(" / ") + " segment" : "단일 게놈";
+      const stats = [stat(st.sets, "프라이머 세트"), stat(st.genomes, "분석 게놈"),
+        stat(st.lineages, st.lineage_label || "계통"), stat(st.best_validated_pct != null ? st.best_validated_pct + "%" : null, "최고 검증률")].join("");
+      const b = busy.has(p.id);
+      const tx = st.taxonomy;
+      const tax = tx && tx.ranks ? `<div class="card-desc" style="font-size:12.5px;" title="${esc(tx.source || "")}">ICTV · ${tx.ranks.map(([rk, nm], i) => i === tx.ranks.length - 1
+        ? `<i><b>${esc(nm)}</b></i> <span style="opacity:.7">(${esc(rk)})</span>` : `<span title="${esc(rk)}">${esc(nm)}</span>`).join(" &rsaquo; ")}</div>` : "";
+      const open = up ? `<a class="btn" href="${appUrl(p)}" target="_blank" rel="noopener">대시보드 열기 →</a>`
+        : `<button class="btn" data-act="start" data-id="${p.id}" ${b || p.state === "port_busy" ? "disabled" : ""}>${b ? "시작하는 중..." : "▶ 시작"}</button>`;
+      const stop = up && p.managed ? `<button class="btn danger" data-act="stop" data-id="${p.id}" ${b ? "disabled" : ""}>■ 중지</button>` : "";
+      return `<div class="card">
+        <div class="card-head"><div class="card-title">${esc(p.name)}<span class="sci">${esc(p.sci)}</span></div>${badge}</div>
+        <div class="card-desc">${esc(p.desc)}</div>
+        ${tax}
+        <div class="stats">${stats}</div>
+        <div class="meta">${esc(seg)}${st.version ? " · v" + esc(st.version) : ""}${st.analysed_at ? " · 마지막 분석 " + esc(st.analysed_at) : " · 아직 분석 결과 없음"}</div>
+        <div class="actions">${open}${stop}</div>
+        <div class="msg">${esc(notes[p.id] || "")}</div>
+        <div class="card-note"><code>${esc(p.path)}</code> · 포트 ${p.port}</div>
+      </div>`;
+    }
+
+    async function refresh() {
+      try {
+        const d = await (await fetch("/api/pipelines")).json();
+        $("#active").innerHTML = d.pipelines.map(card).join("");
+        $("#planned").innerHTML = (d.planned || []).map((q) => `<div class="card disabled">
+          <div class="card-head"><div class="card-title">${esc(q.name)}<span class="sci">${esc(q.sci)}</span></div><span class="badge soon">준비 중</span></div>
+          <div class="card-desc">${esc(q.desc)}</div></div>`).join("");
+        $("#plannedTitle").hidden = !(d.planned || []).length;
+      } catch (e) {
+        $("#active").innerHTML = `<div class="card"><div class="card-desc">상태를 불러오지 못했습니다: ${esc(e.message)}</div></div>`;
+      }
+    }
+
+    document.addEventListener("click", async (e) => {
+      const btn = e.target.closest("button[data-act]");
+      if (!btn) return;
+      const { act, id } = btn.dataset;
+      busy.add(id); notes[id] = ""; await refresh();
+      try {
+        const r = await fetch(`/api/pipelines/${id}/${act}`, { method: "POST" });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) notes[id] = j.error || `실패 (${r.status})`;
+      } catch (err) { notes[id] = err.message; }
+      busy.delete(id); await refresh();
+    });
+
+    refresh();
+    setInterval(() => { if (!busy.size) refresh(); }, 5000);
+  </script>
+</body>
+</html>
