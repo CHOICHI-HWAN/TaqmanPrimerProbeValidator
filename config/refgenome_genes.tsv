@@ -1,0 +1,5 @@
+segment	accession	genome_len	gene	start	end	strand
+s	NC_010562	3357	CVsS_gp1	59	1513	+
+s	NC_010562	3357	CVsS_gp2	1609	3297	-
+l	NC_010563	7107	CVsL_gp1	73	369	+
+l	NC_010563	7107	CVsL_gp2	442	7068	-
