@@ -50,3 +50,7 @@ tools/primerhunter/PrimerHunter/
 # compiled Go probe engine (built on demand by scripts/engine_check.py)
 go/probedesign/probedesign
 go/scan/scan
+
+# data backup / restore (tools/backup_ui)
+.pre_restore_*/
+.restore_tmp_*/

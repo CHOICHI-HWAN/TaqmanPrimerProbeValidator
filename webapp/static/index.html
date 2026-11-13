@@ -26,7 +26,7 @@
         <button id="sidebarCollapseBtn" class="theme-toggle-btn sidebar-collapse-btn" title="사이드바 숨기기 (Ctrl+B)">&laquo; 숨기기</button>
         <button id="themeToggleBtn" class="theme-toggle-btn" title="라이트/다크 모드 전환 (Toggle light/dark mode)">&#9789;</button>
         <button id="langToggleBtn" class="theme-toggle-btn lang-toggle-btn" title="한국어 / English">EN</button>
-        <div class="entry-row"><a id="entryLink" href="http://localhost:8760" target="_blank" rel="noopener" class="back-to-entry" title="전체 파이프라인 목록 (LASV / NiV ...)">&larr; 전체 파이프라인 목록</a><span id="fbSlot"></span></div>
+        <div class="entry-row"><a id="entryLink" href="http://localhost:8760" class="back-to-entry" title="전체 파이프라인 목록 (LASV / NiV ...)">&larr; 전체 파이프라인 목록</a><span id="fbSlot"></span></div>
         <h1>LASV Primer/Probe</h1>
         <div class="subtitle">인터랙티브 검증 대시보드</div>
         <div id="pipelineSwitch" class="pipeline-switch" hidden></div>
@@ -42,7 +42,6 @@
       <button id="courseBtn" class="btn btn-secondary btn-block" title="발병 시기와 바이러스량이 오르는 시기, 검체별 검출 시기">⏱ 감염 경과 · 바이러스량</button>
       <button type="button" id="menuToggleBtn" class="menu-toggle-btn" title="위쪽 메뉴 버튼만 접고 아래 프라이머 그룹·세트 목록을 넓게 봅니다">&#9776; 메뉴 접기 &#9652;</button>
       <div id="sidebarMenu" class="sidebar-menu">
-      <button id="addSetBtn" class="btn btn-primary btn-block">+ 새 프라이머 세트 분석</button>
       <details class="menu-group" data-menu="analyze" open>
         <summary>🔬 분석 · 검증</summary>
         <button id="primersBtn" class="btn btn-secondary btn-block">📝 프라이머 입력 / 관리</button>
@@ -90,7 +89,7 @@
       </div>
       <input id="searchBox" class="search-box" type="text" placeholder="세트 검색 (이름, 벤더)...">
       <div id="setList" class="set-list"></div>
-      <div class="sidebar-footer">&copy; 2026 Chihwan Choi &middot; GPL-3.0 &middot; v<span id="footerVersion">0.36.5</span><br><button id="skinToggleBtn" class="skin-toggle" title="화면 스타일 전환 (Vaadin Lumo / 기본)">스타일: Lumo</button></div>
+      <div class="sidebar-footer">&copy; 2026 Chihwan Choi &middot; GPL-3.0 &middot; v<span id="footerVersion">0.37.0</span><br><button id="skinToggleBtn" class="skin-toggle" title="화면 스타일 전환 (Vaadin Lumo / 기본)">스타일: Lumo</button></div>
     </aside>
 
     <main class="main">
@@ -279,6 +278,7 @@
   <script src="vendor/d3.min.js"></script>
   <script src="vendor/topojson-client.min.js"></script>
   <script src="app.js"></script>
+  <script src="backup.js"></script>
   <script type="module" src="publish.js"></script>
 </body>
 </html>

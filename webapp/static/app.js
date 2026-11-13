@@ -678,11 +678,20 @@ function buildSetTree(seg, q) {
     out.push({ type: "group", g, kids, childGroups });
   }
   const free = tops.filter((s) => !prim.has(s.set_id));
+  // User-submitted sets first (grouped by vendor, A-Z), auto-designed sets in their own section at the very end --
+  // vendorLabel("AUTO-DESIGN") is just "AUTO-DESIGN", which otherwise sorts alphabetically among real vendor names
+  // (often near the top) instead of reading as "ours" vs "the pipeline's own suggestions".
+  const manualFree = free.filter((s) => s.source !== "AUTO-DESIGN");
+  const autoFree = free.filter((s) => s.source === "AUTO-DESIGN");
   const buckets = {};
-  for (const s of free) (buckets[vendorLabel(s.source)] = buckets[vendorLabel(s.source)] || []).push(s);
+  for (const s of manualFree) (buckets[vendorLabel(s.source)] = buckets[vendorLabel(s.source)] || []).push(s);
   for (const name of Object.keys(buckets).sort((x, y) => x.localeCompare(y))) {
     const sets = sortSets(buckets[name]).map(entry).filter(Boolean);
     if (sets.length) out.push({ type: "vendor", name, sets });
+  }
+  if (autoFree.length) {
+    const sets = sortSets(autoFree).map(entry).filter(Boolean);
+    if (sets.length) out.push({ type: "auto", name: "자동 설계 (AUTO-DESIGN)", sets });
   }
   return out;
 }
@@ -814,7 +823,7 @@ function renderSidebar() {
           list.appendChild(wrap);
         }
       } else {
-        list.appendChild(el("div", null, `<div class="tree-vendor">그룹 없음 · ${escHtml(node.name)} (${node.sets.length})</div>`));
+        list.appendChild(el("div", null, `<div class="tree-vendor">${node.type === "auto" ? "&#9881; " : "그룹 없음 · "}${escHtml(node.name)} (${node.sets.length})</div>`));
         const wrap = el("div", "source-group");
         const ids = node.sets.map((k) => k.s.set_id);
         for (const k of node.sets) wrap.appendChild(renderSetItem(k, 0, "v|" + seg + "|" + node.name, ids));
@@ -2343,7 +2352,7 @@ function showMainView(id) {
 // ---- back / forward: every page change is a browser-history entry (Alt+arrows and the browser buttons work) and the bar on top of the page
 // goes back / forward the same way. A page is {view id, active set/group id}; going back re-opens it through its own menu button.
 const NAV = { idx: 0, max: 0, lock: false, last: null };
-const NAV_VIEW_BTN = { overview: "overviewBtn", addForm: "addSetBtn", paramsView: "paramsBtn", changelogView: "changelogBtn", guideView: "guideBtn",
+const NAV_VIEW_BTN = { overview: "overviewBtn", paramsView: "paramsBtn", changelogView: "changelogBtn", guideView: "guideBtn",
   diversityView: "diversityBtn", geneConsView: "geneConsBtn", redesignView: "redesignBtn", vennView: "vennBtn", metadataView: "metadataBtn",
   primersView: "primersBtn", litView: "litBtn", standardsView: "standardsBtn", metaTableView: "metaTableBtn", stdMgrView: "stdMgrBtn", requirementsView: "reportBtn" };
 NAV_VIEW_BTN.requirementsView = "requirementsBtn";
@@ -2667,6 +2676,7 @@ function renderDetail(setData) {
       </div>
     </div>
 
+    ${renderSetMismatchCurveSection(setData)}
     ${renderSetDiversitySection(setData)}
 
     <div class="card" style="margin-bottom:20px;">
@@ -2898,6 +2908,7 @@ function renderDetail(setData) {
   $("#renameSetBtn").addEventListener("click", () => renameSet(setData.set_id, setDisplayName));
   wireFluorophore(setData);
   loadSetDiversityOverlay(setData);
+  loadSetMismatchCurve(setData);
 }
 
 function wireFluorophore(setData) {
@@ -5795,7 +5806,6 @@ const TOUR_STEPS = [
   { target: "#detail .card-grid", title: "세트 상세: 요약 카드", text: "세트를 열면 Coverage, probe dropout, 표준물질 매치/대표성, 참조유전체 결합 위치 등이 카드로 나옵니다. 카드 오른쪽 위 − / ⛶ 버튼으로 접거나 전체화면으로 볼 수 있습니다.", show: async () => { const s = state.sets[0]; if (s) { await selectSet(s.set_id); await new Promise((r) => setTimeout(r, 900)); } } },
   { target: "#detail .msa-card", title: "MSA와 게놈별 결합 상세", text: "프라이머가 결합하는 구간의 다중서열정렬입니다. 게놈 행이나 아래 '게놈별 미스매치' 표의 행을 클릭하면 그 게놈에서 F/Probe/R이 어떻게 결합하는지(미스매치 위치, Tm, ΔG)를 창으로 보여줍니다." },
   { target: "#detail .tree-card", title: "Nextstrain 계통수", text: "'계통수 불러오기'를 누르면 Nextstrain 트리에 이 세트의 검증 결과를 색으로 입힙니다. 초록=통과, 빨강=불일치, 회색=우리 DB에 없음이고, 범례를 클릭하면 해당 상태만 남깁니다." },
-  { target: "#addSetBtn", title: "새 프라이머 세트 분석", text: "서열(F/R/Probe)만 넣으면 전체 게놈 대비 mismatch, 표준물질 매치, 결합 위치까지 바로 계산합니다. '저장'을 체크하면 다음 전체 분석에도 포함됩니다.", show: () => $("#overviewBtn").click() },
   { target: "#primersBtn", title: "프라이머 입력 / 관리", text: "엑셀처럼 편집하는 입력표입니다. Enter/Tab으로 이동하고 엑셀에서 복사한 영역을 그대로 붙여넣을 수 있습니다. ID(P001…)는 자동 부여되어 이름을 바꿔도 유지되고, '분석진행'을 해제한 행은 분석에서 제외됩니다. 비고에는 제조사 제품명 등을 적으세요." },
   { target: "#stdMgrBtn", title: "표준물질 입력 / 관리", text: "양성대조물질(표준물질)의 서열을 등록·수정합니다. 이름이 곧 결과의 ID이고, 분석진행을 해제하면 제외됩니다. FASTA를 붙여넣어 한 번에 추가할 수도 있습니다. 저장 후 '분석 다시하기'로 반영하세요." },
   { target: "#standardsBtn", title: "표준물질 대표성", text: "KDCA 표준물질이 전체 LASV 게놈을 얼마나 대표하는지 평가합니다. 90% 이상 적합, 50% 이상 재검토, 미만이면 재선정을 권고하며, 리니지별로 어디가 비는지도 보여줍니다." },
@@ -8010,7 +8020,7 @@ async function showVennPage() {
     if (node.type === "seghead") return `<div class="vn-seghead">${escHtml(node.name)} 세그먼트</div>`;
     const row = (en, lv) => (byKey.has(en.s.set_id) ? itemChk(byKey.get(en.s.set_id), lv) : "") + en.variants.map((v) => (byKey.has(v.set_id) ? itemChk(byKey.get(v.set_id), lv + 1) : "")).join("");
     if (node.type === "group") return `<div class="vn-tree-group">${byKey.has(node.g.group_id) ? itemChk(byKey.get(node.g.group_id), 0) : ""}<div class="vn-members">${node.kids.map((k) => row(k, 1)).join("")}</div></div>`;
-    return `<div class="vn-tree-group vn-tree-loose"><div class="vn-tree-vendor">그룹 없음 · ${escHtml(node.name)}</div><div class="vn-members">${node.sets.map((k) => row(k, 1)).join("")}</div></div>`;
+    return `<div class="vn-tree-group vn-tree-loose"><div class="vn-tree-vendor">${node.type === "auto" ? "&#9881; " : "그룹 없음 · "}${escHtml(node.name)}</div><div class="vn-members">${node.sets.map((k) => row(k, 1)).join("")}</div></div>`;
   }).join("") || "<span class='note'>없음</span>";
   let savedList = [];
   try { savedList = (await fetchJSON("/api/venn-saved")).filter((x) => String(x.seg).toUpperCase() === VN.seg.toUpperCase()); } catch (e) { /* none */ }
@@ -8334,6 +8344,52 @@ function updateMsaDiversityBaseline(setData, diversityData) {
   if (legendNote) {
     legendNote.innerHTML = `<span class="dot" style="background:rgba(84,162,74,.55)"></span>&#8594;<span class="dot" style="background:rgba(228,87,86,.55)"></span> &#960;(다양성) 행: 초록=보존(낮은 π) &#8594; 빨강=다양(높은 π), pixy 리니지 평균, window=${windowSize}bp 근사 매핑`;
   }
+}
+
+// ---- per-set mismatch-tolerance curve (ROC-style): the same curve the genome-map page draws when several sets are overlaid
+// (gmCurveRender / /api/mismatch-curve/<seg>), but for just THIS set, on its own detail page -- no need to go pick it on the map. ----
+function renderSetMismatchCurveSection(setData) {
+  return `
+    <div class="card" style="margin-bottom:20px;">
+      <h3>커버리지 곡선 <span class="note">(허용하는 mismatch가 늘 때 통과하는 유전체의 비율 &mdash; ROC 곡선처럼 읽습니다)</span></h3>
+      <div class="note" style="margin-bottom:10px;">
+        이 세트 하나만의 곡선입니다. 여러 세트를 겹쳐 비교하려면 🧭 프라이머 매핑지도에서 세트를 고르세요.
+      </div>
+      <div id="setCurveChartWrap"><p class="note">불러오는 중...</p></div>
+    </div>`;
+}
+
+async function loadSetMismatchCurve(setData) {
+  const wrap = $("#setCurveChartWrap");
+  if (!wrap) return;
+  const seg = String(setData.segment).toLowerCase();
+  let c;
+  try { c = await fetchJSON(`/api/mismatch-curve/${seg}`); }
+  catch (e) { wrap.innerHTML = `<p class="note">곡선을 불러오지 못했습니다: ${escHtml(e.message)}</p>`; return; }
+  const s = (c.series || []).find((x) => x.set_id === setData.set_id);
+  if (!s) { wrap.innerHTML = `<p class="note">이 세트의 곡선 데이터가 없습니다 (분석을 먼저 돌려야 합니다).</p>`; return; }
+  wrap.dataset.mode = wrap.dataset.mode || "fixed";
+  const render = () => {
+    const mode = wrap.dataset.mode;
+    const W = 760, H = 240, L = 48, R = 20, T = 14, B = 42, ks = c.x, kmax = ks[ks.length - 1] || 1, total = c.total || 1;
+    const X = (k) => L + (k / kmax) * (W - L - R), Y = (p) => T + (1 - p / 100) * (H - T - B);
+    const grid = [0, 25, 50, 75, 100].map((p) => `<line x1="${L}" x2="${W - R}" y1="${Y(p)}" y2="${Y(p)}" stroke="currentColor" opacity="${p ? ".08" : ".3"}"/><text x="${L - 7}" y="${Y(p) + 4}" text-anchor="end" font-size="10" fill="currentColor" opacity=".75">${p}%</text>`).join("");
+    const xl = ks.map((k) => `<line x1="${X(k)}" x2="${X(k)}" y1="${H - B}" y2="${H - B + 5}" stroke="currentColor" opacity=".4"/><text x="${X(k)}" y="${H - B + 17}" text-anchor="middle" font-size="11" fill="currentColor">${k}</text>`).join("");
+    const rule = c.primer_pass <= kmax ? `<line x1="${X(c.primer_pass)}" x2="${X(c.primer_pass)}" y1="${T}" y2="${H - B}" stroke="#e5484d" stroke-dasharray="5 4" opacity=".7"/><text x="${X(c.primer_pass) + 5}" y="${T + 11}" font-size="10" fill="#e5484d">현재 기준 (프라이머 ${c.primer_pass})</text>` : "";
+    const vals = s[mode] || [];
+    const pts = ks.map((k, i) => [X(k), Y(100 * (vals[i] || 0) / total)]);
+    const dots = ks.map((k, i) => `<circle cx="${pts[i][0].toFixed(1)}" cy="${pts[i][1].toFixed(1)}" r="4" fill="var(--accent)" stroke="var(--bg,#fff)" stroke-width="1.2"><title>k=${k}: ${vals[i] || 0} / ${total} (${(100 * (vals[i] || 0) / total).toFixed(1)}%)</title></circle>`).join("");
+    const atRule = 100 * (vals[Math.min(c.primer_pass, kmax)] || 0) / total;
+    wrap.innerHTML = `<div class="table-toolbar" style="gap:10px;flex-wrap:wrap;margin-bottom:4px;">
+        <span class="note">현재 기준(mismatch&le;${c.primer_pass})에서 <b>${atRule.toFixed(1)}%</b> (${total}개 기준)</span>
+        <label class="note" style="margin-left:auto;">곡선 기준 <select id="setCurveMode"><option value="fixed" ${mode === "fixed" ? "selected" : ""}>F·R만 k까지 (프로브는 파이프라인 기준)</option><option value="same" ${mode === "same" ? "selected" : ""}>F·R·프로브 모두 k까지</option></select></label></div>
+      <svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:820px;height:auto;display:block;color:var(--fg);">${grid}${rule}
+        <path d="${vnSmoothPath(pts)}" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"/>${dots}${xl}
+        <text x="${(L + W - R) / 2}" y="${H - 4}" text-anchor="middle" font-size="11" fill="currentColor">허용하는 mismatch 수 k</text>
+        <text transform="translate(12,${(T + H - B) / 2}) rotate(-90)" text-anchor="middle" font-size="11" fill="currentColor">통과 유전체 (%)</text></svg>`;
+    wrap.querySelector("#setCurveMode").addEventListener("change", (e) => { wrap.dataset.mode = e.target.value; render(); });
+  };
+  render();
 }
 
 function renderSetDiversitySection(setData) {
@@ -9014,7 +9070,7 @@ function overviewOrder(data) {
         rows.push({ kind: "group", g });
         node.kids.forEach((k) => addSet(k, 1));
       } else {
-        rows.push({ kind: "vendor", name: node.name, seg });
+        rows.push({ kind: node.type === "auto" ? "auto" : "vendor", name: node.name, seg });
         node.sets.forEach((k) => addSet(k, 0));
       }
     }
@@ -9050,6 +9106,7 @@ function renderOverviewHtml(data) {
   const tableRows = order.map((r) => {
     if (r.kind === "set") return setRowHtml(r.s);
     if (r.kind === "group") return `<tr class="genome-row ov-group-head" data-group-id="${r.g.group_id}"><td colspan="11">&#9633; <b>${escHtml(r.g.label)}</b> <span class="note">(${(r.g.members || "").split(";").filter(Boolean).length}개 세트 ALL · 합집합 ${fmtPct(r.g.validated_pct)} · 교차 포함 ${fmtPct(r.g.validated_with_cross_pct ?? r.g.validated_pct)}) ${finalChipHtml(r.g.group_id)}</span></td></tr>`;
+    if (r.kind === "auto") return `<tr class="ov-vendor-head" style="border-top:2px solid var(--border);"><td colspan="11">&#9881; ${escHtml(r.name)} <span class="note">(파이프라인이 자동으로 설계한 세트 — 사용자가 입력한 세트 아래에 모아 둡니다)</span></td></tr>`;
     return `<tr class="ov-vendor-head"><td colspan="11">그룹 없음 · ${escHtml(r.name)}</td></tr>`;
   }).join("");
 
@@ -9133,6 +9190,7 @@ function renderOverviewHtml(data) {
   const heatBody = order.map((r) => {
     if (r.kind === "group") return groupHeatRow(r.g);
     if (r.kind === "set") return mergedRow(r.s);
+    if (r.kind === "auto") return `<tr class="ov-vendor-head" style="border-top:2px solid var(--border);"><td colspan="${2 + lineages.length}">&#9881; ${escHtml(r.name)}</td></tr>`;
     return `<tr class="ov-vendor-head"><td colspan="${2 + lineages.length}">그룹 없음 · ${escHtml(r.name)}</td></tr>`;
   }).join("");
   const lineageHeaderRow = lineages.map((l) => {
@@ -9420,7 +9478,6 @@ $("#reportBtn").addEventListener("click", startReportJob);
 
 // ---------------- init ----------------
 
-$("#addSetBtn").addEventListener("click", showAddForm);
 $("#overviewBtn").addEventListener("click", showOverview);
 $("#searchBox").addEventListener("input", renderSidebar);
 $("#fSubmit").addEventListener("click", submitNewSet);

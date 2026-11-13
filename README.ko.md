@@ -261,7 +261,7 @@ python3 webapp/server.py --host 0.0.0.0 --port 8765
   author  = {Choi, Chihwan},
   title   = {TaqMan Primer/Probe Validator},
   year    = {2026},
-  version = {0.36.5},
+  version = {0.37.0},
   url     = {https://github.com/CHOICHI-HWAN/TaqmanPrimerProbeValidator}
 }
 ```
