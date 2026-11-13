@@ -76,7 +76,7 @@ RVFV 에디션은 Phlebovirus riftense의 3분절(S/M/L) 유전체를 다룹니�
 
 ### 현재 버전
 
-코드: **v0.1.0 (RVFV 에디션)**   ·   Ubuntu 24.04, x86_64에서 테스트
+코드: **v0.1.1 (RVFV 에디션)**   ·   Ubuntu 24.04, x86_64에서 테스트
 
 ### 필요한 것
 
@@ -238,7 +238,7 @@ python3 webapp/server.py --host 0.0.0.0 --port 8767
   author  = {Choi, Chihwan},
   title   = {TaqMan Primer/Probe Validator (RVFV edition)},
   year    = {2026},
-  version = {0.1.0},
+  version = {0.1.1},
   url     = {https://github.com/CHOICHI-HWAN/TaqmanPrimerProbeValidator/tree/rvfv}
 }
 ```
