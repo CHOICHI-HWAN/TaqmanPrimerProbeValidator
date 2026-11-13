@@ -15,6 +15,19 @@ rule extract_refgenome:
         "scripts/extract_refgenome.py"
 
 
+rule extract_extra_refgenomes:
+    input:
+        fasta="data/raw/{seg}_sequences.fasta",
+    output:
+        ref="data/refgenome/{seg}_xref.fasta",
+    params:
+        accessions=lambda wc: REFGENOME_EXTRA[wc.seg],
+    log:
+        "logs/extract_extra_refgenomes_{seg}.log",
+    script:
+        "scripts/extract_extra_refgenomes.py"
+
+
 rule refgenome_index:
     input:
         "data/refgenome/{seg}_ref.fasta",
@@ -35,6 +48,7 @@ rule refgenome_binding:
     input:
         ref=lambda wc: f"data/refgenome/{SET_SEG[wc.set_id]}_ref.fasta",
         ref_fai=lambda wc: f"data/refgenome/{SET_SEG[wc.set_id]}_ref.fasta.fai",
+        xref=lambda wc: f"data/refgenome/{SET_SEG[wc.set_id]}_xref.fasta",
         manifest=primer_input,
         # Already-validated population-wide F/R/Probe results for this same set -- the
         # reference genome is itself just a regular population member, so if it already
@@ -46,6 +60,7 @@ rule refgenome_binding:
         alignment=lambda wc: f"output/primers/{wc.set_id}/alignment/mismatch_table.tsv",
     output:
         binding="output/primers/{set_id}/refgenome_binding/binding.tsv",
+        binding_extra="output/primers/{set_id}/refgenome_binding/binding_extra.tsv",
     params:
         max_mismatch_search=6,
     log:

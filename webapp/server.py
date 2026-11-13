@@ -267,6 +267,63 @@ def run_pipeline_job(job_id, args, label, on_success=None):
             JOBS[job_id]["log_path"] = str(log_path)
 
 
+# ---- data backup / restore (scripts/backup_data.py) -------------------------------------------------------------------------------------------
+# One .tar.xz of config / input_primers / profiles / data / output of THIS edition, outside git (~/primer_validation_backups or $PRIMER_BACKUP_DIR).
+_BACKUP_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]+\.tar\.(xz|zst)$")
+
+
+def _backup_mod():
+    scripts = str(ROOT / "scripts")
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    import backup_data  # noqa: PLC0415
+    return backup_data
+
+
+def _backup_items():
+    bd = _backup_mod()
+    rows = []
+    for m in bd.listing():
+        if m.get("exists"):
+            rows.append({"file": Path(m["file"]).name, "created": m["created"], "version": m.get("version", ""), "archive_bytes": m["archive_bytes"],
+                         "uncompressed_bytes": m["uncompressed_bytes"], "includes": m["includes"], "path": m["file"]})
+    return sorted(rows, key=lambda r: r["created"], reverse=True)
+
+
+def run_backup_job(job_id, data, output, fast=False):
+    def log(msg):
+        with JOBS_LOCK:
+            JOBS[job_id]["progress"] = str(msg)[-300:]
+    try:
+        res = _backup_mod().backup(root=ROOT, data=data, output=output, fast=fast, log=log)
+        with JOBS_LOCK:
+            JOBS[job_id]["status"] = "done"
+            JOBS[job_id]["progress"] = f"완료: {Path(res['file']).name} ({_backup_mod().human(res['archive_bytes'])})"
+    except (Exception, SystemExit) as exc:  # noqa: BLE001 -- backup_data exits with a message on failure
+        traceback.print_exc()
+        with JOBS_LOCK:
+            JOBS[job_id]["status"] = "error"
+            JOBS[job_id]["error"] = str(exc)
+            JOBS[job_id]["progress"] = f"백업 실패: {exc}"
+
+
+def run_restore_job(job_id, path):
+    def log(msg):
+        with JOBS_LOCK:
+            JOBS[job_id]["progress"] = str(msg)[-300:]
+    try:
+        res = _backup_mod().restore(Path(path), root=ROOT, log=log)
+        with JOBS_LOCK:
+            JOBS[job_id]["status"] = "done"
+            JOBS[job_id]["progress"] = f"복원 완료. 이전 폴더: {res.get('previous', '')}"
+    except (Exception, SystemExit) as exc:  # noqa: BLE001
+        traceback.print_exc()
+        with JOBS_LOCK:
+            JOBS[job_id]["status"] = "error"
+            JOBS[job_id]["error"] = str(exc)
+            JOBS[job_id]["progress"] = f"복원 실패: {exc}"
+
+
 def run_report_job(job_id, base_url):
     # generate_report.py only needs stdlib + a Chrome/Chromium binary on PATH (its own
     # find_chrome() tries several common names, not just "google-chrome" -- no
@@ -1677,14 +1734,27 @@ def save_final_result(item_id, verdict, note):
 
 
 def load_pipelines():
-    """The dashboards listed on the front-door page (entry/pipelines.json, two levels above a project folder), for the LASV / NiV switch in
-    the sidebar: [{id, name, port, current}]. Empty when this project is used on its own."""
-    reg = ROOT.parent.parent / "entry" / "pipelines.json"
+    """The dashboards listed on the front-door page (entry/pipelines.json), for the LASV / NiV switch in the sidebar: [{id, name, port,
+    current}]. Empty when this project is used on its own. Walks upward from this project folder to find entry/ -- project folders sit at
+    different depths (LASV/pipeline_x is one level above the repo root, EBOLA/EBOV/pipeline_ebov and SAHF/GTOV/pipeline_gtov are two), so a
+    fixed parent.parent missed entry/pipelines.json (and so the switch) for every two-level edition."""
+    reg, base = None, ROOT
+    for _ in range(4):
+        base = base.parent
+        candidate = base / "entry" / "pipelines.json"
+        if candidate.exists():
+            reg = candidate
+            break
+    if reg is None:
+        return []
     try:
         items = json.loads(reg.read_text(encoding="utf-8")).get("pipelines", [])
     except (OSError, ValueError):
         return []
-    here = f"{ROOT.parent.name}/{ROOT.name}"
+    try:
+        here = str(ROOT.relative_to(reg.parent.parent)).replace("\\\\", "/")
+    except ValueError:
+        here = f"{ROOT.parent.name}/{ROOT.name}"
     return [{"id": p["id"], "name": p.get("short") or p["name"], "port": p["port"], "current": p.get("path") == here} for p in items]
 
 
@@ -2601,6 +2671,11 @@ def load_set_detail(set_id):
         base["host_scope"] = view.info(seg_k)
         base["standard_genomes"] = standard_genomes
         base["binding"] = binding
+        extra_path = ROOT / "output" / "primers" / set_id / "refgenome_binding" / "binding_extra.tsv"      # the unit's other reference genomes (profile extra_references)
+        extra = read_tsv(extra_path) if extra_path.exists() else []
+        for b in extra:
+            b["found"] = b.get("found") == "1"
+        base["binding_extra"] = extra
         base["msa"] = msa
         base["dimer_hairpin"] = dimer_hairpin
         base["standard_representativeness"] = standard_rep_for_set(set_id, base["segment"])
@@ -2790,6 +2865,13 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/lumo.css":
             return self._send_file(STATIC_DIR / "lumo.css", "text/css; charset=utf-8")
 
+        if path == "/backup.js":
+            return self._send_file(STATIC_DIR / "backup.js", "application/javascript; charset=utf-8")
+        if path == "/api/backup/list":
+            bd = _backup_mod()
+            return self._send_json({"dir": str(bd.default_out()), "items": [{k: v for k, v in r.items() if k != "path"} for r in _backup_items()]})
+        if path == "/api/backup/download":
+            return self._send_backup_file((qs.get("file") or [""])[0])
         if path == "/api/report/download":
             return self._send_file(ROOT / "output" / "report" / "report.pdf", "application/pdf",
                                     download_name=f"{get_profile()['short_name']}_primer_validation_report.pdf")
@@ -3262,6 +3344,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._handle_set_analyze(m.group(1), "force=1" in (m.group(2) or ""))
         if self.path == "/api/pipeline/rerun-analysis":
             return self._handle_pipeline(label="전체 분석 다시 실행", args=[])
+        if self.path == "/api/backup/create":
+            return self._handle_backup_create()
+        if self.path == "/api/backup/restore":
+            return self._handle_backup_restore()
         if self.path == "/api/report/generate":
             return self._handle_generate_report()
         if self.path == "/api/groups":
@@ -3983,6 +4069,60 @@ class Handler(BaseHTTPRequestHandler):
         if force:
             args = ["--forcerun", f"{out}/validated_ids.txt", *combos, "--", *targets]
         return self._handle_pipeline(label=f"그룹 {group_id} " + ("재분석 (강제)" if force else "분석"), args=args)
+
+    def _send_backup_file(self, name):
+        item = next((r for r in _backup_items() if r["file"] == name), None)
+        if item is None or not _BACKUP_NAME_RE.match(name):
+            self.send_error(404)
+            return
+        path = Path(item["path"])
+        self.send_response(200)
+        self.send_header("Content-Type", "application/zstd" if name.endswith(".zst") else "application/x-xz")
+        self.send_header("Content-Length", str(path.stat().st_size))
+        self.send_header("Content-Disposition", f'attachment; filename="{name}"')
+        self.end_headers()
+        with open(path, "rb") as fh:                                  # streamed: a backup can be many GB
+            while True:
+                block = fh.read(1 << 20)
+                if not block:
+                    break
+                self.wfile.write(block)
+
+    def _backup_busy(self):
+        with JOBS_LOCK:
+            return any(j.get("status") == "running" for j in JOBS.values())
+
+    def _handle_backup_create(self):
+        try:
+            body = self._read_json_body()
+        except json.JSONDecodeError:
+            return self._send_json({"error": "invalid JSON"}, 400)
+        if self._backup_busy():
+            return self._send_json({"error": "다른 작업이 실행 중입니다. 끝난 뒤 다시 시도하세요."}, 409)
+        job_id = uuid.uuid4().hex[:12]
+        with JOBS_LOCK:
+            JOBS[job_id] = {"status": "running", "kind": "backup", "label": "데이터 백업", "progress": "시작...", "started": time.time()}
+        threading.Thread(target=run_backup_job, args=(job_id, bool(body.get("data", True)), bool(body.get("output", True)), bool(body.get("fast", False))), daemon=True).start()
+        return self._send_json({"job_id": job_id})
+
+    def _handle_backup_restore(self):
+        try:
+            body = self._read_json_body()
+        except json.JSONDecodeError:
+            return self._send_json({"error": "invalid JSON"}, 400)
+        name = str(body.get("file", ""))
+        item = next((r for r in _backup_items() if r["file"] == name), None)
+        if item is None or not _BACKUP_NAME_RE.match(name):
+            return self._send_json({"error": "백업 파일을 찾을 수 없습니다."}, 404)
+        if body.get("confirm") is not True:
+            return self._send_json({"error": "복원은 확인(confirm)이 필요합니다."}, 400)
+        if self._backup_busy():
+            return self._send_json({"error": "다른 작업이 실행 중입니다. 끝난 뒤 다시 시도하세요."}, 409)
+        job_id = uuid.uuid4().hex[:12]
+        with JOBS_LOCK:
+            JOBS[job_id] = {"status": "running", "kind": "restore", "label": f"데이터 복원 ({name})", "progress": "시작...", "started": time.time()}
+        threading.Thread(target=run_restore_job, args=(job_id, item["path"]), daemon=True).start()
+        return self._send_json({"job_id": job_id})
 
     def _handle_generate_report(self):
         with JOBS_LOCK:

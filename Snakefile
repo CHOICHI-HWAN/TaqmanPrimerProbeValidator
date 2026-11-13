@@ -74,6 +74,8 @@ STANDARD_META = {seg: f"config/kdca_standard_{seg}_metadata.tsv" for seg in SEGM
 
 # single canonical reference genome per segment, used for the per-oligo binding-site maps
 REFGENOME_ACCESSION = {seg: s["reference_accession"] for seg, s in PROFILE["segments"].items()}
+# More reference genomes of the same unit (e.g. mpox clade I / Ib next to the clade II one): their binding sites are shown next to the main reference's.
+REFGENOME_EXTRA = {seg: list(s.get("extra_references", [])) for seg, s in PROFILE["segments"].items()}
 
 # Groups come from the input_primers/ snapshot too: member ids of primers that are still active
 # (a member that was unchecked/deleted is already gone, and a group left with none is dropped).
@@ -103,9 +105,13 @@ STD_SEGS = [seg for seg in SEGMENTS if (Path(workflow.basedir) / STANDARD_FASTA[
 SET_IDS_STD = [s for s in SET_IDS if SET_SEG[s] in STD_SEGS]
 GROUP_IDS_STD = [g for g in GROUP_IDS if GROUP_SEG[g] in STD_SEGS]
 
+# Genome-wide diversity (pixy pi) is optional: a profile with "diversity": {"enabled": false} skips it (very large genomes, e.g. MPXV 197 kb x 7000+
+# genomes, make the reference-anchored MSA take many hours). The standard representativeness step needs its VCF, so it is skipped with it.
+DIVERSITY_ON = PROFILE.get("diversity", {}).get("enabled", True)
+
 ALL_TARGETS = [
-    expand("output/diversity/{seg}/pixy_pi.json", seg=SEGMENTS),
-    expand("output/standards/{seg}/representativeness.json", seg=STD_SEGS),
+    *(expand("output/diversity/{seg}/pixy_pi.json", seg=SEGMENTS) if DIVERSITY_ON else []),
+    *(expand("output/standards/{seg}/representativeness.json", seg=STD_SEGS) if DIVERSITY_ON else []),
     expand("data/filtered/{seg}_filter_status.tsv", seg=SEGMENTS),
     expand("data/filtered/{seg}_metadata_annotated.tsv", seg=SEGMENTS),
 ]

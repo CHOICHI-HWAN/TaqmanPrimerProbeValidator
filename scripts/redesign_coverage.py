@@ -154,6 +154,14 @@ def candidates(al, kind, amb, pass_mm, tp_n, primer_tm, gc, say):
         starts = al.windows(k)
         if not len(starts):
             continue
+        if kind != "P" and len(starts) > 20000:             # large genome: only windows whose GC/Tm can pass compete for the exact evaluation
+            gcc = np.concatenate([[0], np.cumsum(np.isin(al.cons_u8, (ord("G"), ord("C"))))])
+            n_gc = gcc[starts + k] - gcc[starts]
+            tm_est = 64.9 + 41.0 * (n_gc - 16.4) / k
+            keep = (tm_est >= primer_tm[0] - 5) & (tm_est <= primer_tm[1] + 5) & (100.0 * n_gc / k >= gc[0] - 5) & (100.0 * n_gc / k <= gc[1] + 5)
+            starts = starts[keep]
+            if not len(starts):
+                continue
         ub = al.upper_bound(k, starts, thr)
         sp = al.std_possible(k, starts, thr)
         pool.extend(zip(ub.tolist(), starts.tolist(), [k] * len(starts), sp.tolist()))

@@ -55,34 +55,22 @@
     "sublineage_field": "lineage"
   },
   "segments": {
-    "ci": {
-      "label": "Clade I/Ia",
-      "min_len": 180000,
-      "lineage_col": "country_lineage",
-      "reference_accession": "NC_003310",
-      "lineage_in": [
-        "I",
-        "Ia"
-      ]
-    },
-    "ib": {
-      "label": "Clade Ib",
-      "min_len": 180000,
-      "lineage_col": "country_lineage",
-      "reference_accession": "PP601219",
-      "lineage_in": [
-        "Ib"
-      ]
-    },
-    "ii": {
-      "label": "Clade II",
+    "genome": {
+      "label": "MPXV (Clade I/Ia/Ib/II)",
       "min_len": 180000,
       "lineage_col": "country_lineage",
       "reference_accession": "NC_063383",
       "lineage_in": [
+        "I",
+        "Ia",
+        "Ib",
         "II",
         "IIa",
         "IIb"
+      ],
+      "extra_references": [
+        "NC_003310",
+        "PP601219"
       ]
     }
   },
@@ -112,7 +100,8 @@
     "window_size": 1,
     "min_coverage": 0.95,
     "min_identity": 0.65,
-    "min_lineage_n": 10
+    "min_lineage_n": 10,
+    "enabled": false
   },
   "ui": {
     "name_ko": "엠폭스 바이러스(원숭이두창)",

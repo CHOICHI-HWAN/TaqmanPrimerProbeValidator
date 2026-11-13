@@ -11,6 +11,9 @@ records, the representativeness report), so it must be unique, filename-safe and
 key: renaming one orphans results/verifications that mention the old name.
 """
 import csv
+import sys
+
+csv.field_size_limit(sys.maxsize)          # a whole reference genome (190 kb) can be a standard material: the default 128 KB field limit is too small
 import datetime
 import io
 import re

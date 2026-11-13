@@ -73,6 +73,45 @@ def load_probe_row(alignment_path: Path, ref_chrom: str, probe_seq: str, ref_gen
     return None
 
 
+def binding_rows(row, oligos, ref_chrom, ref_seqs, ref_fasta, spec, alignment, mfeprimer_bin, out_dir, max_mismatch, tag=""):
+    """One row per oligo (role, oligo_id, seq, found, chrom, start, end, strand, mismatches) for ONE reference genome of the unit.
+    `ref_seqs` holds that reference's sequence under `ref_chrom`; `ref_fasta` is an indexed FASTA with just that record for the independent mfeprimer search (None: skip it)."""
+    fr_validated = parse_spec_best(spec, row["F_id"], row["F_seq"], row["R_id"], row["R_seq"], genome_seqs=ref_seqs).get(ref_chrom) if ref_chrom else None
+    probe_validated = (load_probe_row(alignment, ref_chrom, row["P_seq"], ref_seqs[ref_chrom]) if ref_chrom else None)
+    out = []
+    for role, oid, seq in oligos:
+        best = None
+        if role in ("F", "R") and fr_validated is not None:
+            pos = fr_validated[f"{role.lower()}_pos"]
+            best = {"chrom": ref_chrom, "start": pos["start"], "end": pos["end"],
+                    "strand": pos["strand"], "mismatches": fr_validated[f"{role.lower()}_mismatch"]}
+        elif role == "P" and probe_validated is not None:
+            best = {"chrom": ref_chrom, "start": probe_validated["start"], "end": probe_validated["end"],
+                    "strand": probe_validated["strand"], "mismatches": probe_validated["mismatches"]}
+
+        if best is None:
+            # Not in this set's own already-validated population results (mismatch too high for what that search covers, or genuinely never found
+            # there either) -- fall back to this script's own independent, wider-tolerance search.
+            if ref_fasta is not None:            # an extra reference has no mfeprimer index: it goes straight to the brute-force scan below
+                oligo_fa = out_dir / f"{tag}{oid}.fa"
+                write_oligo_fasta(oligo_fa, [(oid, seq)])
+                out_txt = out_dir / f"{tag}{oid}_search.txt"
+                best = search_best_hit(mfeprimer_bin, ref_fasta, oligo_fa, out_txt, max_mismatch)
+            if best is None and ref_chrom is not None:
+                # Same seed-finding-miss class direct_best_match() handles elsewhere in this pipeline -- last resort when even the wide
+                # independent search above finds nothing at all.
+                fallback = direct_best_match(seq, ref_seqs[ref_chrom])
+                if fallback and fallback[0] <= max_mismatch:
+                    mm, i, strand = fallback
+                    best = {"chrom": ref_chrom, "start": i, "end": i + len(seq), "strand": strand, "mismatches": mm}
+
+        if best is None:
+            out.append([role, oid, seq, "0", ref_chrom or "", "", "", "", ""])
+        else:
+            out.append([role, oid, seq, "1", best["chrom"], best["start"], best["end"], best["strand"], best["mismatches"]])
+    return out
+
+
 def main():
     set_id = snakemake.wildcards.set_id
     ref_fasta = Path(snakemake.input.ref)
@@ -85,52 +124,24 @@ def main():
 
     out_dir = Path(snakemake.output.binding).parent
     out_dir.mkdir(parents=True, exist_ok=True)
+    spec, alignment = Path(snakemake.input.spec), Path(snakemake.input.alignment)
+    oligos = [("F", row["F_id"], row["F_seq"]), ("P", row["P_id"], row["P_seq"]), ("R", row["R_id"], row["R_seq"])]
+    header = ["role", "oligo_id", "seq", "found", "chrom", "start", "end", "strand", "mismatches"]
 
     ref_seqs = read_fasta_seqs(ref_fasta)  # only one record, but keyed by id for the fallbacks below
     ref_chrom = next(iter(ref_seqs)) if ref_seqs else None
-
-    fr_validated = parse_spec_best(Path(snakemake.input.spec), row["F_id"], row["F_seq"],
-                                    row["R_id"], row["R_seq"], genome_seqs=ref_seqs).get(ref_chrom) if ref_chrom else None
-    probe_validated = (load_probe_row(Path(snakemake.input.alignment), ref_chrom, row["P_seq"], ref_seqs[ref_chrom])
-                        if ref_chrom else None)
-
-    oligos = [("F", row["F_id"], row["F_seq"]), ("P", row["P_id"], row["P_seq"]), ("R", row["R_id"], row["R_seq"])]
-
     with open(snakemake.output.binding, "w", newline="", encoding="utf-8") as fh:
         writer = csv.writer(fh, delimiter="\t")
-        writer.writerow(["role", "oligo_id", "seq", "found", "chrom", "start", "end", "strand", "mismatches"])
-        for role, oid, seq in oligos:
-            best = None
-            if role in ("F", "R") and fr_validated is not None:
-                pos = fr_validated[f"{role.lower()}_pos"]
-                best = {"chrom": ref_chrom, "start": pos["start"], "end": pos["end"],
-                        "strand": pos["strand"], "mismatches": fr_validated[f"{role.lower()}_mismatch"]}
-            elif role == "P" and probe_validated is not None:
-                best = {"chrom": ref_chrom, "start": probe_validated["start"], "end": probe_validated["end"],
-                        "strand": probe_validated["strand"], "mismatches": probe_validated["mismatches"]}
+        writer.writerow(header)
+        writer.writerows(binding_rows(row, oligos, ref_chrom, ref_seqs, ref_fasta, spec, alignment, mfeprimer_bin, out_dir, max_mismatch))
 
-            if best is None:
-                # Not in this set's own already-validated population results (mismatch too
-                # high for what that search covers, or genuinely never found there either) --
-                # fall back to this script's own independent, wider-tolerance search.
-                oligo_fa = out_dir / f"{oid}.fa"
-                write_oligo_fasta(oligo_fa, [(oid, seq)])
-                out_txt = out_dir / f"{oid}_search.txt"
-                best = search_best_hit(mfeprimer_bin, ref_fasta, oligo_fa, out_txt, max_mismatch)
-                if best is None and ref_chrom is not None:
-                    # Same seed-finding-miss class direct_best_match() handles elsewhere in
-                    # this pipeline -- last resort when even the wide independent search above
-                    # finds nothing at all.
-                    fallback = direct_best_match(seq, ref_seqs[ref_chrom])
-                    if fallback and fallback[0] <= max_mismatch:
-                        mm, i, strand = fallback
-                        best = {"chrom": ref_chrom, "start": i, "end": i + len(seq), "strand": strand, "mismatches": mm}
-
-            if best is None:
-                writer.writerow([role, oid, seq, "0", "", "", "", "", ""])
-            else:
-                writer.writerow([role, oid, seq, "1", best["chrom"], best["start"], best["end"],
-                                  best["strand"], best["mismatches"]])
+    # The unit's other reference genomes (profile extra_references): same logic, one block of rows per reference, written to a separate file so that
+    # everything reading binding.tsv (gene summary, groups, standards) keeps seeing the main reference only.
+    with open(snakemake.output.binding_extra, "w", newline="", encoding="utf-8") as fh:
+        writer = csv.writer(fh, delimiter="\t")
+        writer.writerow(header)
+        for chrom, seq in read_fasta_seqs(Path(snakemake.input.xref)).items():
+            writer.writerows(binding_rows(row, oligos, chrom, {chrom: seq}, None, spec, alignment, mfeprimer_bin, out_dir, max_mismatch, tag=f"{chrom}_"))
 
 
 if __name__ == "__main__":
