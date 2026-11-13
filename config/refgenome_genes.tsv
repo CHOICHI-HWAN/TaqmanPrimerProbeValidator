@@ -1,0 +1,5 @@
+segment	accession	genome_len	gene	start	end	strand
+s	NC_005081	3411	GPC	87	1544	+
+s	NC_005081	3411	N	1636	3330	-
+l	NC_005080	7114	JVsLgp1	84	368	+
+l	NC_005080	7114	JVsLgp2	452	7084	-
