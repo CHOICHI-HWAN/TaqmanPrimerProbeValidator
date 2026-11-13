@@ -1,3 +1,10 @@
+# chichipes v0.2.0 (2026-11-14)
+
+- **Inosine (`I`) in oligos.** One base that pairs with A, C, G and T, never expanded into variants and never a
+  mismatch; its binding, probe, dimer and hairpin energies use the deoxyinosine nearest-neighbour parameters of
+  Watkins & SantaLucia (2005) Nucleic Acids Res. 33:6258 (I·C > I·A > I·T ≈ I·G). An inosine in the 3' window is still
+  found. Oligos without `I` give byte-identical results to v0.1.0.
+
 # chichipes v0.1.0 (2026-11-14)
 
 First release: a clean-room, MFEprimer-4.2.4-compatible primer / probe search engine in one dependency-free binary.

@@ -100,6 +100,9 @@ func isSelfComp(f []byte) bool {
 
 // perfectHS is dH and salt-corrected dS of f against its exact complement. f must be pure A/C/G/T.
 func perfectHS(f []byte, na float64) (h, s float64) {
+	if HasInosine(f) {
+		return perfectHSIno(f, na)
+	}
 	n := len(f)
 	for i := 0; i+1 < n; i++ {
 		a, b := Code(f[i]), Code(f[i+1])

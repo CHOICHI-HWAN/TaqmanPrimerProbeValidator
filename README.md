@@ -24,8 +24,8 @@ Download the archive for your platform from the
 unpack it and put `chichipes` on your `PATH`:
 
 ```bash
-tar xzf chichipes-v0.1.0-linux-amd64.tar.gz
-sudo install chichipes-v0.1.0-linux-amd64/chichipes /usr/local/bin/
+tar xzf chichipes-v0.2.0-linux-amd64.tar.gz
+sudo install chichipes-v0.2.0-linux-amd64/chichipes /usr/local/bin/
 chichipes version
 ```
 
@@ -101,6 +101,25 @@ oligos. Non-default buffer conditions and non-default hairpin `--maxl`/`--minl` 
 | One degenerate primer pair against a 663-genome segment | 18.2 s | 0.1 s |
 | Whole pipeline run of an Ebola-virus panel (2,900 genomes, 29 steps) | 14 min 58 s | 16 s |
 
+## Inosine (I)
+
+Oligos may contain deoxyinosine, written `I` (not an IUPAC code, but common in degenerate primers). chichipes treats
+it as what it is — **one** base that pairs with every base, unevenly — rather than as `N`:
+
+| | `N` | `I` |
+|---|---|---|
+| What is synthesised | a mix of 4 oligos | one oligo |
+| Expanded into variants | ×4 | no |
+| Counts as a mismatch | no | no (against A, C, G or T) |
+| Tm / ΔG at that position | each variant pairs perfectly | I·C > I·A > I·T ≈ I·G, all weaker than a Watson–Crick pair |
+
+The inosine stacks are the nearest-neighbour parameters of Watkins & SantaLucia (2005), *Nucleic Acids Res.*
+33:6258–6267 (Table 2, I·C, I·A, I·T, I·G, I·I). A stack the paper has no value for (an inosine next to a mismatch or
+an `N`, or at a dangling end) adds nothing beyond its salt term, the convention already used for `N`. Inosine in the
+3′ window is still found (one index key per facing base). For dimer and hairpin detection I·C and I·A count as pairs.
+MFEprimer does not accept `I`, so these results have no MFEprimer counterpart; oligos without `I` give byte-identical
+results to before.
+
 ## Thermodynamics
 
 SantaLucia & Hicks (2004) nearest-neighbour, mismatch, dangling-end and loop parameters, salt correction after
@@ -122,11 +141,11 @@ truncation, end terms, hairpin search) are written up in [docs/FINDINGS.md](docs
 ## Releasing
 
 ```bash
-git tag chichipes-v0.1.1 && git push origin chichipes-v0.1.1
+git tag chichipes-v0.2.1 && git push origin chichipes-v0.2.1
 ```
 
 Pushing a `chichipes-v*` tag runs `.github/workflows/release.yml`, which tests, builds Linux / macOS / Windows archives with
-`scripts/release.sh` and attaches them with `SHA256SUMS.txt` to a GitHub Release. `scripts/release.sh v0.1.1` builds
+`scripts/release.sh` and attaches them with `SHA256SUMS.txt` to a GitHub Release. `scripts/release.sh v0.2.1` builds
 the same archives locally into `dist/`.
 
 ## License and citation

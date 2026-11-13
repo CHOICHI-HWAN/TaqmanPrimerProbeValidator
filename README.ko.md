@@ -20,8 +20,8 @@
 `chichipes`를 `PATH`에 넣으면 돼요.
 
 ```bash
-tar xzf chichipes-v0.1.0-linux-amd64.tar.gz
-sudo install chichipes-v0.1.0-linux-amd64/chichipes /usr/local/bin/
+tar xzf chichipes-v0.2.0-linux-amd64.tar.gz
+sudo install chichipes-v0.2.0-linux-amd64/chichipes /usr/local/bin/
 chichipes version
 ```
 
@@ -87,14 +87,31 @@ mfeprimer_bin: "/usr/local/bin/chichipes"
 | 축퇴 프라이머쌍 하나 × 유전체 663개 분절 | 18.2초 | 0.1초 |
 | 에볼라바이러스 패널 전체 파이프라인 (유전체 2,900개, 29단계) | 14분 58초 | 16초 |
 
+## 이노신 (I)
+
+올리고에 deoxyinosine(`I`)을 쓸 수 있어요. IUPAC 코드는 아니지만 축퇴 프라이머에 자주 쓰여요. chichipes는 `I`를 `N`과
+같게 보지 않고, **하나의** 염기가 모든 염기와 고르지 않게 짝짓는 것으로 계산해요.
+
+| | `N` | `I` |
+|---|---|---|
+| 합성되는 것 | 올리고 4종 혼합 | 올리고 1종 |
+| 변이로 펼침 | ×4 | 안 펼침 |
+| 미스매치로 셈 | 아니요 | 아니요 (A·C·G·T 모두) |
+| 그 자리의 Tm/ΔG | 각 변이가 완전 결합 | I·C > I·A > I·T ≈ I·G, 모두 Watson–Crick 쌍보다 약함 |
+
+이노신 스택 값은 Watkins & SantaLucia (2005) *Nucleic Acids Res.* 33:6258–6267, Table 2의 최근접 이웃 파라미터예요.
+논문에 값이 없는 스택(미스매치·`N` 옆의 이노신, dangling end)은 `N`과 같은 규칙으로 염 보정 항만 더해요. 3′ 창에 있는
+이노신도 찾아요. 다이머·헤어핀 탐지에서는 I·C와 I·A를 짝으로 셉니다. MFEprimer는 `I`를 받지 않아 비교 대상이 없고,
+`I`가 없는 올리고는 이전과 결과가 바이트 단위로 같아요.
+
 ## 배포 (릴리즈)
 
 ```bash
-git tag chichipes-v0.1.1 && git push origin chichipes-v0.1.1
+git tag chichipes-v0.2.1 && git push origin chichipes-v0.2.1
 ```
 
 `chichipes-v*` 태그를 올리면 `.github/workflows/release.yml`이 테스트 → `scripts/release.sh`로 Linux/macOS/Windows 압축 파일
-빌드 → `SHA256SUMS.txt`와 함께 GitHub Release에 올려요. 로컬에서는 `scripts/release.sh v0.1.1`로 `dist/`에 같은
+빌드 → `SHA256SUMS.txt`와 함께 GitHub Release에 올려요. 로컬에서는 `scripts/release.sh v0.2.1`로 `dist/`에 같은
 파일을 만들 수 있어요.
 
 ## 라이선스와 인용

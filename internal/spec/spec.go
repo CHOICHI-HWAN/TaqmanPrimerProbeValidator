@@ -89,7 +89,7 @@ func init() {
 		comp[i] = 'N'
 	}
 	// IUPAC complements, both cases
-	for _, p := range []string{"AT", "CG", "GC", "TA", "RY", "YR", "KM", "MK", "SS", "WW", "BV", "VB", "DH", "HD", "NN"} {
+	for _, p := range []string{"AT", "CG", "GC", "TA", "RY", "YR", "KM", "MK", "SS", "WW", "BV", "VB", "DH", "HD", "NN", "II"} {
 		comp[p[0]], comp[p[0]+32] = p[1], p[1]+32
 	}
 }
@@ -122,6 +122,32 @@ func encode(s []byte) (uint32, bool) {
 	return v, true
 }
 
+// encodeAll is encode for an oligo window that may hold inosine: one key per base an I can face (4^m keys for m
+// inosines), so the window is found whatever the genome has there.
+func encodeAll(s []byte) []uint32 {
+	keys := []uint32{0}
+	for _, b := range s {
+		if b == 'I' || b == 'i' {
+			next := make([]uint32, 0, 4*len(keys))
+			for _, v := range keys {
+				for c := uint32(0); c < 4; c++ {
+					next = append(next, v<<2|c)
+				}
+			}
+			keys = next
+			continue
+		}
+		c := thermo.Code(b)
+		if c < 0 {
+			return nil
+		}
+		for i := range keys {
+			keys[i] = keys[i]<<2 | uint32(c)
+		}
+	}
+	return keys
+}
+
 // New builds the search set from the input oligos.
 func New(oligos []primers.Oligo, opt Options) (*Engine, error) {
 	e := &Engine{opt: opt, fwd: map[uint32][]*probe{}, rev: map[uint32][]*probe{}}
@@ -142,10 +168,10 @@ func New(oligos []primers.Oligo, opt Options) (*Engine, error) {
 				if len(p.seq) < opt.K {
 					continue
 				}
-				if w, ok := encode(p.seq[len(p.seq)-opt.K:]); ok {
+				for _, w := range encodeAll(p.seq[len(p.seq)-opt.K:]) {
 					e.fwd[w] = append(e.fwd[w], p)
 				}
-				if w, ok := encode(p.rcs[:opt.K]); ok {
+				for _, w := range encodeAll(p.rcs[:opt.K]) {
 					e.rev[w] = append(e.rev[w], p)
 				}
 				if len(p.seq) > e.maxLen {

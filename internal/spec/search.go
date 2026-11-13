@@ -100,17 +100,18 @@ func kmerPositions(g []byte, k int, want map[uint32]bool) map[uint32][]int {
 
 func searchOne(rec int, g []byte, qs []query, k, maxMM int, c thermo.Cond) []SearchHit {
 	want := map[uint32]bool{}
-	type anchors struct{ a, b, ra, rb uint32 }
+	type anchors struct{ a, b, ra, rb []uint32 }
 	an := make([]anchors, len(qs))
 	for i, q := range qs {
 		n := len(q.seq)
 		rcq := revComp(q.seq)
-		a, _ := encode(q.seq[:k])
-		b, _ := encode(q.seq[n-k:])
-		ra, _ := encode(rcq[:k]) // on the plus strand the reverse complement starts with rc(3' k-mer)
-		rb, _ := encode(rcq[n-k:])
-		an[i] = anchors{a, b, ra, rb}
-		want[a], want[b], want[ra], want[rb] = true, true, true, true
+		// on the plus strand the reverse complement starts with rc(3' k-mer); an inosine gives one key per base
+		an[i] = anchors{encodeAll(q.seq[:k]), encodeAll(q.seq[n-k:]), encodeAll(rcq[:k]), encodeAll(rcq[n-k:])}
+		for _, ks := range [][]uint32{an[i].a, an[i].b, an[i].ra, an[i].rb} {
+			for _, w := range ks {
+				want[w] = true
+			}
+		}
 	}
 	pos := kmerPositions(g, k, want)
 	var hits []SearchHit
@@ -121,9 +122,9 @@ func searchOne(rec int, g []byte, qs []query, k, maxMM int, c thermo.Cond) []Sea
 	for i, q := range qs {
 		n := len(q.seq)
 		for _, strand := range []byte{'+', '-'} {
-			lead, tail := pos[an[i].a], pos[an[i].b]
+			lead, tail := positions(pos, an[i].a), positions(pos, an[i].b)
 			if strand == '-' {
-				lead, tail = pos[an[i].ra], pos[an[i].rb]
+				lead, tail = positions(pos, an[i].ra), positions(pos, an[i].rb)
 			}
 			for _, s := range lead {
 				for _, t := range tail {
@@ -156,6 +157,19 @@ func searchOne(rec int, g []byte, qs []query, k, maxMM int, c thermo.Cond) []Sea
 	return hits
 }
 
+// positions merges the occurrences of several anchor keys (one key unless the anchor holds inosine).
+func positions(pos map[uint32][]int, keys []uint32) []int {
+	if len(keys) == 1 {
+		return pos[keys[0]]
+	}
+	var out []int
+	for _, w := range keys {
+		out = append(out, pos[w]...)
+	}
+	sort.Ints(out)
+	return out
+}
+
 func levenshtein(a, b []byte) int {
 	prev := make([]int, len(b)+1)
 	cur := make([]int, len(b)+1)
@@ -166,7 +180,7 @@ func levenshtein(a, b []byte) int {
 		cur[0] = i
 		for j := 1; j <= len(b); j++ {
 			d := prev[j-1]
-			if a[i-1] != b[j-1] {
+			if a[i-1] != b[j-1] && !(a[i-1] == 'I' && thermo.Code(b[j-1]) >= 0) { // inosine faces any base
 				d++
 			}
 			if prev[j]+1 < d {

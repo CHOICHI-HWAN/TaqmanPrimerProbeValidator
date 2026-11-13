@@ -48,7 +48,10 @@ func init() {
 // hpStack is the stack 5'-t0 t1-3' / 3'-b0 b1-5': a nearest-neighbour stack when both columns pair, else a mismatch
 // stack (zero for two mismatches in a row, bar the few mfeprimer has values for).
 func hpStack(t0, t1, b0, b1 byte) (h, s float64) {
-	a, b, c, d := Code(t0), Code(t1), Code(b0), Code(b1)
+	a, b, c, d := OCode(t0), OCode(t1), OCode(b0), OCode(b1)
+	if a == Ino || b == Ino || c == Ino || d == Ino {
+		return stack(a, b, c, d)
+	}
 	if c == 3-a && d == 3-b {
 		return nnH[a][b], nnS[a][b]
 	}
@@ -91,10 +94,10 @@ func HairpinEnergy(s []byte, pairs [][2]int, c Cond) (dg, tm float64) {
 		dh, ds := hpStack(s[i-1], s[i], s[j+1], s[j])
 		h, sd, units = h+dh, sd+ds, units+1
 	case j+1 < n:
-		v := hpDangle[0][Code(s[j])][Code(s[i])][Code(s[j+1])]
+		v := dangle(0, s[j], s[i], s[j+1])
 		h, sd, units = h+v[0], sd+v[1], units+0.5
 	case i > 0:
-		v := hpDangle[1][Code(s[j])][Code(s[i])][Code(s[i-1])]
+		v := dangle(1, s[j], s[i], s[i-1])
 		h, sd, units = h+v[0], sd+v[1], units+0.5
 	}
 	i, j = pairs[len(pairs)-1][0], pairs[len(pairs)-1][1]
@@ -124,10 +127,10 @@ func OligoReport(f []byte, c Cond) (tm, dg float64) {
 // itself) gets the symmetry term and its Tm uses Ct instead of Ct/4. Same tables as the hairpin.
 func DimerDG(a, br []byte, shift, i, j int, c Cond) (dg, tm float64, ok bool) {
 	for x := i - 1; x <= j+1; x++ {
-		if x >= 0 && x < len(a) && Code(a[x]) < 0 {
+		if x >= 0 && x < len(a) && OCode(a[x]) < 0 {
 			return 0, 0, false
 		}
-		if y := x - shift; y >= 0 && y < len(br) && Code(br[y]) < 0 {
+		if y := x - shift; y >= 0 && y < len(br) && OCode(br[y]) < 0 {
 			return 0, 0, false
 		}
 	}
@@ -149,10 +152,10 @@ func DimerDG(a, br []byte, shift, i, j int, c Cond) (dg, tm float64, ok bool) {
 		dh, ds := hpStack(aL, a[i], bL, br[i-shift])
 		h, sd, units = h+dh, sd+ds, units+1
 	case aL != 0:
-		v := hpDangle[1][Code(br[i-shift])][Code(a[i])][Code(aL)]
+		v := dangle(1, br[i-shift], a[i], aL)
 		h, sd, units = h+v[0], sd+v[1], units+0.5
 	case bL != 0:
-		v := hpDangle[0][Code(br[i-shift])][Code(a[i])][Code(bL)]
+		v := dangle(0, br[i-shift], a[i], bL)
 		h, sd, units = h+v[0], sd+v[1], units+0.5
 	}
 	// right end: 5'-a[j] aR-3' / 3'-br[j] bR-5'
@@ -162,10 +165,10 @@ func DimerDG(a, br []byte, shift, i, j int, c Cond) (dg, tm float64, ok bool) {
 		dh, ds := hpStack(a[j], aR, br[j-shift], bR)
 		h, sd, units = h+dh, sd+ds, units+1
 	case bR != 0:
-		v := hpDangle[1][Code(a[j])][Code(br[j-shift])][Code(bR)]
+		v := dangle(1, a[j], br[j-shift], bR)
 		h, sd, units = h+v[0], sd+v[1], units+0.5
 	case aR != 0:
-		v := hpDangle[0][Code(a[j])][Code(br[j-shift])][Code(aR)]
+		v := dangle(0, a[j], br[j-shift], aR)
 		h, sd, units = h+v[0], sd+v[1], units+0.5
 	}
 	x := 4.0
@@ -182,4 +185,14 @@ func DimerDG(a, br []byte, shift, i, j int, c Cond) (dg, tm float64, ok bool) {
 	}
 	sd += 0.368 * units * math.Log(c.NaEq())
 	return h - t37*sd/1000, 1000*h/(sd+hpGasR*math.Log(c.Oligo*1e-9/x)) - 273.15, true
+}
+
+// dangle is hpDangle by bases; an inosine in it has no published value and adds nothing (its half salt unit is
+// still counted by the caller).
+func dangle(half int, p3, p5, d byte) [2]float64 {
+	a, b, c := OCode(p3), OCode(p5), OCode(d)
+	if a < 0 || b < 0 || c < 0 || a == Ino || b == Ino || c == Ino {
+		return [2]float64{}
+	}
+	return hpDangle[half][a][b][c]
 }

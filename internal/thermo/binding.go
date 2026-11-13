@@ -23,12 +23,12 @@ func tStack(t0, t1, b0, b1 int) (h, s float64) {
 func bindCut(f []byte, s []int) int {
 	n, d := len(f), 0
 	for i := 0; i < n; {
-		if Code(f[i]) == s[i] {
+		if colMatch(f[i], s[i]) {
 			i++
 			continue
 		}
 		j := i
-		for j < n && Code(f[j]) != s[j] {
+		for j < n && !colMatch(f[j], s[j]) {
 			j++
 		}
 		if j-i >= 3 || i == 0 {
@@ -55,7 +55,7 @@ func Binding(f, s []byte, l5, r3 byte, rev bool, c Cond) (tm, dg float64, ok boo
 	}
 	sc := make([]int, n)
 	for i := 0; i < n; i++ {
-		if Code(f[i]) < 0 || siteCode(s[i]) < 0 {
+		if OCode(f[i]) < 0 || siteCode(s[i]) < 0 {
 			return 0, 0, false
 		}
 		sc[i] = siteCode(s[i])
@@ -72,17 +72,24 @@ func Binding(f, s []byte, l5, r3 byte, rev bool, c Cond) (tm, dg float64, ok boo
 	h, sd, units := 0.2, -5.7, 0.0
 	for x := 0; x+1 < n; x++ {
 		var dh, ds float64
-		if rev { // rc(primer) over the plus-strand site
-			y := n - 2 - x
+		if y := n - 2 - x; rev && OCode(f[y]) != Ino && OCode(f[y+1]) != Ino { // rc(primer) over the plus-strand site
 			dh, ds = tStack(3-Code(f[y+1]), 3-Code(f[y]), sc[y+1], sc[y])
+		} else if rev {
+			// a stack holding inosine is read as the physical duplex: mfeprimer's complemented reading of reverse-primer
+			// mismatches would score I against the complement of the template base
+			dh, ds = stack(OCode(f[y]), OCode(f[y+1]), compCode(sc[y]), compCode(sc[y+1]))
 		} else {
-			dh, ds = tStack(Code(f[x]), Code(f[x+1]), compCode(sc[x]), compCode(sc[x+1]))
+			dh, ds = stack(OCode(f[x]), OCode(f[x+1]), compCode(sc[x]), compCode(sc[x+1]))
 		}
 		h, sd, units = h+dh, sd+ds, units+1
 	}
-	f0, fl := Code(f[0]), Code(f[n-1])
+	f0, fl := OCode(f[0]), OCode(f[n-1])
 	switch {
 	case d > 0: // blunt cut end
+	case f0 == Ino: // no dangle values for an inosine end; terminal-AT does not apply
+		if lc <= 4 {
+			units += 0.5
+		}
 	case lc <= 3:
 		var v [2]float64
 		if rev {
@@ -97,6 +104,10 @@ func Binding(f, s []byte, l5, r3 byte, rev bool, c Cond) (tm, dg float64, ok boo
 		h, sd = h+2.2, sd+6.9
 	}
 	switch {
+	case fl == Ino:
+		if !rev || rc <= 4 {
+			units += 0.5
+		}
 	case !rev:
 		v := hpDangle[1][fl][3-fl][fl]
 		h, sd, units = h+v[0], sd+v[1], units+0.5
@@ -121,9 +132,12 @@ func Search(q, hit []byte, c Cond) (tm, dg float64, ok bool) {
 		return 0, 0, false
 	}
 	for i := 0; i < n; i++ {
-		if Code(q[i]) < 0 || siteCode(hit[i]) < 0 {
+		if OCode(q[i]) < 0 || siteCode(hit[i]) < 0 {
 			return 0, 0, false
 		}
+	}
+	if HasInosine(q) {
+		return searchIno(q, hit, c)
 	}
 	h, sd := perfectHS(q, c.NaEq())
 	for i := 0; i+1 < n; i++ {
@@ -140,4 +154,28 @@ func Search(q, hit []byte, c Cond) (tm, dg float64, ok bool) {
 		x = 1
 	}
 	return 1000*h/(sd+gasR*math.Log(c.Oligo*1e-9/x)) - 273.15, h - t37*sd/1000, true
+}
+
+// colMatch: the oligo base pairs with the site base (inosine with any of A/C/G/T, never with N).
+func colMatch(f byte, s int) bool {
+	o := OCode(f)
+	return o == s || (o == Ino && s >= 0 && s <= 3)
+}
+
+// searchIno is Search for a query holding inosine: every stack read from the actual pairs (inosine stacks from
+// Watkins & SantaLucia 2005), with the same initiation, terminal-AT and salt terms as the perfect duplex.
+func searchIno(q, hit []byte, c Cond) (tm, dg float64, ok bool) {
+	n := len(q)
+	h, sd := 0.2, -5.7
+	for i := 0; i+1 < n; i++ {
+		dh, ds := stack(OCode(q[i]), OCode(q[i+1]), compCode(siteCode(hit[i])), compCode(siteCode(hit[i+1])))
+		h, sd = h+dh, sd+ds
+	}
+	for _, e := range []byte{q[0], q[n-1]} {
+		if x := Code(e); x == 0 || x == 3 {
+			h, sd = h+2.2, sd+6.9
+		}
+	}
+	sd += 0.368 * float64(n-1) * math.Log(c.NaEq())
+	return 1000*h/(sd+gasR*math.Log(c.Oligo*1e-9/4)) - 273.15, h - t37*sd/1000, true
 }

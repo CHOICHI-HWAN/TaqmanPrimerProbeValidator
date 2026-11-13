@@ -50,7 +50,8 @@ func ExpandAll(oligos []primers.Oligo) ([]Expanded, error) {
 }
 
 var pairOK = func() (t [256][256]bool) {
-	for _, p := range []string{"AT", "TA", "CG", "GC"} {
+	// inosine counts as a pair with C and A (the stabilising pairs); I·T, I·G and I·I are scored as mismatches
+	for _, p := range []string{"AT", "TA", "CG", "GC", "IC", "CI", "IA", "AI"} {
 		t[p[0]][p[1]] = true
 	}
 	return

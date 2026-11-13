@@ -14,6 +14,7 @@ var degen = map[byte]string{
 	'A': "A", 'C': "C", 'G': "G", 'T': "T",
 	'R': "GA", 'Y': "TC", 'M': "AC", 'K': "GT", 'S': "GC", 'W': "TA",
 	'B': "GTC", 'D': "GTA", 'H': "TAC", 'V': "GAC", 'N': "GATC",
+	'I': "I", // deoxyinosine is one molecule that pairs with every base: kept as is, never expanded
 }
 
 // substitution order for a mismatch at one position, per original base (read off real reports)
@@ -99,7 +100,9 @@ func Variants(seq string, maxMM, misStart, misEnd int) []Variant {
 	}
 	var pos []int // string indices, 3'-nearest first
 	for d := misStart; d <= misEnd; d++ {
-		pos = append(pos, n-d)
+		if seq[n-d] != 'I' { // an inosine already pairs with every base: no variants there
+			pos = append(pos, n-d)
+		}
 	}
 	out := []Variant{{0, seq}}
 	idx := 1
