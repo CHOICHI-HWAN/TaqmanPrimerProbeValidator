@@ -1,0 +1,5 @@
+segment	accession	genome_len	gene	start	end	strand
+s	NC_006317	3366	SabVsSgp1	59	1525	+
+s	NC_006317	3366	SabVsSgp2	1620	3308	-
+l	NC_006313	7133	SabVsLgp1	75	377	+
+l	NC_006313	7133	SabVsLgp2	448	7086	-
