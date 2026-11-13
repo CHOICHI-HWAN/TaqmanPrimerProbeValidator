@@ -1,0 +1,5 @@
+segment	accession	genome_len	gene	start	end	strand
+s	NC_005077	3343	GTOVsSgp1	74	1513	+
+s	NC_005077	3343	GTOVsSgp2	1609	3291	-
+l	NC_005082	7081	GTOVsLgp1	75	362	+
+l	NC_005082	7081	GTOVsLgp2	455	7051	-
