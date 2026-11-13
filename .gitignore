@@ -1,0 +1,7 @@
+# work/ holds primer sequences (CONFIDENTIAL), mfeprimer outputs and comparison results: never version it
+work/
+/pe
+/chichipes
+*.test
+__pycache__/
+dist/
