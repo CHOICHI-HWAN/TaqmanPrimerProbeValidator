@@ -1,0 +1,100 @@
+{
+  "profile_version": 1,
+  "id": "machv",
+  "name": "Mammarenavirus machupoense (Machupo virus)",
+  "short_name": "MACHV",
+  "taxonomy": {
+    "source": "ICTV Master Species List (2023-2025 releases). Names and ranks change between releases -- check https://ictv.global/taxonomy",
+    "virus": "Machupo virus",
+    "ranks": [
+      [
+        "Realm",
+        "Riboviria"
+      ],
+      [
+        "Kingdom",
+        "Orthornavirae"
+      ],
+      [
+        "Phylum",
+        "Negarnaviricota"
+      ],
+      [
+        "Class",
+        "Ellioviricetes"
+      ],
+      [
+        "Order",
+        "Bunyavirales"
+      ],
+      [
+        "Family",
+        "Arenaviridae"
+      ],
+      [
+        "Genus",
+        "Mammarenavirus"
+      ],
+      [
+        "Species",
+        "Mammarenavirus machupoense"
+      ]
+    ],
+    "former_species": "Machupo virus"
+  },
+  "source": {
+    "type": "ncbi",
+    "base_url": "https://api.ncbi.nlm.nih.gov/datasets/v2",
+    "taxon": 3052317,
+    "segment_subdirs": true
+  },
+  "segments": {
+    "s": {
+      "label": "S",
+      "min_len": 2800,
+      "lineage_col": "country_lineage",
+      "reference_accession": "NC_005078"
+    },
+    "l": {
+      "label": "L",
+      "min_len": 6000,
+      "lineage_col": "country_lineage",
+      "reference_accession": "NC_005079"
+    }
+  },
+  "metadata": {
+    "accession": "accession",
+    "lineage_fallback": "country_lineage",
+    "date": "date",
+    "country": "country",
+    "region": "region",
+    "host": "host",
+    "lab_host": "is_lab_host"
+  },
+  "lineage": {
+    "label": "Country",
+    "mode": "metadata_column"
+  },
+  "qc": {
+    "max_n_fraction": 0.01,
+    "exclude_list": null
+  },
+  "population": {
+    "pooled_label": "ALL_MACHV",
+    "chrom_prefix": "MACHV"
+  },
+  "diversity": {
+    "window_size": 1,
+    "min_coverage": 0.95,
+    "min_identity": 0.65,
+    "min_lineage_n": 10
+  },
+  "ui": {
+    "name_ko": "마추포 바이러스(볼리비아 출혈열)",
+    "web_url": "https://www.ncbi.nlm.nih.gov/datasets/taxonomy/3052317/",
+    "lineage_ko": "발생 국가",
+    "lineage_examples": "COD, UGA, ...",
+    "lineage_def": "에볼라 바이러스는 공식 클레이드 체계가 없어, 게놈을 채집된 나라(발생 국가)별로 묶어 리니지 대신 사용한다(Pathoplexus/NCBI 메타데이터의 채집 국가).",
+    "orientation_note": ""
+  }
+}

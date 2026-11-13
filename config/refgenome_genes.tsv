@@ -1,0 +1,5 @@
+segment	accession	genome_len	gene	start	end	strand
+s	NC_005078	3439	MACVsSgp1	89	1579	+
+s	NC_005078	3439	MACVsSgp2	1670	3364	-
+l	NC_005079	7196	MACVsLgp1	98	382	+
+l	NC_005079	7196	MACVsLgp2	465	7094	-
