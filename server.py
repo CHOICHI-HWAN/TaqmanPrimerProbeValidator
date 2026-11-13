@@ -17,8 +17,11 @@ import signal
 import socket
 import subprocess
 import sys
+import threading
 import time
+import urllib.parse
 import urllib.request
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -27,6 +30,51 @@ STATIC_DIR = HERE / "static"
 LOG_DIR = HERE / "logs"
 BASE = HERE.parent                     # the folder that holds LASV/, NIPAH/, entry/
 STARTED = {}                           # pipeline id -> subprocess.Popen started from this page
+
+sys.path.insert(0, str(BASE / "tools"))
+import backup_restore as br  # noqa: E402  -- ALL editions' data backup/restore (per-edition dialog: webapp/static/backup.js)
+
+JOBS = {}                              # job_id -> {"status": running|done|error, "progress": str, "kind": "backup"|"restore", ...}
+JOBS_LOCK = threading.Lock()
+
+
+def _job_log(job_id):
+    def log(msg):
+        with JOBS_LOCK:
+            JOBS[job_id]["progress"] = str(msg)[-400:]
+    return log
+
+
+def run_full_backup_job(job_id, data, output, fast):
+    log = _job_log(job_id)
+    try:
+        res = br.run_backup(data=data, output=output, fast=fast, log=log)
+        with JOBS_LOCK:
+            JOBS[job_id]["status"] = "error" if res["failed"] else "done"
+            n = len(res["editions"])
+            JOBS[job_id]["progress"] = f"{n}개 에디션 완료" + (f", {len(res['failed'])}개 실패: {', '.join(x[0] for x in res['failed'])}" if res["failed"] else "")
+    except (Exception, SystemExit) as exc:  # noqa: BLE001
+        with JOBS_LOCK:
+            JOBS[job_id]["status"] = "error"
+            JOBS[job_id]["progress"] = f"백업 실패: {exc}"
+
+
+def run_full_restore_job(job_id, folder, shared):
+    log = _job_log(job_id)
+    try:
+        res = br.run_restore(folder, shared=shared, log=log)
+        with JOBS_LOCK:
+            JOBS[job_id]["status"] = "error" if res["skipped"] else "done"
+            JOBS[job_id]["progress"] = f"{len(res['restored'])}개 복원" + (f", {len(res['skipped'])}개 건너뜀: {', '.join(x[0] for x in res['skipped'])}" if res["skipped"] else "")
+    except (Exception, SystemExit) as exc:  # noqa: BLE001
+        with JOBS_LOCK:
+            JOBS[job_id]["status"] = "error"
+            JOBS[job_id]["progress"] = f"복원 실패: {exc}"
+
+
+def _any_job_running():
+    with JOBS_LOCK:
+        return any(j.get("status") == "running" for j in JOBS.values())
 
 
 def registry():
@@ -183,6 +231,11 @@ class Handler(BaseHTTPRequestHandler):
     def _json(self, obj, code=200):
         self._send(code, json.dumps(obj, ensure_ascii=False).encode(), "application/json; charset=utf-8")
 
+    def _read_json_body(self):
+        n = int(self.headers.get("Content-Length") or 0)
+        raw = self.rfile.read(n) if n else b"{}"
+        return json.loads(raw or b"{}")
+
     def do_GET(self):  # noqa: N802
         path = self.path.split("?")[0]
         if path in ("/", "/index.html"):
@@ -191,10 +244,56 @@ class Handler(BaseHTTPRequestHandler):
             reg = registry()
             return self._json({"title": reg.get("title", ""), "pipelines": [pipeline_status(p) for p in reg["pipelines"]],
                                "planned": reg.get("planned", [])})
+        if path == "/api/backup/sets":
+            # Every pathogen panel already has its OWN backup/restore dialog (webapp/static/backup.js) for just that edition; this is the
+            # all-editions version: one backup SET (tools/backup_restore.py) across every pipeline plus the shared files (Firebase allow
+            # lists, this page's own pipeline list, the dashboards' systemd units).
+            return self._json({"dir": str(br.bd.default_out()), "editions": sorted(br.editions()), "sets": br.list_sets()})
+        if path == "/api/jobs/active":
+            with JOBS_LOCK:
+                active = [dict(j, job_id=jid) for jid, j in JOBS.items() if j.get("status") == "running"]
+            return self._json(active)
+        m = re.fullmatch(r"/api/jobs/([^/]+)", path)
+        if m:
+            with JOBS_LOCK:
+                j = JOBS.get(m.group(1))
+            return self._json(j, 200) if j else self._json({"error": "unknown job"}, 404)
         self.send_error(404)
 
     def do_POST(self):  # noqa: N802
-        m = re.fullmatch(r"/api/pipelines/([a-z0-9_-]+)/(start|stop)", self.path.split("?")[0])
+        path = self.path.split("?")[0]
+        if path == "/api/backup/create":
+            try:
+                body = self._read_json_body()
+            except json.JSONDecodeError:
+                return self._json({"error": "invalid JSON"}, 400)
+            if _any_job_running():
+                return self._json({"error": "다른 전체 백업·복원 작업이 실행 중입니다. 끝난 뒤 다시 시도하세요."}, 409)
+            job_id = uuid.uuid4().hex[:12]
+            with JOBS_LOCK:
+                JOBS[job_id] = {"status": "running", "kind": "backup", "label": "전체 데이터 백업", "progress": "시작..."}
+            threading.Thread(target=run_full_backup_job, args=(job_id, bool(body.get("data", True)), bool(body.get("output", True)),
+                                                                bool(body.get("fast", False))), daemon=True).start()
+            return self._json({"job_id": job_id})
+        if path == "/api/backup/restore":
+            try:
+                body = self._read_json_body()
+            except json.JSONDecodeError:
+                return self._json({"error": "invalid JSON"}, 400)
+            folder_name = str(body.get("folder", ""))
+            match = next((s for s in br.list_sets() if s["folder"] == folder_name), None)
+            if match is None or not re.fullmatch(r"[0-9]{8}-[0-9]{6}", folder_name):
+                return self._json({"error": "백업 세트를 찾을 수 없습니다."}, 404)
+            if body.get("confirm") is not True:
+                return self._json({"error": "복원은 확인(confirm)이 필요합니다."}, 400)
+            if _any_job_running():
+                return self._json({"error": "다른 전체 백업·복원 작업이 실행 중입니다. 끝난 뒤 다시 시도하세요."}, 409)
+            job_id = uuid.uuid4().hex[:12]
+            with JOBS_LOCK:
+                JOBS[job_id] = {"status": "running", "kind": "restore", "label": f"전체 데이터 복원 ({folder_name})", "progress": "시작..."}
+            threading.Thread(target=run_full_restore_job, args=(job_id, match["path"], bool(body.get("shared", False))), daemon=True).start()
+            return self._json({"job_id": job_id})
+        m = re.fullmatch(r"/api/pipelines/([a-z0-9_-]+)/(start|stop)", path)
         p = find_pipeline(m.group(1)) if m else None
         if not p:
             return self._json({"error": "unknown pipeline"}, 404)

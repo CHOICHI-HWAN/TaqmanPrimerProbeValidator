@@ -108,6 +108,60 @@
       "port": 8777,
       "desc": "8분절 유전체(HA·NA는 아형별). NCBI 공개 데이터, 아형(H1N1·H3N2·H5N1)별 커버리지.",
       "short": "FLUA"
+    },
+    {
+      "id": "gtov",
+      "name": "GTOV",
+      "sci": "Mammarenavirus guanaritoense (Guanarito virus)",
+      "path": "SAHF/GTOV/pipeline_gtov",
+      "port": 8778,
+      "desc": "베네수엘라 출혈열. 2분절(S / L) 유전체, 아레나바이러스. NCBI 공개 데이터, 채집 국가별 묶음.",
+      "short": "GTOV"
+    },
+    {
+      "id": "chpv",
+      "name": "CHPV",
+      "sci": "Mammarenavirus chapareense (Chapare virus)",
+      "path": "SAHF/CHPV/pipeline_chpv",
+      "port": 8779,
+      "desc": "차파레 출혈열. 2분절(S / L) 유전체, 아레나바이러스. NCBI 공개 데이터, 채집 국가별 묶음.",
+      "short": "CHPV"
+    },
+    {
+      "id": "junv",
+      "name": "JUNV",
+      "sci": "Mammarenavirus juninense (Junin virus)",
+      "path": "SAHF/JUNV/pipeline_junv",
+      "port": 8780,
+      "desc": "아르헨티나 출혈열. 2분절(S / L) 유전체, 아레나바이러스. NCBI 공개 데이터, 채집 국가별 묶음.",
+      "short": "JUNV"
+    },
+    {
+      "id": "sabv",
+      "name": "SABV",
+      "sci": "Mammarenavirus brazilense (Sabia virus)",
+      "path": "SAHF/SABV/pipeline_sabv",
+      "port": 8781,
+      "desc": "브라질 출혈열. 2분절(S / L) 유전체, 아레나바이러스. NCBI 공개 데이터, 채집 국가별 묶음.",
+      "short": "SABV"
+    },
+    {
+      "id": "machv",
+      "name": "MACHV",
+      "sci": "Mammarenavirus machupoense (Machupo virus)",
+      "path": "SAHF/MACHV/pipeline_machv",
+      "port": 8782,
+      "desc": "볼리비아 출혈열. 2분절(S / L) 유전체, 아레나바이러스. NCBI 공개 데이터, 채집 국가별 묶음.",
+      "short": "MACHV"
+    },
+    {
+      "id": "varv",
+      "name": "VARV",
+      "sci": "Orthopoxvirus variola (Variola virus)",
+      "path": "VARV/pipeline_varv",
+      "port": 8783,
+      "desc": "두창(천연두). 비분절 dsDNA 유전체(약 186 kb). NCBI 공개 데이터, 채집 국가별 묶음.",
+      "short": "VARV"
     }
   ],
   "planned": []
