@@ -2,7 +2,7 @@
 """Concatenate every combined-panel group's summary row into one table."""
 import csv
 
-GROUP_SUMMARY_HEADER = ["group_id", "label", "segment", "members", "total_genomes", "validated", "validated_pct"]
+GROUP_SUMMARY_HEADER = ["group_id", "label", "segment", "members", "total_genomes", "validated", "validated_pct", "host_scope"]
 
 
 def main():
