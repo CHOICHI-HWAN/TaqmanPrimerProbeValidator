@@ -32,7 +32,14 @@ BASE = HERE.parent                     # the folder that holds LASV/, NIPAH/, en
 STARTED = {}                           # pipeline id -> subprocess.Popen started from this page
 
 sys.path.insert(0, str(BASE / "tools"))
-import backup_restore as br  # noqa: E402  -- ALL editions' data backup/restore (per-edition dialog: webapp/static/backup.js)
+try:
+    import backup_restore as br  # noqa: E402  -- ALL editions' data backup/restore (per-edition dialog: webapp/static/backup.js)
+except ImportError:
+    # tools/backup_restore.py lives outside every edition's own git repo (it orchestrates ALL of them, which only makes sense run from
+    # inside the full checkout, next to LASV/, MPXV/, ...) so it is never published -- a bare `git clone` of just this `entry` branch
+    # (which also has no sibling edition folders to back up) does not have it. The rest of the list page still works; only the
+    # "전체 백업 · 복원" panel is disabled, with a clear reason instead of refusing to even start.
+    br = None
 
 JOBS = {}                              # job_id -> {"status": running|done|error, "progress": str, "kind": "backup"|"restore", ...}
 JOBS_LOCK = threading.Lock()
@@ -248,6 +255,8 @@ class Handler(BaseHTTPRequestHandler):
             # Every pathogen panel already has its OWN backup/restore dialog (webapp/static/backup.js) for just that edition; this is the
             # all-editions version: one backup SET (tools/backup_restore.py) across every pipeline plus the shared files (Firebase allow
             # lists, this page's own pipeline list, the dashboards' systemd units).
+            if br is None:
+                return self._json({"error": "이 서버에는 tools/backup_restore.py가 없어 전체 백업·복원을 쓸 수 없습니다 (각 에디션 자체 백업은 그대로 됩니다)."}, 501)
             return self._json({"dir": str(br.bd.default_out()), "editions": sorted(br.editions()), "sets": br.list_sets()})
         if path == "/api/jobs/active":
             with JOBS_LOCK:
@@ -263,6 +272,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):  # noqa: N802
         path = self.path.split("?")[0]
         if path == "/api/backup/create":
+            if br is None:
+                return self._json({"error": "이 서버에는 tools/backup_restore.py가 없어 전체 백업을 쓸 수 없습니다."}, 501)
             try:
                 body = self._read_json_body()
             except json.JSONDecodeError:
@@ -276,6 +287,8 @@ class Handler(BaseHTTPRequestHandler):
                                                                 bool(body.get("fast", False))), daemon=True).start()
             return self._json({"job_id": job_id})
         if path == "/api/backup/restore":
+            if br is None:
+                return self._json({"error": "이 서버에는 tools/backup_restore.py가 없어 전체 복원을 쓸 수 없습니다."}, 501)
             try:
                 body = self._read_json_body()
             except json.JSONDecodeError:
