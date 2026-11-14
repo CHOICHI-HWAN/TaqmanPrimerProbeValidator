@@ -5,6 +5,7 @@
 //!     chichipes dimer -i oligos.fa -o dimer.txt / chichipes hairpin -i oligos.fa -o hairpin.txt
 //!     chichipes reads -i oligos.fa -r reads.fq.gz -o prefix   (or -1 R1 -2 R2; see `chichipes reads -h`)
 //!     chichipes design cover|sweep|shift|tile|labels -a aligned.fa ...   (see `chichipes design -h`)
+//!     chichipes scan / chichipes probedesign   (pipeline engines: one JSON request on stdin, JSON on stdout)
 //!     chichipes version
 
 mod design;
@@ -13,6 +14,7 @@ mod flags;
 mod golog;
 mod hairpin;
 mod json;
+mod pipe;
 mod primers;
 mod reads;
 mod search;
@@ -61,6 +63,8 @@ fn main() {
             "dimer" => return run_dimer(rest),
             "hairpin" => return run_hairpin(rest),
             "reads" => return run_reads(rest),
+            "scan" => exit(pipe::run_scan(rest)),
+            "probedesign" => exit(pipe::run_probedesign(rest)),
             "design" => {
                 if let Err(e) = design::cli::run(rest) {
                     eprintln!("chichipes design: {e}");

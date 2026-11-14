@@ -245,6 +245,15 @@ chichipes design labels --sets primers.tsv --groups set_groups.tsv # 형광·퀀
 
 `6FAM / MGBNFQ`, `SUN`, `CY5` 같은 제조사 표기도 알아봐요.
 
+## 검증 파이프라인용 엔진
+
+`chichipes scan`과 `chichipes probedesign`은 표준입력으로 JSON 요청을 하나 받아 표준출력으로 답을 써요. 파이프라인에
+있던 Go 프로그램 `go/scan`(유전체 전체 스캔)과 `go/probedesign`(규칙 기반 프로브 설계)을 옮긴 것이고, 17개 에디션의
+요청 992건에서 출력이 바이트 단위로 같았어요.
+
+파이프라인은 `scripts/mfe_common.py`에서 `mfeprimer_bin`이 `scan` 명령이 있는 chichipes면 그걸 쓰고, 없으면
+`go/scan`, 그다음 Python 스캔을 써요. 결과는 셋 다 같아요. Snakemake 파일은 바꾸지 않았어요.
+
 ## 배포 (릴리즈)
 
 ```bash

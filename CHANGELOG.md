@@ -1,3 +1,12 @@
+# chichipes v0.7.0 (2026-11-14)
+
+- **`chichipes scan` and `chichipes probedesign`: the validation pipeline's engines in Rust.** They replace the pipeline's
+  separate Go programs `go/scan` (whole-genome brute-force scan: primer pair, probe, raw sites) and `go/probedesign`
+  (rule-based probe design). Same JSON request on stdin, byte-identical JSON answer on stdout: 992 of 992 requests on
+  17 virus editions (all four scan modes, four probe-design parameter sets), about 1.4× faster than Go.
+  The pipeline uses them through `scripts/mfe_common.py` when `mfeprimer_bin` is a chichipes with `scan` and falls
+  back to `go/scan`, then to the Python scan; its Snakemake files are unchanged.
+
 # chichipes v0.6.0 (2026-11-14)
 
 - **The engine is now written in Rust.** Same commands, options and output files; every output is byte-identical to

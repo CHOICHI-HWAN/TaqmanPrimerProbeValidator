@@ -252,6 +252,21 @@ Every format also follows these rules:
 FAM / BHQ2), and a group whose sets share a detection channel if they would run in one tube. Vendor spellings such as
 `6FAM / MGBNFQ`, `SUN` and `CY5` are understood.
 
+## Engines of the validation pipeline
+
+`chichipes scan` and `chichipes probedesign` read one JSON request on stdin and write the answer on stdout, exactly
+as the pipeline's former Go programs `go/scan` and `go/probedesign` did (byte-identical output on 992 requests from
+17 editions).
+
+```bash
+echo '{"mode":"fr","f":"ACGT...","r":"TTGC...","three_prime_n":2,"max_mm":2,"max_size":2000,"genomes":[{"id":"x","seq":"..."}]}' | chichipes scan
+```
+
+Modes: `fr` (best F/R pair per genome), `probe` (best probe window, optionally inside an amplicon), `sites` and
+`multi` (every window with at most `max_mm` mismatches, for one or several oligos). The pipeline calls `scan`
+through `scripts/mfe_common.py` when its `mfeprimer_bin` points at a chichipes that has the command, and falls back
+to `go/scan` and then to the Python scan, which all give the same result.
+
 ## Thermodynamics
 
 SantaLucia & Hicks (2004) nearest-neighbour, mismatch, dangling-end and loop parameters, salt correction after
@@ -267,6 +282,7 @@ truncation, end terms, hairpin search) are written up in [docs/FINDINGS.md](docs
 | `src/spec.rs`, `src/search.rs`, `src/dimer.rs`, `src/hairpin.rs` | primer-pair, probe, dimer and hairpin search and their output files |
 | `src/primers.rs` | IUPAC expansion, 3'-window mismatch variants and their names |
 | `src/reads.rs`, `src/seqio.rs` | sequencing-read check; FASTA / FASTQ (gzip) reading |
+| `src/pipe/` | `scan` and `probedesign`: the validation pipeline's whole-genome scan and rule-based probe design (JSON on stdin and stdout; formerly the pipeline's Go programs `go/scan` and `go/probedesign`) |
 | `src/design/` | primer / probe design: coverage-first, sweep, shift, tile, exclusion, probe formats, labels |
 | `src/golog.rs` | Go's `math.Log`, so every printed value matches the earlier releases bit for bit |
 | `harness/` | the black-box experiments and comparison scripts used to derive and check the rules (need `MFEPRIMER`, `EDITIONS`) |
