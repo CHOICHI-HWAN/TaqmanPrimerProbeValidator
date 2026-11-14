@@ -9,7 +9,8 @@
 [TaqMan Primer/Probe Validator](https://github.com/CHOICHI-HWAN/TaqmanPrimerProbeValidator) 파이프라인의 검색 엔진이며,
 엔진만 필요한 분을 위해 별도 브랜치(`chichipes`)로 배포해요.
 
-- **의존성 없음** — Go 표준 라이브러리만 사용. Linux, macOS, Windows용 단일 실행 파일.
+- **실행 파일 하나** — Rust로 작성(v0.4까지는 Go). Linux, macOS, Windows용 단일 실행 파일이고 따로 설치할 것이 없어요.
+  Linux용은 glibc 2.17 이상(CentOS 7, Ubuntu 14.04 이후)에서 돌아가요.
 - **색인 불필요** — DB를 바로 읽어요. `chichipes index`는 다른 도구가 기대하는 `.fai`/`.json`만 만들어요.
 - **클린룸 구현** — 공개 열역학 논문과 MFEprimer 출력 비교 실험만으로 규칙을 찾았어요. MFEprimer 코드를 쓰거나
   디컴파일하지 않았어요. 자세한 규칙: [docs/FINDINGS.md](docs/FINDINGS.md).
@@ -20,18 +21,18 @@
 `chichipes`를 `PATH`에 넣으면 돼요.
 
 ```bash
-tar xzf chichipes-v0.3.0-linux-amd64.tar.gz
-sudo install chichipes-v0.3.0-linux-amd64/chichipes /usr/local/bin/
+tar xzf chichipes-v0.5.0-linux-amd64.tar.gz
+sudo install chichipes-v0.5.0-linux-amd64/chichipes /usr/local/bin/
 chichipes version
 ```
 
-소스에서 빌드 (Go 1.22 이상):
+소스에서 빌드 ([Rust](https://rustup.rs) stable과 C 링커 `cc` 필요):
 
 ```bash
 git clone -b chichipes https://github.com/CHOICHI-HWAN/TaqmanPrimerProbeValidator.git chichipes
 cd chichipes
-go build -o chichipes ./cmd/chichipes
-go test ./...
+cargo build --release          # -> target/release/chichipes
+cargo test --release           # work/에 MFEprimer 기준 실행 결과가 있으면 대조 테스트도 돌아요
 ```
 
 ## 사용법
@@ -87,6 +88,10 @@ mfeprimer_bin: "/usr/local/bin/chichipes"
 |---|---|---|
 | 축퇴 프라이머쌍 하나 × 유전체 663개 분절 | 18.2초 | 0.1초 |
 | 에볼라바이러스 패널 전체 파이프라인 (유전체 2,900개, 29단계) | 14분 58초 | 16초 |
+
+Rust 엔진(v0.5.0)은 Go 엔진(v0.4.0)과 출력이 바이트 단위로 같고 더 빨라요. 실제 프라이머 검색 182건이 CPU 1개로
+326초 → 70초(CPU 24개로 42초 → 20초), 가장 큰 세트(증폭산물 22만 8천 개)가 0.84초 → 0.29초(메모리 140MB → 57MB),
+롱리드 4,000개 `--indel` 검사가 13.5초 → 0.5초.
 
 ## 이노신 (I)
 
@@ -181,8 +186,9 @@ chichipes design labels --sets primers.tsv --groups set_groups.tsv # 형광·퀀
 - 각 후보가 통과시키는 유전체를 비트로 기록하고, F·R·프로브를 합쳐 통과 수가 최대인 조합을 골라요.
 - 그다음 세트는 앞 세트가 놓친 유전체를 대상으로 다시 골라요(탐욕적 집합 덮기).
 - 패널의 `scripts/redesign_coverage.py`를 그대로 옮긴 것이에요.
-  - LASV S·L의 `hightm` 그리드 240회 실행 모두 설계 결과가 Tm까지 같았어요.
-  - 실행당 2스레드에서 S는 22.7초 → 2.1초, L은 16.6초 → 1.2초예요.
+  - LASV S·L의 `hightm` 그리드 240회 실행 모두 설계 결과가 모든 항목(서열, 커버리지, Tm, GC)까지 같았어요.
+  - 실행당 2스레드에서 S는 22.7초 → 1.4초, L은 16.6초 → 0.8초예요.
+  - Rust 엔진은 이전 Go 엔진과 출력 파일이 같고(LASV에서 cover, shift, tile, 배제, labels), 약 1.5배 빨라요.
 
 **sweep**
 - `design_sweep.py`의 그리드(`wide`, `hightm`, `midtm`, `longoligo`, `mega`, `mega2`, `mega3`)를 그대로 돌려요.
@@ -194,14 +200,14 @@ chichipes design labels --sets primers.tsv --groups set_groups.tsv # 형광·퀀
 - 올리고별로 상위 `--keep`개를 남긴 뒤 전부 조합해서, 바뀐 올리고 종류(F, R, P, FR, FP, RP, FRP)마다 최고 세트를 보고해요.
 - 조건: 각 프라이머의 Tm은 원래 값 ±3 °C 안, 프로브는 프라이머보다 `--probe-above` 이상 높아야 해요.
 - LASV S 사용자 세트 25개 결과:
-  - ±8 bp: 모든 세트에서 `optimize_user_sets.py` 이상이었어요(45초 → 4.9초).
-  - ±50 bp: 7.2초 걸렸고, 여러 세트가 약 0 %에서 55–68 %로 올라갔어요.
+  - ±8 bp: 모든 세트에서 `optimize_user_sets.py` 이상이었어요(45초 → 3.2초).
+  - ±50 bp: 4.9초 걸렸고, 여러 세트가 약 0 %에서 55–68 %로 올라갔어요.
 
 **tile** (전수 탐색)
 - 모든 보존 창, 모든 길이, IUPAC 코드 0~N개를 전부 평가해요.
 - `--step` 간격으로 `[x, x+amp_max)` 구간마다 최고 세트를 찾아요.
 - `tile.tsv`는 게놈을 따라 본 커버리지 지도이고, `tile.panel.tsv`는 함께 쓸 때 가장 많이 덮는 상위 `--top` 세트예요.
-- LASV S 전체(655개 유전체)에 2.2초 걸렸어요.
+- LASV S 전체(655개 유전체)에 1.4초 걸렸어요.
 
 ### 비표적 배제 (`--exclude other.fa`)
 
@@ -242,12 +248,13 @@ chichipes design labels --sets primers.tsv --groups set_groups.tsv # 형광·퀀
 ## 배포 (릴리즈)
 
 ```bash
-git tag chichipes-v0.3.1 && git push origin chichipes-v0.3.1
+git tag chichipes-v0.5.1 && git push origin chichipes-v0.5.1
 ```
 
-`chichipes-v*` 태그를 올리면 `.github/workflows/release.yml`이 테스트 → `scripts/release.sh`로 Linux/macOS/Windows 압축 파일
-빌드 → `SHA256SUMS.txt`와 함께 GitHub Release에 올려요. 로컬에서는 `scripts/release.sh v0.3.1`로 `dist/`에 같은
-파일을 만들 수 있어요.
+`.github/workflows/release.yml`은 `chichipes` 브랜치에 푸시할 때마다 테스트하고 빌드해요(Linux amd64/arm64는
+`cargo zigbuild`로 glibc 2.17 대상, macOS amd64/arm64, Windows amd64; 압축 파일은 워크플로 아티팩트로 남음).
+`chichipes-v*` 태그를 올리면 그 압축 파일을 `SHA256SUMS.txt`와 함께 GitHub Release에 올려요. 로컬에서는
+`cargo build --release && scripts/release.sh v0.5.1 linux amd64 target/release/chichipes`로 `dist/`에 만들어요.
 
 ## 라이선스와 인용
 

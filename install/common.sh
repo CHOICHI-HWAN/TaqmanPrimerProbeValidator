@@ -112,9 +112,9 @@ install_chichipes() {
     CHI="$DIR/bin/chichipes"
     if [ -x "$HERE/chichipes" ] && "$HERE/chichipes" version >/dev/null 2>&1; then
         cp "$HERE/chichipes" "$CHI"
-    elif have go && [ -f "$HERE/go.mod" ]; then
-        info "소스에서 빌드 (go)"
-        (cd "$HERE" && CGO_ENABLED=0 go build -o "$CHI" ./cmd/chichipes) || die "chichipes 빌드 실패"
+    elif have cargo && [ -f "$HERE/Cargo.toml" ]; then
+        info "소스에서 빌드 (cargo)"
+        (cd "$HERE" && cargo build --release -q) && cp "$HERE/target/release/chichipes" "$CHI" || die "chichipes 빌드 실패"
     else
         local oa api tag url tmp
         oa="$(go_os_arch)"

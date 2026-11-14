@@ -1,3 +1,20 @@
+# chichipes v0.6.0 (2026-11-14)
+
+- **The engine is now written in Rust.** Same commands, options and output files; every output is byte-identical to
+  v0.4.0/v0.5.0 on 182 real primer sets, 182 probe and 812 reference searches, dimer/hairpin reports (real and 81,000
+  synthetic oligos, non-default options), inosine oligos, 83 databases (`index`) and simulated reads (`reads`).
+  The MFEprimer reference tests (full-precision binding, dimer and hairpin energies) moved along: `cargo test`.
+- **Faster:** the 182 primer searches 326 s → 70 s on one CPU; the largest set 0.84 s → 0.29 s and 140 → 57 MB;
+  4,000 long reads with `--indel` 13.5 s → 0.5 s (read batches now also close at 256 kb, so long-read files use every
+  thread).
+- `reads`: hits are taken in oligo order, so when both mates of a pair carry an oligo with equally many mismatches the
+  first mate's hit is always the one counted (Go picked either), and `.hits.tsv` lines come in input order.
+- Linux release builds need glibc 2.17 or newer. Building from source needs Rust (`cargo build --release`).
+- **`chichipes design` in Rust as well:** the same output files as the Go v0.5.0 engine (cover, shift, tile, exclusion,
+  labels on LASV) and about 1.5× faster; sweep results equal the Python engine's in every field on 240 LASV runs.
+- `design`: Tm, GC and coverage % are rounded like Python's `round()` (ties to even), so sweep results match the
+  Python engine field for field.
+
 # chichipes v0.5.0 (2026-11-14)
 
 - **`chichipes design`: primer and probe design.**

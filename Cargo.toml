@@ -1,0 +1,16 @@
+[package]
+name = "chichipes"
+version = "0.6.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+description = "Clean-room, MFEprimer-compatible primer/probe search engine"
+
+[dependencies]
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+flate2 = "1"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
