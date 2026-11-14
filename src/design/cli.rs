@@ -37,6 +37,7 @@ Common options (cover, shift, tile):
   --exclude nontarget.fa      reject sets that would amplify a non-target sequence; penalise oligos that bind one
   --top N                     designs to report (3)
   --cpu N                     worker threads
+  --dtm 3                     shift: primer variants keep their Tm within this of the original
   --large-genome-prefilter    skip primer windows whose GC / rough Tm cannot pass (> 20,000 windows per length)
   --json                      cover: the designs as JSON (status, n, candidate counts, designs, message)
 ";
@@ -71,6 +72,7 @@ fn flags(name: &str) -> FlagSet {
     f.int("max-amb", -1, "shift: IUPAC codes a variant may have (default --ambig / --probe-ambig)");
     f.int("jobs", (cpu / 4).max(1), "sweep: runs in parallel");
     f.boolean("large-genome-prefilter", "only evaluate primer windows whose consensus GC / rough Tm can pass, when a length has > 20,000 windows (the MPXV / VARV pipelines' engine)");
+    f.float("dtm", 3.0, "shift: a primer variant's Tm stays within this of the original (C)");
     f.boolean("json", "cover: print {status, n, nf, nr, np, designs, message} as JSON (the pipeline's redesign_coverage.py reads it)");
     f.boolean_d("qc", true, "check the chosen sets with chichipes thermodynamics (Tm 2004, hairpin, dimer)");
     f
@@ -378,7 +380,12 @@ fn apply(c: &Combo, p: &mut Params) {
             ("pass_mm", GVal::I(x)) => p.pass_mm = *x as usize,
             ("tp_n", GVal::I(x)) => p.tp_n = *x as usize,
             ("len_primer_max", GVal::I(x)) => p.len_primer.1 = *x as usize,
-            ("len_probe_max", GVal::I(x)) => p.len_probe.1 = *x as usize,
+            ("len_probe_max", GVal::I(x)) => {
+                // as --probe-len: the grid's probe lengths replace the probe format's limits (design_sweep.py has none)
+                p.len_probe.1 = *x as usize;
+                p.probe.min_len = p.len_probe.0;
+                p.probe.max_len = p.len_probe.1;
+            }
             ("amp", GVal::A(a, b)) => p.amp = (*a, *b),
             ("primer_tm", GVal::F(a, b)) => p.primer_tm = (*a, *b),
             ("probe_above", GVal::F(a, b)) => p.probe_above = (*a, *b),
@@ -570,7 +577,7 @@ fn shift_cmd(f: &FlagSet) -> Result<(), String> {
         keep: f.get_int("keep").max(1) as usize,
         primer_amb: if ma >= 0 { ma as usize } else { p.ambig },
         probe_amb: if ma >= 0 { ma as usize } else { p.probe_ambig.max(3) },
-        dtm: 3.0,
+        dtm: f.get_float("dtm"),
     };
     let mut w = out_writer(&f.get_str("o"))?;
     let io = |e: std::io::Error| e.to_string();

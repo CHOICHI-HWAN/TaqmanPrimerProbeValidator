@@ -1,3 +1,10 @@
+# chichipes v0.8.1 (2026-11-14)
+
+- `design sweep`: the grids' `len_probe_max` (e.g. 36, 42) now lifts the probe format's 30-nt limit, as `--probe-len`
+  does since v0.8.0; mega3 runs on LASV L with 42-nt probes now equal the Python engine's (4,219 of 4,219 compared).
+- `design shift --dtm X`: how far a primer variant's Tm may move from the original (was fixed at 3 °C). The pipeline's
+  `optimize_user_sets.py` now runs its search through `design shift`.
+
 # chichipes v0.8.0 (2026-11-14)
 
 - `design cover --json`: the designs as JSON (status, genome count, candidate counts, designs, message). The pipeline's
