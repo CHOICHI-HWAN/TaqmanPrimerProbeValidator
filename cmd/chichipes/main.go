@@ -3,6 +3,7 @@
 //	chichipes -d db.fa -i primers.fa -o out.txt [--fasta] [--virus] [--misMatch 2] [--cpu 8] [-t 30] [-T 100] [-s 0] [-S 2000]
 //	chichipes index -i db.fa        (writes the .fai/.json the pipeline expects; the search needs no index)
 //	chichipes dimer -i oligos.fa -o dimer.txt / chichipes hairpin -i oligos.fa -o hairpin.txt
+//	chichipes reads -i oligos.fa -r reads.fq.gz -o prefix   (or -1 R1 -2 R2; see `chichipes reads -h`)
 //	chichipes version
 package main
 
@@ -38,6 +39,9 @@ func main() {
 			return
 		case "dimer":
 			runDimer(os.Args[2:])
+			return
+		case "reads":
+			runReads(os.Args[2:])
 			return
 		case "hairpin":
 			runHairpin(os.Args[2:])

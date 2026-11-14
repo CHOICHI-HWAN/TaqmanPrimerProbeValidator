@@ -24,8 +24,8 @@ Download the archive for your platform from the
 unpack it and put `chichipes` on your `PATH`:
 
 ```bash
-tar xzf chichipes-v0.2.0-linux-amd64.tar.gz
-sudo install chichipes-v0.2.0-linux-amd64/chichipes /usr/local/bin/
+tar xzf chichipes-v0.3.0-linux-amd64.tar.gz
+sudo install chichipes-v0.3.0-linux-amd64/chichipes /usr/local/bin/
 chichipes version
 ```
 
@@ -49,6 +49,7 @@ The options are MFEprimer's, so existing scripts only need the binary path chang
 | `chichipes dimer -i oligos.fa -o dimer.txt` | `mfeprimer dimer` | Primer–primer / primer–probe dimers |
 | `chichipes hairpin -i oligos.fa -o hairpin.txt` | `mfeprimer hairpin` | Hairpins |
 | `chichipes index -i db.fa` | `mfeprimer index` | Writes `db.fa.fai` / `db.fa.json` (the search itself needs no index) |
+| `chichipes reads -i oligos.fa -r reads.fastq.gz -o out` | — | Which sequencing reads carry each primer / probe (below) |
 | `chichipes version` | `mfeprimer version` | Version |
 
 Degenerate (IUPAC) primers are expanded, and up to `--misMatch` mismatches in the 3'-end window are tolerated, exactly
@@ -120,6 +121,33 @@ an `N`, or at a dangling end) adds nothing beyond its salt term, the convention 
 MFEprimer does not accept `I`, so these results have no MFEprimer counterpart; oligos without `I` give byte-identical
 results to before.
 
+## Checking sequencing reads (FASTQ)
+
+`chichipes reads` uses FASTQ files the way the primer search uses a genome FASTA: it reports which reads carry each
+primer / probe. Single-end, paired-end and long reads; FASTQ or FASTA, gzip or not.
+
+```bash
+chichipes reads -i oligos.fa -r sample.fastq.gz -o sample                      # single-end / long reads
+chichipes reads -i oligos.fa -1 S_R1.fastq.gz -2 S_R2.fastq.gz -o sample        # paired-end (a pair counts once)
+chichipes reads -i oligos.fa -r ont.fastq.gz -o ont -m 3 --indel                # error-prone long reads (ONT, PacBio CLR)
+```
+
+Name the oligos `SET_F`, `SET_R`, `SET_P` to also get per-set counts.
+
+| File | Contents |
+|---|---|
+| `<prefix>.summary.tsv` | per oligo: reads (or read pairs) carrying it, %, how many with 0, 1, 2… mismatches, strand |
+| `<prefix>.sets.tsv` | per set: reads with F, R, P, with F and R, with F, R and P |
+| `<prefix>.positions.tsv` | per oligo position: the bases the reads have there (A/C/G/T/other/deleted) and % matching — shows which position a variant hits |
+| `<prefix>.hits.tsv` | with `--hits`: one line per read and oligo (position, strand, mismatches, read bases) |
+
+`-m` is mismatches per oligo (substitutions; with `--indel`, edits). The whole oligo must lie inside the read. IUPAC
+codes and inosine match every base they stand for; a read `N` is a mismatch. Each oligo is cut into m+1 or more
+disjoint exact seeds (at least one is untouched when there are at most m errors), and every seed hit is verified
+over the whole oligo, so nothing within `-m` is missed: on simulated Illumina single-end (20,000 reads), paired-end
+(10,000 pairs) and ONT-like long reads (400 reads, 4 % errors, `--indel`) the reads found were exactly those a
+brute-force check finds. About 1 million 150-bp gzipped reads in 2 s on 16 threads.
+
 ## Thermodynamics
 
 SantaLucia & Hicks (2004) nearest-neighbour, mismatch, dangling-end and loop parameters, salt correction after
@@ -141,11 +169,11 @@ truncation, end terms, hairpin search) are written up in [docs/FINDINGS.md](docs
 ## Releasing
 
 ```bash
-git tag chichipes-v0.2.1 && git push origin chichipes-v0.2.1
+git tag chichipes-v0.3.1 && git push origin chichipes-v0.3.1
 ```
 
 Pushing a `chichipes-v*` tag runs `.github/workflows/release.yml`, which tests, builds Linux / macOS / Windows archives with
-`scripts/release.sh` and attaches them with `SHA256SUMS.txt` to a GitHub Release. `scripts/release.sh v0.2.1` builds
+`scripts/release.sh` and attaches them with `SHA256SUMS.txt` to a GitHub Release. `scripts/release.sh v0.3.1` builds
 the same archives locally into `dist/`.
 
 ## License and citation

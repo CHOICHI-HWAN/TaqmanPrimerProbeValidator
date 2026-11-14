@@ -1,3 +1,10 @@
+# chichipes v0.3.0 (2026-11-14)
+
+- **`chichipes reads`**: checks sequencing reads (FASTQ or FASTA, gzip or not; single-end, paired-end with `-1/-2`,
+  long reads, `--indel` for ONT-type errors) for the primers and probes — reads carrying each oligo and how many
+  mismatches, per-set counts (F, R, P, F+R, F+R+P), and the bases the reads have at every oligo position. Exact seeds +
+  full verification: matches a brute-force check on simulated Illumina SE/PE and ONT reads.
+
 # chichipes v0.2.0 (2026-11-14)
 
 - **Inosine (`I`) in oligos.** One base that pairs with A, C, G and T, never expanded into variants and never a

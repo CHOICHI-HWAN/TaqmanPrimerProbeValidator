@@ -20,8 +20,8 @@
 `chichipes`를 `PATH`에 넣으면 돼요.
 
 ```bash
-tar xzf chichipes-v0.2.0-linux-amd64.tar.gz
-sudo install chichipes-v0.2.0-linux-amd64/chichipes /usr/local/bin/
+tar xzf chichipes-v0.3.0-linux-amd64.tar.gz
+sudo install chichipes-v0.3.0-linux-amd64/chichipes /usr/local/bin/
 chichipes version
 ```
 
@@ -45,6 +45,7 @@ go test ./...
 | `chichipes dimer -i oligos.fa -o dimer.txt` | `mfeprimer dimer` | 프라이머·프로브 다이머 |
 | `chichipes hairpin -i oligos.fa -o hairpin.txt` | `mfeprimer hairpin` | 헤어핀 |
 | `chichipes index -i db.fa` | `mfeprimer index` | `db.fa.fai` / `db.fa.json` 작성 (검색엔 색인 불필요) |
+| `chichipes reads -i oligos.fa -r reads.fastq.gz -o out` | — | 시퀀싱 리드에 프라이머·프로브가 있는지 (아래) |
 | `chichipes version` | `mfeprimer version` | 버전 |
 
 출력 파일은 MFEprimer와 이름·형식이 같아요: `out.txt`(`Coverage …` 줄 포함 보고서), `out.txt.spec.tsv`,
@@ -104,14 +105,38 @@ mfeprimer_bin: "/usr/local/bin/chichipes"
 이노신도 찾아요. 다이머·헤어핀 탐지에서는 I·C와 I·A를 짝으로 셉니다. MFEprimer는 `I`를 받지 않아 비교 대상이 없고,
 `I`가 없는 올리고는 이전과 결과가 바이트 단위로 같아요.
 
+## 시퀀싱 리드 검사 (FASTQ)
+
+`chichipes reads`는 유전체 FASTA를 DB로 쓰듯 FASTQ를 DB로 써서, 어떤 리드에 각 프라이머·프로브가 들어 있는지 알려줘요.
+single-end, paired-end, 롱리드 모두 되고, FASTQ/FASTA, gzip 여부는 자동으로 알아봐요.
+
+```bash
+chichipes reads -i oligos.fa -r sample.fastq.gz -o sample                      # single-end / 롱리드
+chichipes reads -i oligos.fa -1 S_R1.fastq.gz -2 S_R2.fastq.gz -o sample        # paired-end (한 쌍을 한 번으로 셈)
+chichipes reads -i oligos.fa -r ont.fastq.gz -o ont -m 3 --indel                # 오류가 많은 롱리드 (ONT, PacBio CLR)
+```
+
+올리고 이름을 `SET_F`, `SET_R`, `SET_P`로 주면 세트별 집계도 나와요.
+
+| 파일 | 내용 |
+|---|---|
+| `<prefix>.summary.tsv` | 올리고별: 들어 있는 리드(쌍) 수, %, 미스매치 0·1·2…개별 수, 가닥 |
+| `<prefix>.sets.tsv` | 세트별: F, R, P가 있는 리드, F와 R 모두, F·R·P 모두 |
+| `<prefix>.positions.tsv` | 올리고 위치별: 리드가 그 자리에 가진 염기(A/C/G/T/기타/결실)와 일치율 — 변이가 어느 자리에 있는지 보여줌 |
+| `<prefix>.hits.tsv` | `--hits`일 때: 리드·올리고마다 한 줄 (위치, 가닥, 미스매치, 리드 염기) |
+
+`-m`은 올리고당 미스매치 수(치환; `--indel`이면 편집 거리)예요. 올리고 전체가 리드 안에 있어야 하고, IUPAC 코드와 이노신은
+해당 염기 모두와 맞고, 리드의 `N`은 미스매치예요. 시뮬레이션한 Illumina single-end 2만, paired-end 1만 쌍, ONT형 롱리드
+400개(오류 4 %, `--indel`)에서 찾은 리드가 전수 검사 결과와 정확히 같았어요. gzip 150 bp 리드 100만 개에 약 2초(16 스레드).
+
 ## 배포 (릴리즈)
 
 ```bash
-git tag chichipes-v0.2.1 && git push origin chichipes-v0.2.1
+git tag chichipes-v0.3.1 && git push origin chichipes-v0.3.1
 ```
 
 `chichipes-v*` 태그를 올리면 `.github/workflows/release.yml`이 테스트 → `scripts/release.sh`로 Linux/macOS/Windows 압축 파일
-빌드 → `SHA256SUMS.txt`와 함께 GitHub Release에 올려요. 로컬에서는 `scripts/release.sh v0.2.1`로 `dist/`에 같은
+빌드 → `SHA256SUMS.txt`와 함께 GitHub Release에 올려요. 로컬에서는 `scripts/release.sh v0.3.1`로 `dist/`에 같은
 파일을 만들 수 있어요.
 
 ## 라이선스와 인용
