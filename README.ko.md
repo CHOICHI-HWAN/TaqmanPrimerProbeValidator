@@ -105,6 +105,34 @@ mfeprimer_bin: "/usr/local/bin/chichipes"
 이노신도 찾아요. 다이머·헤어핀 탐지에서는 I·C와 I·A를 짝으로 셉니다. MFEprimer는 `I`를 받지 않아 비교 대상이 없고,
 `I`가 없는 올리고는 이전과 결과가 바이트 단위로 같아요.
 
+## 대시보드(UI) 설치
+
+`setup.sh` 하나로 chichipes를 TaqMan Primer/Probe Validator 전체로 만들 수 있어요. 이 저장소의 병원체 대시보드(패널)를
+설치하고, chichipes를 쓰도록 맞추고, 유전체 데이터를 받고, 화면을 띄워요.
+
+```bash
+git clone -b chichipes https://github.com/CHOICHI-HWAN/TaqmanPrimerProbeValidator.git chichipes
+cd chichipes
+./setup.sh                          # 패널을 고르고 설치 → http://localhost:8760
+./setup.sh --panels lasv,ebov --yes # 묻지 않고 설치
+```
+
+| 컴퓨터 | 명령 | 하는 일 |
+|---|---|---|
+| Ubuntu / Debian / 기타 Linux | `./setup.sh` | mamba 환경 (없으면 Miniforge 설치) |
+| macOS (Apple Silicon·Intel) | `./setup.sh` | mamba 환경, `--backend brew`면 Homebrew |
+| Windows | PowerShell에서 `.\setup.ps1` | Docker Desktop (기본), `.\setup.ps1 -Wsl`이면 WSL2 Ubuntu 안에서 `setup.sh` 실행 |
+| Docker가 있는 모든 컴퓨터 | `./setup.sh --backend docker` | 컨테이너 하나에서 실행, 패널·데이터는 설치 폴더에 저장 |
+
+Snakemake·MAFFT·htslib은 Windows판이 없어서 Windows에서는 WSL2나 Docker로 실행해요. 둘 다 BIOS에서 가상화가 켜져
+있어야 하고, 처음 설치할 때 관리자 권한이 필요해요.
+
+주요 옵션: `--panels 목록|all|everything` (`all`은 대용량인 mpox·인플루엔자 제외), `--dir`(기본 `~/chichipes-ui`),
+`--port-base`(목록 화면 포트, 기본 8760), `--no-data`, `--primers 파일`(파이프라인의 `tools/export_primer_sets.py`로
+내보낸 세트), `--update`. 설치 폴더에 `start.sh`, `stop.sh`, `fetch_data.sh`가 생기고, 데이터는 백그라운드로 받아요
+(`logs/data_status.tsv`). 공개 패널에는 프라이머 세트가 없으니 각 패널의 프라이머 세트 화면에서 넣거나 `--primers`로
+가져오세요.
+
 ## 시퀀싱 리드 검사 (FASTQ)
 
 `chichipes reads`는 유전체 FASTA를 DB로 쓰듯 FASTQ를 DB로 써서, 어떤 리드에 각 프라이머·프로브가 들어 있는지 알려줘요.

@@ -15,6 +15,7 @@ for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64; d
   CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" go build -trimpath -ldflags "-s -w -X main.Version=${VERSION}" \
     -o "dist/$name/$exe" ./cmd/chichipes
   cp README.md README.ko.md LICENSE THIRD_PARTY_NOTICES.md "dist/$name/"
+  cp -r setup.sh setup.ps1 install .gitattributes "dist/$name/"  # the UI installer: ./setup.sh next to the binary
   if [ "$os" = windows ]; then
     (cd dist && zip -qr "$name.zip" "$name")
   else

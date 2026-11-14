@@ -1,0 +1,21 @@
+# id	data_size	heavy	note
+# data_size: disk the panel's data/ folder used on the reference server (2026-11-14). heavy=yes: left out of
+# "--panels all"; name it to install it.
+lasv	140 MB	no
+nipah	50 MB	no
+ebov	1.3 GB	no
+sudv	60 MB	no
+bdbv	390 MB	no
+restv	16 MB	no
+tafv	6 MB	no
+marv	60 MB	no
+cchfv	240 MB	no
+mpxv	72 GB	yes	whole-genome mpox: very large download and alignment
+rvfv	60 MB	no
+flua	800 MB	yes	influenza A: on hold (data source too large)
+gtov	9 MB	no
+chpv	5 MB	no
+junv	10 MB	no
+sabv	4 MB	no
+machv	11 MB	no
+varv	320 MB	no

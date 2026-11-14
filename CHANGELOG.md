@@ -1,3 +1,11 @@
+# chichipes v0.4.0 (2026-11-14)
+
+- **`setup.sh`: one-command dashboard install.** Installs the chosen pathogen panels and the front page from this
+  repository, points them at chichipes, downloads their data in the background and starts them; `start.sh`,
+  `stop.sh`, `fetch_data.sh` in the install folder. Backends: mamba (default; Miniforge installed when missing),
+  Homebrew, Docker. Per-OS scripts in `install/` (Ubuntu/Debian/WSL, macOS, Windows), `setup.ps1` for PowerShell
+  (WSL2 or Docker Desktop). Release archives now include the installer.
+
 # chichipes v0.3.0 (2026-11-14)
 
 - **`chichipes reads`**: checks sequencing reads (FASTQ or FASTA, gzip or not; single-end, paired-end with `-1/-2`,

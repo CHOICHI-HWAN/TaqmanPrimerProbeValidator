@@ -121,6 +121,35 @@ an `N`, or at a dangling end) adds nothing beyond its salt term, the convention 
 MFEprimer does not accept `I`, so these results have no MFEprimer counterpart; oligos without `I` give byte-identical
 results to before.
 
+## Install the dashboards (UI)
+
+`setup.sh` turns chichipes into the full TaqMan Primer/Probe Validator: it installs the pathogen dashboards (panels)
+from this repository, points them at chichipes, downloads their genome data and starts them.
+
+```bash
+git clone -b chichipes https://github.com/CHOICHI-HWAN/TaqmanPrimerProbeValidator.git chichipes
+cd chichipes
+./setup.sh                          # asks which panels; then open http://localhost:8760
+./setup.sh --panels lasv,ebov --yes # no questions
+```
+
+| Your computer | Command | What happens |
+|---|---|---|
+| Ubuntu / Debian / other Linux | `./setup.sh` | mamba environment (Miniforge installed if missing) |
+| macOS (Apple Silicon or Intel) | `./setup.sh` | mamba environment; `--backend brew` uses Homebrew instead |
+| Windows | `.\setup.ps1` in PowerShell | Docker Desktop (default); `.\setup.ps1 -Wsl` runs `setup.sh` inside WSL2 Ubuntu instead |
+| Any, with Docker | `./setup.sh --backend docker` | everything in one container; panels and data stay in the install folder |
+
+Snakemake, MAFFT and htslib have no Windows builds, so on Windows the panels run in WSL2 or Docker (both need
+virtualisation enabled in the BIOS and administrator rights the first time).
+
+Main options: `--panels LIST|all|everything` (`all` leaves out the very large mpox and influenza panels),
+`--dir` (default `~/chichipes-ui`), `--port-base` (front page port, default 8760), `--no-data`,
+`--primers FILE` (primer sets exported with the pipeline's `tools/export_primer_sets.py`), `--update`. The install
+folder gets `start.sh`, `stop.sh` and `fetch_data.sh`; data download runs in the background
+(`logs/data_status.tsv`). The public panels contain no primer sets: add yours on each panel's primer-set page or
+with `--primers`.
+
 ## Checking sequencing reads (FASTQ)
 
 `chichipes reads` uses FASTQ files the way the primer search uses a genome FASTA: it reports which reads carry each

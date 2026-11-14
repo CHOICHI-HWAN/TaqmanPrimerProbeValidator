@@ -1,0 +1,24 @@
+# Same tools as environment.yml, without the exact Linux build versions: for macOS (and any platform where the
+# pinned versions are not published). setup.sh picks this file on macOS.
+name: chichipes_ui
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - python=3.12
+  - snakemake>=9.27
+  - mafft
+  - htslib
+  - zstd
+  - pyyaml
+  - git
+  - pip
+  - pip:
+      - scikit-allel==1.3.13
+      - numcodecs
+      - dask
+      - pixy @ git+https://github.com/ksamuk/pixy.git@21c7c33dea315a035d6aff86caba018ab668864a
+      - pytest
+      - primer3-py==2.3.1
+      - varvamp==1.3.2
