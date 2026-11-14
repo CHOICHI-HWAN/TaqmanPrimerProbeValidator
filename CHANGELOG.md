@@ -1,15 +1,15 @@
 # chichipes v0.5.0 (2026-11-14)
 
-- **The engine is now written in Rust.** Same commands, options and output files; every output is byte-identical to
-  v0.4.0 on 182 real primer sets, 182 probe and 812 reference searches, dimer/hairpin reports (real and 81,000
-  synthetic oligos, non-default options), inosine oligos, 83 databases (`index`) and simulated reads (`reads`).
-  The MFEprimer reference tests (full-precision binding, dimer and hairpin energies) moved along: `cargo test`.
-- **Faster:** the 182 primer searches 326 s → 70 s on one CPU; the largest set 0.84 s → 0.29 s and 140 → 57 MB;
-  4,000 long reads with `--indel` 13.5 s → 0.5 s (read batches now also close at 256 kb, so long-read files use every
-  thread).
-- `reads`: hits are taken in oligo order, so when both mates of a pair carry an oligo with equally many mismatches the
-  first mate's hit is always the one counted (Go picked either), and `.hits.tsv` lines come in input order.
-- Linux release builds need glibc 2.17 or newer. Building from source needs Rust (`cargo build --release`).
+- **`chichipes design`: primer and probe design.**
+  - `cover`: coverage-first design, ported from the panels' Python engine. All 240 LASV `hightm` runs gave identical
+    designs, about 10–25× faster per run.
+  - `sweep`: the `design_sweep.py` grids, with compatible `results.jsonl`.
+  - `shift`: exhaustive ±N bp / length / IUPAC variants of existing sets.
+  - `tile`: a genome-wide sliding-window coverage map plus a greedy panel.
+  - `labels`: reporter / quencher and channel checks.
+- `--exclude`: non-target product check, and veto of cross-reactive sets in `cover`.
+- `--probe-chem linear|zen|mgb`: probe length limits and Tm offset.
+- Each set is checked with chichipes Tm, hairpin and 3'-extendable dimers.
 
 # chichipes v0.4.0 (2026-11-14)
 

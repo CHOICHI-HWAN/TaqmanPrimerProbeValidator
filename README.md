@@ -1,6 +1,6 @@
 # chichipes
 
-![License](https://img.shields.io/badge/license-GPL--3.0--or--later-blue) ![Rust](https://img.shields.io/badge/rust-stable-B7410E)
+![License](https://img.shields.io/badge/license-GPL--3.0--or--later-blue) ![Go](https://img.shields.io/badge/go-%E2%89%A51.22-00ADD8) ![Dependencies](https://img.shields.io/badge/dependencies-none-brightgreen)
 
 [한국어](README.ko.md)
 
@@ -12,8 +12,7 @@ files, same numbers — usually tens to hundreds of times faster.
 It is the search engine of the [TaqMan Primer/Probe Validator](https://github.com/CHOICHI-HWAN/TaqmanPrimerProbeValidator)
 pipeline, published on its own branch for anyone who only wants the engine.
 
-- **One executable.** Written in Rust (v0.4 and earlier: Go); a single file for Linux, macOS and Windows, nothing to
-  install alongside. The Linux build runs on glibc 2.17 or newer (CentOS 7 / Ubuntu 14.04 onwards).
+- **No dependencies.** Pure Go standard library; one static executable for Linux, macOS and Windows.
 - **No index.** Databases are read directly; `chichipes index` only writes the `.fai`/`.json` files tools expect.
 - **Clean-room.** Built from published thermodynamics and black-box comparison of MFEprimer's outputs; no MFEprimer
   code was used or decompiled. See [docs/FINDINGS.md](docs/FINDINGS.md).
@@ -25,18 +24,18 @@ Download the archive for your platform from the
 unpack it and put `chichipes` on your `PATH`:
 
 ```bash
-tar xzf chichipes-v0.5.0-linux-amd64.tar.gz
-sudo install chichipes-v0.5.0-linux-amd64/chichipes /usr/local/bin/
+tar xzf chichipes-v0.3.0-linux-amd64.tar.gz
+sudo install chichipes-v0.3.0-linux-amd64/chichipes /usr/local/bin/
 chichipes version
 ```
 
-Or build from source ([Rust](https://rustup.rs) stable and a C linker, `cc`):
+Or build from source (Go 1.22 or newer):
 
 ```bash
 git clone -b chichipes https://github.com/CHOICHI-HWAN/TaqmanPrimerProbeValidator.git chichipes
 cd chichipes
-cargo build --release          # -> target/release/chichipes
-cargo test --release           # the MFEprimer reference tests run when work/ holds the reference runs
+go build -o chichipes ./cmd/chichipes
+go test ./...
 ```
 
 ## Usage
@@ -102,11 +101,6 @@ oligos. Non-default buffer conditions and non-default hairpin `--maxl`/`--minl` 
 |---|---|---|
 | One degenerate primer pair against a 663-genome segment | 18.2 s | 0.1 s |
 | Whole pipeline run of an Ebola-virus panel (2,900 genomes, 29 steps) | 14 min 58 s | 16 s |
-
-The Rust engine (v0.5.0) gives byte-identical output to the Go engine (v0.4.0) and is faster again: the 182 real
-primer searches take 70 s instead of 326 s on one CPU (20 s instead of 42 s on 24), the largest set (228,000
-amplicons) 0.29 s instead of 0.84 s with 57 MB instead of 140 MB, and 4,000 long reads with `--indel` 0.5 s
-instead of 13.5 s.
 
 ## Inosine (I)
 
@@ -183,6 +177,73 @@ over the whole oligo, so nothing within `-m` is missed: on simulated Illumina si
 (10,000 pairs) and ONT-like long reads (400 reads, 4 % errors, `--indel`) the reads found were exactly those a
 brute-force check finds. About 1 million 150-bp gzipped reads in 2 s on 16 threads.
 
+## Designing primers and probes
+
+`chichipes design` picks F / R / probe from a lineage alignment (aligned FASTA, e.g. from MAFFT) so that the genomes
+that PASS are as many as possible. A genome passes when each primer has at most `--mm` mismatches with its last
+`--tp` bases at the 3' end intact, and the probe matches perfectly. IUPAC codes count as matches for every base they
+stand for.
+
+```bash
+chichipes design cover -a aligned.fa --top 3                       # coverage-first panel
+chichipes design sweep -a aligned.fa --grid mega -o results.jsonl  # thousands of parameter combinations
+chichipes design shift -a aligned.fa --sets primers.tsv --shift 50 # improve existing sets
+chichipes design tile  -a aligned.fa --step 10                     # coverage map along the genome
+chichipes design labels --sets primers.tsv --groups set_groups.tsv # reporter / quencher check
+```
+
+- **cover**: for every window of the alignment, the consensus gets up to `--ambig` two-base IUPAC codes, placed
+  where they add the most passing genomes. The genomes each candidate passes are kept as a bit set. F, R and probe
+  are combined to pass the most genomes, and further sets are chosen for the genomes the earlier ones miss (greedy
+  set cover).
+  - This is a port of the panels' `scripts/redesign_coverage.py`. On LASV S and L, all 240 runs of the `hightm` grid
+    gave identical designs, Tm included.
+  - About 10–25× faster per run: 2.1 s instead of 22.7 s (S), 1.2 s instead of 16.6 s (L), at 2 threads per run.
+- **sweep**: runs the grids of `design_sweep.py` (`wide`, `hightm`, `midtm`, `longoligo`, `mega`, `mega2`,
+  `mega3`). It writes the same `results.jsonl` lines and skips runs already in the file.
+- **shift** (brute force): moves each oligo of a set up to `--shift` bases either way, in `--step` steps. It tries every
+  length of the length ranges and 0 to N IUPAC codes, and scores every variant against every genome. It keeps the
+  `--keep` best of each oligo, combines all of them, and reports the best set for each change class (F, R, P, FR,
+  FP, RP, FRP).
+  - Each primer stays within 3 °C of its original Tm, and the probe at least `--probe-above` above the primers.
+  - On the 25 user sets of LASV S, ±8 bases was never worse than `optimize_user_sets.py` (4.9 s instead of 45 s).
+    ±50 bases took 7.2 s and raised several sets from about 0 % to 55–68 %.
+- **tile** (brute force): evaluates every conserved window of every length with 0 to N IUPAC codes. For each region
+  `[x, x + amp_max)`, with x stepping by `--step`, it finds the best set. `tile.tsv` is the resulting coverage map;
+  `tile.panel.tsv` holds the `--top` sets that together cover the most genomes. On the whole LASV S alignment
+  (655 genomes) this took 2.2 s.
+- **Non-target exclusion** (`--exclude other.fa`): other viruses, the host, and so on.
+  - With `cover`, a set whose primers would amplify a non-target sequence with the probe inside is skipped, and the
+    next best set is taken.
+  - Every reported set gets an `off_target` column: products, products with probe, and oligo hits.
+  - A primer binds when it has at most `--mm` mismatches with its 3' bases intact; the search uses the read
+    search's exact seeds.
+  - Checked against 129 New World arenavirus S genomes (no hits) and against LASV itself (every product found).
+- **Check of each set**: chichipes Tm (SantaLucia & Hicks 2004, spec-search buffer), the most stable hairpin, and
+  dimers. Only dimers at a primer's 3' end count as extendable, because the probe's 3' end carries the quencher.
+  Each set also gets a varVAMP-like penalty (lower is better) and flags.
+
+### Fluorophore and quencher
+
+`--probe-chem` sets the probe format:
+
+| Format | Example | Probe length | Probe Tm offset |
+|---|---|---|---|
+| `linear` (default) | FAM / BHQ1, FAM / TAMRA | ≤ 30 nt (quenching needs the dye and quencher close) | 0 |
+| `zen` | FAM / ZEN / IBFQ (internal quencher) | ≤ 40 nt | 0 |
+| `mgb` | FAM / MGB-NFQ | 13–22 nt | +10 °C (rough; set `--probe-tm-offset` from the vendor's Tm of a probe you use) |
+
+Every format also follows these rules:
+
+- No G at the probe's 5' end, because it quenches the reporter.
+- No run of four or more identical bases.
+- The probe goes on the strand with more C than G; coverage does not change, because a perfect-match probe passes on
+  either strand.
+
+`design labels` reads the `fluorophore` column. It flags a quencher that does not cover its reporter (for example
+FAM / BHQ2), and a group whose sets share a detection channel if they would run in one tube. Vendor spellings such as
+`6FAM / MGBNFQ`, `SUN` and `CY5` are understood.
+
 ## Thermodynamics
 
 SantaLucia & Hicks (2004) nearest-neighbour, mismatch, dangling-end and loop parameters, salt correction after
@@ -193,26 +254,24 @@ truncation, end terms, hairpin search) are written up in [docs/FINDINGS.md](docs
 
 | Path | Contents |
 |---|---|
-| `src/main.rs`, `src/flags.rs` | command line (MFEprimer's / Go `flag` syntax) |
-| `src/thermo.rs`, `data/hairpin_tables.json` | thermodynamics: perfect duplex, binding to a target, dimer and hairpin energies |
-| `src/spec.rs`, `src/search.rs`, `src/dimer.rs`, `src/hairpin.rs` | primer-pair, probe, dimer and hairpin search and their output files |
-| `src/primers.rs` | IUPAC expansion, 3'-window mismatch variants and their names |
-| `src/reads.rs`, `src/seqio.rs` | sequencing-read check; FASTA / FASTQ (gzip) reading |
-| `src/golog.rs` | Go's `math.Log`, so every printed value matches the earlier releases bit for bit |
+| `cmd/chichipes/` | command line |
+| `internal/thermo/` | thermodynamics: perfect duplex, binding to a target, dimer and hairpin energies |
+| `internal/spec/` | primer-pair, probe, dimer and hairpin search and their output files |
+| `internal/design/` | primer / probe design: coverage-first, sweep, shift, tile, exclusion, probe formats |
+| `internal/primers/` | IUPAC expansion, 3'-window mismatch variants and their names |
 | `harness/` | the black-box experiments and comparison scripts used to derive and check the rules (need `MFEPRIMER`, `EDITIONS`) |
 | `docs/` | `FINDINGS.md` (rules, English), `OUTPUT_FORMAT.md` (output formats, Korean) |
-| `scripts/release.sh` | packs one built binary into a release archive |
+| `scripts/release.sh` | builds the release archives for every platform |
 
 ## Releasing
 
 ```bash
-git tag chichipes-v0.5.1 && git push origin chichipes-v0.5.1
+git tag chichipes-v0.3.1 && git push origin chichipes-v0.3.1
 ```
 
-`.github/workflows/release.yml` tests and builds on every push to the `chichipes` branch (Linux amd64/arm64 with
-`cargo zigbuild` against glibc 2.17, macOS amd64/arm64, Windows amd64; archives kept as workflow artifacts). A
-`chichipes-v*` tag also attaches the archives with `SHA256SUMS.txt` to a GitHub Release. Locally:
-`cargo build --release && scripts/release.sh v0.5.1 linux amd64 target/release/chichipes` writes the archive to `dist/`.
+Pushing a `chichipes-v*` tag runs `.github/workflows/release.yml`, which tests, builds Linux / macOS / Windows archives with
+`scripts/release.sh` and attaches them with `SHA256SUMS.txt` to a GitHub Release. `scripts/release.sh v0.3.1` builds
+the same archives locally into `dist/`.
 
 ## License and citation
 

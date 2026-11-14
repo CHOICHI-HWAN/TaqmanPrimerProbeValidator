@@ -36,7 +36,7 @@ Script: `harness/thermo_fit.py`.
 ## 3. Binding thermodynamics against a target — reproduced (exact, SantaLucia tables)
 Full-precision data: `mfeprimer -j` reruns of the 856 synth.py experiment runs (`harness/bind_json.py` ->
 `work/bind_all.json`, 135,851 distinct F and R bindings incl. mismatches, N/ambiguity codes, genome edges and cut
-duplexes). Model `harness/bind_tables.py` / `thermo::binding` (src/thermo.rs), no fitted values:
+duplexes). Model `harness/bind_tables.py` / Go `thermo.Binding`, no fitted values:
 - initiation 0.2 / -5.7; one stack per adjacent column pair: perfect = NN (section 1), mismatch = the mismatch-stack
   table of §7/§8, any N (every ambiguity code is N) = 0 but still one salt unit.
 - **Cut**: a mismatch run (N counts) touching the 5' end, or the 3'-most run of >= 3 mismatches, is dropped up to its

@@ -1,0 +1,62 @@
+[
+ {
+  "params": {},
+  "designs": [
+   {
+    "F": "KGATATTCCTCTGTGAACGTTAAW",
+    "P": "CATAGGGAASGTSAGTCTGC",
+    "R": "CCCTTCGAGGATCATTTWGKA",
+    "F_tm": 52.3,
+    "P_tm": 54.4,
+    "R_tm": 52.3,
+    "est_cov": 54,
+    "est_added": 54,
+    "amplicon_len": 142
+   }
+  ]
+ },
+ {
+  "params": {
+   "ambig": 4,
+   "probe_ambig": 3,
+   "pass_mm": 1,
+   "tp_n": 1,
+   "amp": [
+    80,
+    250
+   ],
+   "primer_tm": [
+    48.0,
+    64.0
+   ],
+   "probe_above": [
+    3.0,
+    15.0
+   ]
+  },
+  "designs": [
+   {
+    "F": "AKTATMTAGTTRCGTSCCA",
+    "P": "TTCCTCYGTGRACGTTAATY",
+    "R": "KGTGAGATAGATAWTKATKATACG",
+    "F_tm": 48.1,
+    "P_tm": 51.3,
+    "R_tm": 48.0,
+    "est_cov": 57,
+    "est_added": 57,
+    "amplicon_len": 213
+   },
+   {
+    "F": "MTAGTTGCGTSCCAATMM",
+    "P": "CAKAGGGAASGTSAGTCTGC",
+    "R": "CTTYTCACTCCCYAACTARAR",
+    "F_tm": 50.3,
+    "P_tm": 55.6,
+    "R_tm": 50.3,
+    "est_cov": 55,
+    "est_added": 3,
+    "amplicon_len": 146
+   }
+  ]
+ }
+]
