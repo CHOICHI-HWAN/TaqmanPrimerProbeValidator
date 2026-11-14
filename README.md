@@ -1,6 +1,6 @@
 # chichipes
 
-![License](https://img.shields.io/badge/license-GPL--3.0--or--later-blue) ![Go](https://img.shields.io/badge/go-%E2%89%A51.22-00ADD8) ![Dependencies](https://img.shields.io/badge/dependencies-none-brightgreen)
+![License](https://img.shields.io/badge/license-GPL--3.0--or--later-blue) ![Rust](https://img.shields.io/badge/rust-stable-B7410E)
 
 [한국어](README.ko.md)
 
@@ -12,7 +12,8 @@ files, same numbers — usually tens to hundreds of times faster.
 It is the search engine of the [TaqMan Primer/Probe Validator](https://github.com/CHOICHI-HWAN/TaqmanPrimerProbeValidator)
 pipeline, published on its own branch for anyone who only wants the engine.
 
-- **No dependencies.** Pure Go standard library; one static executable for Linux, macOS and Windows.
+- **One executable.** Written in Rust (v0.4 and earlier: Go); a single file for Linux, macOS and Windows, nothing to
+  install alongside. The Linux build runs on glibc 2.17 or newer (CentOS 7 / Ubuntu 14.04 onwards).
 - **No index.** Databases are read directly; `chichipes index` only writes the `.fai`/`.json` files tools expect.
 - **Clean-room.** Built from published thermodynamics and black-box comparison of MFEprimer's outputs; no MFEprimer
   code was used or decompiled. See [docs/FINDINGS.md](docs/FINDINGS.md).
@@ -24,18 +25,18 @@ Download the archive for your platform from the
 unpack it and put `chichipes` on your `PATH`:
 
 ```bash
-tar xzf chichipes-v0.3.0-linux-amd64.tar.gz
-sudo install chichipes-v0.3.0-linux-amd64/chichipes /usr/local/bin/
+tar xzf chichipes-v0.5.0-linux-amd64.tar.gz
+sudo install chichipes-v0.5.0-linux-amd64/chichipes /usr/local/bin/
 chichipes version
 ```
 
-Or build from source (Go 1.22 or newer):
+Or build from source ([Rust](https://rustup.rs) stable and a C linker, `cc`):
 
 ```bash
 git clone -b chichipes https://github.com/CHOICHI-HWAN/TaqmanPrimerProbeValidator.git chichipes
 cd chichipes
-go build -o chichipes ./cmd/chichipes
-go test ./...
+cargo build --release          # -> target/release/chichipes
+cargo test --release           # the MFEprimer reference tests run when work/ holds the reference runs
 ```
 
 ## Usage
@@ -101,6 +102,11 @@ oligos. Non-default buffer conditions and non-default hairpin `--maxl`/`--minl` 
 |---|---|---|
 | One degenerate primer pair against a 663-genome segment | 18.2 s | 0.1 s |
 | Whole pipeline run of an Ebola-virus panel (2,900 genomes, 29 steps) | 14 min 58 s | 16 s |
+
+The Rust engine (v0.5.0) gives byte-identical output to the Go engine (v0.4.0) and is faster again: the 182 real
+primer searches take 70 s instead of 326 s on one CPU (20 s instead of 42 s on 24), the largest set (228,000
+amplicons) 0.29 s instead of 0.84 s with 57 MB instead of 140 MB, and 4,000 long reads with `--indel` 0.5 s
+instead of 13.5 s.
 
 ## Inosine (I)
 
@@ -187,23 +193,26 @@ truncation, end terms, hairpin search) are written up in [docs/FINDINGS.md](docs
 
 | Path | Contents |
 |---|---|
-| `cmd/chichipes/` | command line |
-| `internal/thermo/` | thermodynamics: perfect duplex, binding to a target, dimer and hairpin energies |
-| `internal/spec/` | primer-pair, probe, dimer and hairpin search and their output files |
-| `internal/primers/` | IUPAC expansion, 3'-window mismatch variants and their names |
+| `src/main.rs`, `src/flags.rs` | command line (MFEprimer's / Go `flag` syntax) |
+| `src/thermo.rs`, `data/hairpin_tables.json` | thermodynamics: perfect duplex, binding to a target, dimer and hairpin energies |
+| `src/spec.rs`, `src/search.rs`, `src/dimer.rs`, `src/hairpin.rs` | primer-pair, probe, dimer and hairpin search and their output files |
+| `src/primers.rs` | IUPAC expansion, 3'-window mismatch variants and their names |
+| `src/reads.rs`, `src/seqio.rs` | sequencing-read check; FASTA / FASTQ (gzip) reading |
+| `src/golog.rs` | Go's `math.Log`, so every printed value matches the earlier releases bit for bit |
 | `harness/` | the black-box experiments and comparison scripts used to derive and check the rules (need `MFEPRIMER`, `EDITIONS`) |
 | `docs/` | `FINDINGS.md` (rules, English), `OUTPUT_FORMAT.md` (output formats, Korean) |
-| `scripts/release.sh` | builds the release archives for every platform |
+| `scripts/release.sh` | packs one built binary into a release archive |
 
 ## Releasing
 
 ```bash
-git tag chichipes-v0.3.1 && git push origin chichipes-v0.3.1
+git tag chichipes-v0.5.1 && git push origin chichipes-v0.5.1
 ```
 
-Pushing a `chichipes-v*` tag runs `.github/workflows/release.yml`, which tests, builds Linux / macOS / Windows archives with
-`scripts/release.sh` and attaches them with `SHA256SUMS.txt` to a GitHub Release. `scripts/release.sh v0.3.1` builds
-the same archives locally into `dist/`.
+`.github/workflows/release.yml` tests and builds on every push to the `chichipes` branch (Linux amd64/arm64 with
+`cargo zigbuild` against glibc 2.17, macOS amd64/arm64, Windows amd64; archives kept as workflow artifacts). A
+`chichipes-v*` tag also attaches the archives with `SHA256SUMS.txt` to a GitHub Release. Locally:
+`cargo build --release && scripts/release.sh v0.5.1 linux amd64 target/release/chichipes` writes the archive to `dist/`.
 
 ## License and citation
 

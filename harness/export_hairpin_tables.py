@@ -1,4 +1,4 @@
-"""Write internal/thermo/hairpin_tables.json from hp_energy (the tables the Go engine embeds)."""
+"""Write data/hairpin_tables.json from hp_energy (the tables the engine embeds)."""
 import json
 import math
 from pathlib import Path
@@ -13,6 +13,6 @@ out = {
     "loop_sizes": E.LOOP_SIZES,
     "loop_g": E.LOOP_G,
 }
-p = Path(__file__).resolve().parent.parent / "internal/thermo/hairpin_tables.json"
+p = Path(__file__).resolve().parent.parent / "data/hairpin_tables.json"
 p.write_text(json.dumps(out, indent=0) + "\n")
 print(p, len(out["mm"]), len(out["dangle"]), len(out["bonus"]))

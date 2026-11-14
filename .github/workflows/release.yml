@@ -1,22 +1,89 @@
 name: release
 
+# Every push to the chichipes branch tests and builds all platforms (archives kept as workflow artifacts);
+# a chichipes-v* tag also publishes them as a GitHub Release.
 on:
   push:
+    branches: [chichipes]
     tags: ["chichipes-v*"]
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  release:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - run: rustup update stable && rustup default stable
+      - run: cargo test --release
+
+  build:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux: built with zig against glibc 2.17 so the binary runs on old distributions too (a static musl
+          # build would be simpler, but musl's allocator makes it 2-40x slower)
+          - { os: linux, arch: amd64, runner: ubuntu-latest, target: x86_64-unknown-linux-gnu, glibc: "2.17" }
+          - { os: linux, arch: arm64, runner: ubuntu-latest, target: aarch64-unknown-linux-gnu, glibc: "2.17" }
+          - { os: darwin, arch: amd64, runner: macos-latest, target: x86_64-apple-darwin }
+          - { os: darwin, arch: arm64, runner: macos-latest, target: aarch64-apple-darwin }
+          - { os: windows, arch: amd64, runner: windows-latest, target: x86_64-pc-windows-msvc }
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/chichipes-v* ]]; then v="${GITHUB_REF_NAME#chichipes-}"; else v="dev-${GITHUB_SHA::7}"; fi
+          echo "CHICHIPES_VERSION=$v" >> "$GITHUB_ENV"
+      - run: rustup update stable && rustup default stable && rustup target add ${{ matrix.target }}
+      - uses: actions/setup-python@v5
+        if: matrix.glibc
         with:
-          go-version-file: go.mod
-      - run: go vet ./... && go test ./...
-      - run: scripts/release.sh "${GITHUB_REF_NAME#chichipes-}"
+          python-version: "3.12"
+      - name: Build (zig, glibc ${{ matrix.glibc }})
+        if: matrix.glibc
+        run: |
+          pip install ziglang cargo-zigbuild
+          cargo zigbuild --release --target ${{ matrix.target }}.${{ matrix.glibc }}
+      - name: Build
+        if: ${{ !matrix.glibc }}
+        run: cargo build --release --target ${{ matrix.target }}
+      - name: Smoke test
+        if: matrix.target == 'x86_64-unknown-linux-gnu' || matrix.target == 'aarch64-apple-darwin' || matrix.os == 'windows'
+        run: |
+          bin=target/${{ matrix.target }}/release/chichipes
+          [ -f "$bin.exe" ] && bin="$bin.exe"
+          "$bin" version
+      - name: Package
+        run: |
+          bin=target/${{ matrix.target }}/release/chichipes
+          [ -f "$bin.exe" ] && bin="$bin.exe"
+          scripts/release.sh "$CHICHIPES_VERSION" ${{ matrix.os }} ${{ matrix.arch }} "$bin"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chichipes-${{ matrix.os }}-${{ matrix.arch }}
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/chichipes-v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - run: cd dist && sha256sum chichipes-* > SHA256SUMS.txt && ls -la
       - uses: softprops/action-gh-release@v2
         with:
           name: ${{ github.ref_name }}
