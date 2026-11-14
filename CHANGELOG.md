@@ -1,3 +1,9 @@
+# chichipes v0.8.2 (2026-11-14)
+
+- `design sweep --probe-chem mgb|zen`: a grid's `len_probe_max` (30, 36, 42 in the long grids) now only shortens the
+  format's probes instead of replacing its limits, so MGB probes stay at 13–22 nt (and zen at ≤ 40) in every grid.
+  With the default linear format nothing changes (the grid's lengths still lift its 30-nt limit, as in v0.8.1).
+
 # chichipes v0.8.1 (2026-11-14)
 
 - `design sweep`: the grids' `len_probe_max` (e.g. 36, 42) now lifts the probe format's 30-nt limit, as `--probe-len`

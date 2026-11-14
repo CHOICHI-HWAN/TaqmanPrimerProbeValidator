@@ -381,10 +381,15 @@ fn apply(c: &Combo, p: &mut Params) {
             ("tp_n", GVal::I(x)) => p.tp_n = *x as usize,
             ("len_primer_max", GVal::I(x)) => p.len_primer.1 = *x as usize,
             ("len_probe_max", GVal::I(x)) => {
-                // as --probe-len: the grid's probe lengths replace the probe format's limits (design_sweep.py has none)
-                p.len_probe.1 = *x as usize;
-                p.probe.min_len = p.len_probe.0;
-                p.probe.max_len = p.len_probe.1;
+                if p.probe.name == "linear" {
+                    // as --probe-len: the grid's probe lengths replace the linear format's 30-nt limit (design_sweep.py has none)
+                    p.len_probe.1 = *x as usize;
+                    p.probe.min_len = p.len_probe.0;
+                    p.probe.max_len = p.len_probe.1;
+                } else {
+                    // zen / mgb: the grid may only shorten the format's probes (mgb 13-22, zen <= 40)
+                    p.len_probe.1 = (*x as usize).min(p.probe.max_len);
+                }
             }
             ("amp", GVal::A(a, b)) => p.amp = (*a, *b),
             ("primer_tm", GVal::F(a, b)) => p.primer_tm = (*a, *b),
