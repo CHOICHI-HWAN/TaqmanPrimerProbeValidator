@@ -254,6 +254,10 @@ chichipes design labels --sets primers.tsv --groups set_groups.tsv # 형광·퀀
 파이프라인은 `scripts/mfe_common.py`에서 `mfeprimer_bin`이 `scan` 명령이 있는 chichipes면 그걸 쓰고, 없으면
 `go/scan`, 그다음 Python 스캔을 써요. 결과는 셋 다 같아요. Snakemake 파일은 바꾸지 않았어요.
 
+자동설계(`redesign_coverage.py`)는 `chichipes design cover --json`을, 규칙 기반 프로브 설계(`probe_designer.py`)는
+`chichipes probedesign`을 불러요. 결과는 Python 엔진과 같고(설계 81회, 프로브 탐색 408건 비교), chichipes가 없으면
+Python으로 돌아요.
+
 ## 배포 (릴리즈)
 
 ```bash

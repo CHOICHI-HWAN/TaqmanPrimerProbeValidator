@@ -267,6 +267,10 @@ Modes: `fr` (best F/R pair per genome), `probe` (best probe window, optionally i
 through `scripts/mfe_common.py` when its `mfeprimer_bin` points at a chichipes that has the command, and falls back
 to `go/scan` and then to the Python scan, which all give the same result.
 
+The pipeline's coverage-first design (`redesign_coverage.py`) calls `chichipes design cover --json`, and its rule-based
+probe design (`probe_designer.py`) calls `chichipes probedesign`; both give the Python engines' results (81 design runs and
+408 probe searches compared) and fall back to Python when chichipes is missing.
+
 ## Thermodynamics
 
 SantaLucia & Hicks (2004) nearest-neighbour, mismatch, dangling-end and loop parameters, salt correction after

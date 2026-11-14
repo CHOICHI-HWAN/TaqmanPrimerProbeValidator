@@ -1,3 +1,15 @@
+# chichipes v0.8.0 (2026-11-14)
+
+- `design cover --json`: the designs as JSON (status, genome count, candidate counts, designs, message). The pipeline's
+  `redesign_coverage.py` now runs its coverage-first design through it: identical designs on 81 runs over 17 editions
+  (69 + 12), about 20–25× faster.
+- `--large-genome-prefilter`: when a primer length has more than 20,000 windows, only windows whose consensus GC and
+  rough Tm can pass are evaluated (what the MPXV / VARV editions' Python engine does).
+- `--probe-len` now replaces the probe format's length limits (linear ≤ 30, zen ≤ 40, mgb 13–22) instead of being cut
+  by them, so `--probe-len 20,36` really searches 36-nt probes.
+- The pipeline's rule-based probe design (`probe_designer.py`, "own" method) runs through `chichipes probedesign`:
+  identical results on 408 cases (136 set alignments), about 11× faster.
+
 # chichipes v0.7.0 (2026-11-14)
 
 - **`chichipes scan` and `chichipes probedesign`: the validation pipeline's engines in Rust.** They replace the pipeline's

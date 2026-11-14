@@ -31,12 +31,14 @@ Common options (cover, shift, tile):
   --amp 70,200                amplicon length range
   --primer-tm 52,66           primer Tm window (screening Tm, SantaLucia 1998, 250 nM / 50 mM Na+)
   --probe-above 2,14          probe Tm above the higher primer Tm
-  --primer-len 18,25 --probe-len 20,30
+  --primer-len 18,25 --probe-len 20,30   (--probe-len replaces the probe format's length limits)
   --probe-chem linear|zen|mgb probe format (length limits, Tm offset; see README)
   --probe-tm-offset X         override the format's probe Tm offset
   --exclude nontarget.fa      reject sets that would amplify a non-target sequence; penalise oligos that bind one
   --top N                     designs to report (3)
   --cpu N                     worker threads
+  --large-genome-prefilter    skip primer windows whose GC / rough Tm cannot pass (> 20,000 windows per length)
+  --json                      cover: the designs as JSON (status, n, candidate counts, designs, message)
 ";
 
 fn flags(name: &str) -> FlagSet {
@@ -68,6 +70,8 @@ fn flags(name: &str) -> FlagSet {
     f.int("keep", 300, "shift / tile: variants kept per oligo for the combination step");
     f.int("max-amb", -1, "shift: IUPAC codes a variant may have (default --ambig / --probe-ambig)");
     f.int("jobs", (cpu / 4).max(1), "sweep: runs in parallel");
+    f.boolean("large-genome-prefilter", "only evaluate primer windows whose consensus GC / rough Tm can pass, when a length has > 20,000 windows (the MPXV / VARV pipelines' engine)");
+    f.boolean("json", "cover: print {status, n, nf, nr, np, designs, message} as JSON (the pipeline's redesign_coverage.py reads it)");
     f.boolean_d("qc", true, "check the chosen sets with chichipes thermodynamics (Tm 2004, hairpin, dimer)");
     f
 }
@@ -98,6 +102,7 @@ fn params(f: &FlagSet) -> Result<Params, String> {
         workers: f.get_int("cpu").max(1) as usize,
         ..Default::default()
     };
+    p.large_prefilter = f.get_bool("large-genome-prefilter");
     p.amp = ipair(&f.get_str("amp"), p.amp)?;
     p.primer_tm = pair(&f.get_str("primer-tm"), p.primer_tm)?;
     p.probe_above = pair(&f.get_str("probe-above"), p.probe_above)?;
@@ -105,7 +110,10 @@ fn params(f: &FlagSet) -> Result<Params, String> {
     p.probe = parse_chem(&f.get_str("probe-chem"), f.get_float("probe-tm-offset"), 0, 0)?;
     let ql = f.get_str("probe-len");
     if !ql.is_empty() {
+        // explicit probe lengths replace the format's limits (linear <= 30, zen <= 40, mgb 13-22)
         p.len_probe = ipair(&ql, p.len_probe)?;
+        p.probe.min_len = p.len_probe.0;
+        p.probe.max_len = p.len_probe.1;
     } else if p.probe.name != "linear" {
         p.len_probe = p.probe.probe_len_range();
     }
@@ -190,6 +198,22 @@ fn cover(f: &FlagSet) -> Result<(), String> {
         run.designs.len(),
         t0.elapsed().as_secs_f64()
     );
+    if f.get_bool("json") {
+        let designs: Vec<String> = run.designs.iter().map(design_json).collect();
+        let mut msg = Vec::new();
+        json::write_go_string(&mut msg, run.message.as_bytes());
+        println!(
+            "{{\"status\":\"{}\",\"n\":{},\"nf\":{},\"nr\":{},\"np\":{},\"designs\":[{}],\"message\":{}}}",
+            run.status,
+            run.n,
+            run.nf,
+            run.nr,
+            run.np,
+            designs.join(","),
+            String::from_utf8_lossy(&msg)
+        );
+        return Ok(());
+    }
     if run.status != "ok" {
         eprintln!("{}", run.message);
     }

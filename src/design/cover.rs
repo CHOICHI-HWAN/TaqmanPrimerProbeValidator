@@ -31,6 +31,9 @@ pub struct Params {
     pub workers: usize,
     /// vetoes a triple in the greedy pick (e.g. a non-target product with the probe); the next best is taken
     pub reject: Option<RejectFn>,
+    /// large genomes (> 20,000 windows of a primer length): only primer windows whose consensus GC / rough Tm can pass
+    /// (within 5) are evaluated, as the MPXV / VARV editions' Python engine does
+    pub large_prefilter: bool,
 }
 
 impl Default for Params {
@@ -53,6 +56,7 @@ impl Default for Params {
             probe: Chem::default(),
             workers: crate::spec::num_cpu(),
             reject: None,
+            large_prefilter: false,
         }
     }
 }
@@ -162,7 +166,18 @@ pub fn candidates(al: &Aligned, kind: Kind, p: &Params) -> Vec<Cand> {
     };
     let mut pool: Vec<(usize, usize, usize)> = Vec::new(); // ub, s, k
     for k in lr.0..=lr.1 {
-        for s in al.windows(k) {
+        let mut starts = al.windows(k);
+        if p.large_prefilter && kind != b'P' && starts.len() > 20000 {
+            // numpy: tm_est = 64.9 + 41.0 * (n_gc - 16.4) / k; gc = 100.0 * n_gc / k
+            starts.retain(|&s| {
+                let n_gc = al.cons[s..s + k].iter().filter(|&&c| c == b'G' || c == b'C').count() as f64;
+                let kf = k as f64;
+                let tm_est = 64.9 + 41.0 * (n_gc - 16.4) / kf;
+                let gcp = 100.0 * n_gc / kf;
+                tm_est >= p.primer_tm.0 - 5.0 && tm_est <= p.primer_tm.1 + 5.0 && gcp >= p.gc.0 - 5.0 && gcp <= p.gc.1 + 5.0
+            });
+        }
+        for s in starts {
             pool.push((al.upper_bound(s, k, thr), s, k));
         }
     }
