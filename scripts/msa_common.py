@@ -108,6 +108,12 @@ def _score_probe_orientation(aligned_seq, orig_seq, consensus):
     return (frag_penalty, mism)
 
 
+def _restore_oligo(aligned_seq, orig):
+    """Put the oligo's own letters (inosine included) back into its aligned row, gaps kept."""
+    it = iter(orig)
+    return "".join(c if c == "-" else next(it, c) for c in aligned_seq)
+
+
 def _run_mafft_once(mafft_bin, records, f_seq, p_seq, r_seq, out_dir: Path, tag: str):
     """records: list of (genome_id, amplicon_seq). Returns {header: aligned_seq} including
     the synthetic F/P/R reference records."""
@@ -116,11 +122,12 @@ def _run_mafft_once(mafft_bin, records, f_seq, p_seq, r_seq, out_dir: Path, tag:
     with open(dedup_fa, "w", encoding="utf-8") as fh:
         for gid, seq in records:
             fh.write(f">{gid}\n{seq}\n")
-        fh.write(f">{REF_F_ID}\n{f_seq}\n")
+        # mafft does not know inosine: it aligns an N there and the letter is put back afterwards (_restore_oligo)
+        fh.write(f">{REF_F_ID}\n{f_seq.upper().replace('I', 'N')}\n")
         if p_seq:
-            fh.write(f">{REF_P_FWD_ID}\n{p_seq}\n")
-            fh.write(f">{REF_P_RC_ID}\n{reverse_complement(p_seq)}\n")
-        fh.write(f">{REF_R_ID}\n{r_seq_rc}\n")
+            fh.write(f">{REF_P_FWD_ID}\n{p_seq.upper().replace('I', 'N')}\n")
+            fh.write(f">{REF_P_RC_ID}\n{reverse_complement(p_seq).upper().replace('I', 'N')}\n")
+        fh.write(f">{REF_R_ID}\n{r_seq_rc.upper().replace('I', 'N')}\n")
 
     aligned_fa = out_dir / f"aligned_{tag}.fa"
     with open(aligned_fa, "w", encoding="utf-8") as out_f:
@@ -130,6 +137,10 @@ def _run_mafft_once(mafft_bin, records, f_seq, p_seq, r_seq, out_dir: Path, tag:
         sys.exit(f"[error] mafft failed: {result.stderr}")
 
     aligned = {hdr: seq.upper() for hdr, seq in read_fasta(aligned_fa)}
+    for hdr, orig in ((REF_F_ID, f_seq), (REF_P_FWD_ID, p_seq), (REF_P_RC_ID, reverse_complement(p_seq) if p_seq else ""),
+                      (REF_R_ID, r_seq_rc)):
+        if hdr in aligned and "I" in orig.upper():
+            aligned[hdr] = _restore_oligo(aligned[hdr], orig.upper())
     dedup_fa.unlink(missing_ok=True)
     aligned_fa.unlink(missing_ok=True)
     return aligned

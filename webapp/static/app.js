@@ -6496,10 +6496,10 @@ async function initPipelineSwitch() {
   const box = document.getElementById("pipelineSwitch");
   const link = document.getElementById("entryLink");
   if (link) link.href = `${location.protocol}//${location.hostname}:8760/`;
-  if (!box) return;
   let list = [];
   try { list = await fetchJSON("/api/pipelines"); } catch (e) { /* stand-alone project */ }
-  if (list.length < 2) return;
+  if (link && list.length && list[0].entry_port) link.href = `${location.protocol}//${location.hostname}:${list[0].entry_port}/`;
+  if (!box || list.length < 2) return;
   box.innerHTML = list.map((p) => (p.current
     ? `<span class="pipe-pill current" title="지금 보고 있는 대시보드">${escHtml(p.name)}</span>`
     : `<a class="pipe-pill" href="${location.protocol}//${location.hostname}:${p.port}/" title="${escHtml(p.name)} 대시보드로 이동">${escHtml(p.name)}</a>`)).join("");

@@ -80,6 +80,33 @@ def combos(seg, grid_name="wide"):
     elif grid_name == "midtm":
         grid = {"ambig": [3, 4, 5, 6], "probe_ambig": [2, 3, 4], "pass_mm": [1], "tp_n": [2], "amp": [(70, 200), (70, 250)],
                 "primer_tm": [(54.0, 66.0), (55.0, 67.0)], "probe_above": [(3.0, 14.0), (5.0, 14.0)]}
+    elif grid_name == "mega":
+        # A much larger, finer-grained combinatorial sweep (tens of thousands of runs) meant to run for many hours straight -- every
+        # corner of the parameter space the smaller named grids above only sample a few points of: more ambiguity levels, more
+        # mismatch/3'-anchor combinations, more amplicon windows, a sliding Tm window, and both short and very long oligos.
+        grid = {"ambig": [1, 2, 3, 4, 5, 6], "probe_ambig": [1, 2, 3, 4, 5], "pass_mm": [1, 2, 3], "tp_n": [1, 2],
+                "amp": [(60, 150), (70, 200), (70, 250), (70, 300), (100, 250), (150, 300)],
+                "primer_tm": [(50.0, 64.0), (52.0, 66.0), (54.0, 68.0), (56.0, 70.0)],
+                "probe_above": [(2.0, 12.0), (4.0, 14.0), (6.0, 16.0)],
+                "len_primer_max": [24, 30], "len_probe_max": [28, 36]}
+    elif grid_name == "mega2":
+        # A second, independent deep sweep (different corners of the space than "mega": finer Tm steps, more amplicon windows,
+        # even longer oligos) -- run alongside "mega" rather than after it, so the extra cores this machine has free go to more
+        # search instead of sitting idle.
+        grid = {"ambig": [1, 2, 3, 4, 5, 6], "probe_ambig": [1, 2, 3, 4, 5], "pass_mm": [1, 2, 3], "tp_n": [1, 2],
+                "amp": [(70, 180), (90, 220), (110, 260), (130, 280), (150, 320), (180, 350)],
+                "primer_tm": [(51.0, 63.0), (53.0, 65.0), (55.0, 67.0), (57.0, 69.0), (59.0, 71.0)],
+                "probe_above": [(3.0, 13.0), (5.0, 15.0), (7.0, 17.0)],
+                "len_primer_max": [28, 32], "len_probe_max": [32, 40]}
+    elif grid_name == "mega3":
+        # A third pass, queued to start only after mega + mega2 finish: wider tp_n/pass_mm combinations, tighter and looser Tm
+        # extremes than either earlier grid, and the longest oligos tried yet -- rounds out the parameter space these many-hour
+        # sweeps are meant to cover rather than repeating the same corners a third time.
+        grid = {"ambig": [1, 2, 3, 4, 5, 6], "probe_ambig": [1, 2, 3, 4, 5], "pass_mm": [1, 2, 3], "tp_n": [1, 2, 3],
+                "amp": [(60, 160), (80, 210), (100, 240), (120, 270), (140, 300), (160, 330), (200, 360)],
+                "primer_tm": [(48.0, 62.0), (60.0, 72.0), (53.0, 69.0)],
+                "probe_above": [(2.0, 10.0), (4.0, 16.0), (8.0, 18.0)],
+                "len_primer_max": [26, 32], "len_probe_max": [30, 42]}
     else:
         grid = {"ambig": [1, 2, 3, 4, 5], "probe_ambig": [1, 2, 3, 4], "pass_mm": [1, 2], "tp_n": [2], "amp": [(70, 200), (70, 300)], "primer_tm": [(52.0, 66.0), (50.0, 68.0)]}
     keys = list(grid)
@@ -94,7 +121,7 @@ def main():
     ap.add_argument("--jobs", type=int, default=16)
     ap.add_argument("--top", type=int, default=8)
     ap.add_argument("--calibrate", action="store_true")
-    ap.add_argument("--grid", default="wide", choices=("wide", "hightm", "midtm", "longoligo"))
+    ap.add_argument("--grid", default="wide", choices=("wide", "hightm", "midtm", "longoligo", "mega", "mega2", "mega3"))
     a = ap.parse_args()
     ids = scope_ids(a.segment, a.scope)
     print(f"{a.segment}: {len(ids)} genomes in scope '{a.scope}'", flush=True)

@@ -1741,14 +1741,16 @@ def load_pipelines():
     if reg is None:
         return []
     try:
-        items = json.loads(reg.read_text(encoding="utf-8")).get("pipelines", [])
+        reg_data = json.loads(reg.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return []
+    items, entry_port = reg_data.get("pipelines", []), reg_data.get("entry_port", 8760)
     try:
         here = str(ROOT.relative_to(reg.parent.parent)).replace("\\\\", "/")
     except ValueError:
         here = f"{ROOT.parent.name}/{ROOT.name}"
-    return [{"id": p["id"], "name": p.get("short") or p["name"], "port": p["port"], "current": p.get("path") == here} for p in items]
+    return [{"id": p["id"], "name": p.get("short") or p["name"], "port": p["port"], "current": p.get("path") == here,
+             "entry_port": entry_port} for p in items]
 
 
 def _venn_saved_path():
