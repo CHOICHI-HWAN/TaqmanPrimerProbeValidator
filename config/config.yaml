@@ -30,7 +30,8 @@ env_prefix: ""
 
 # path to the mfeprimer static binary (setup.sh asks for it; also editable on the web app's parameter page).
 # Leave empty to auto-discover under ../*/mfeprimer/ or via $MFEPRIMER_BIN / PATH.
-mfeprimer_bin: "/home/biking/BI_CLAUDE/PRIMER_VALIDATION_20260914/LASV/20260819_PRIMER_VALID_VendorD_VendorA/mfeprimer/mfeprimer-4.2.4/mfeprimer-4.2.4-linux-amd64"
+# previous engine (revert by restoring this path): mfeprimer_bin: "/home/biking/BI_CLAUDE/PRIMER_VALIDATION_20260914/LASV/20260819_PRIMER_VALID_VendorD_VendorA/mfeprimer/mfeprimer-4.2.4/mfeprimer-4.2.4-linux-amd64"
+mfeprimer_bin: "/BI/tools_bi/chichipes/chichipes"
 target_coverage_pct: 95.0
 three_prime_consecutive_match: 2
 
