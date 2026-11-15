@@ -130,6 +130,29 @@ def load_msa(set_id: str) -> dict:
         sys.exit(f"[error] {path} not found -- run the set's analysis first.")
     return json.loads(path.read_text(encoding="utf-8"))
 
+def _chichipes_own(cons, f_col, r_col, rows, min_len, max_len, tm_range, gc_range, quota, max_iupac):
+    """The "own" candidate search through `chichipes probedesign` -> (picked candidates, candidates tested, rejected), or None
+    when chichipes is not configured or cannot answer (then the Python loop runs). Same request and answer as go/probedesign."""
+    import os
+    import subprocess
+    from mfe_common import _configured_mfeprimer
+    exe = _configured_mfeprimer(ROOT) or os.environ.get("MFEPRIMER_BIN", "")
+    if not exe or not Path(exe).is_file():
+        return None
+    req = {"consensus": cons, "f_col": list(f_col), "r_col": list(r_col), "dots": [r["dots"] for r in rows], "min_len": min_len,
+           "max_len": max_len, "tm_range": list(tm_range), "gc_range": list(gc_range), "top": quota, "max_iupac": max_iupac, "tm_above": None}
+    try:
+        r = subprocess.run([exe, "probedesign"], input=json.dumps(req), capture_output=True, text=True, timeout=1800)
+        if r.returncode:
+            raise RuntimeError(r.stderr.strip()[-300:] or f"rc={r.returncode}")
+        res = json.loads(r.stdout)
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+        print(f"[warn] chichipes probedesign failed ({exc}) -- using the Python probe search", file=sys.stderr)
+        return None
+    for c in res["candidates"]:
+        c["tm"], c["gc"] = float(c["tm"]), float(c["gc"])
+    return res["candidates"], res["n_total"], res["n_rejected"]
+
 
 def design(set_id: str, min_len=18, max_len=30, tm_range=None, gc_range=(30.0, 80.0), top=10, max_iupac=2, tm_above=None, method="both", ids=None, msa=None):
     msa = msa or load_msa(set_id)
@@ -155,6 +178,11 @@ def design(set_id: str, min_len=18, max_len=30, tm_range=None, gc_range=(30.0, 8
     n_rows = len(rows)
     out, rejected = [], 0
     use_own, use_p3 = method in ("own", "both"), method in ("primer3", "both")
+    quota_own = top if method == "own" else (top - top // 2 if method == "both" else 0)
+    fast = _chichipes_own(cons, f_col, r_col, rows, min_len, max_len, tm_range, gc_range, quota_own, max_iupac) if use_own else None
+    if fast is not None:                                     # chichipes did the "own" search: its picks, totals and rejects
+        own_picked, n_own, rejected = fast
+        use_own = False
     for length in (range(min_len, max_len + 1) if use_own else ()):
         for s in range(lo, hi - length + 2):
             e = s + length                                  # python slice end
@@ -178,9 +206,8 @@ def design(set_id: str, min_len=18, max_len=30, tm_range=None, gc_range=(30.0, 8
                     "gc": round(sum(gc_percent(r) for r in res) / len(res), 1),
                     "msa_cov0": cov0, "msa_cov1": cov1, "msa_n": n_rows, "source": "own",
                 })
-    quota_own = top if method == "own" else (top - top // 2 if method == "both" else 0)
     quota_p3 = top if method == "primer3" else (top // 2 if method == "both" else 0)
-    picked = _pick(out, quota_own, primer_tm)
+    picked = own_picked if fast is not None else _pick(out, quota_own, primer_tm)
     p3_info = {}
     if use_p3:
         p3_out, p3_info = design_primer3(cons, rows, lo, hi, f_col, r_col, min_len, max_len, gc_range, above, max_iupac,
@@ -198,7 +225,7 @@ def design(set_id: str, min_len=18, max_len=30, tm_range=None, gc_range=(30.0, 8
     picked = sorted(merged.values(), key=lambda c: (-c["msa_cov0"], -c["msa_cov1"], c["n_iupac"], c["length"]))
     for c in picked:
         c["tm_p3"] = tm_primer3(c["seq"])
-    return {"primer_tm": primer_tm, "tm_range": tm_range, "window": (lo + 1, hi + 1), "n_total": len(out), "n_rejected": rejected,
+    return {"primer_tm": primer_tm, "tm_range": tm_range, "window": (lo + 1, hi + 1), "n_total": (n_own if fast is not None else len(out)), "n_rejected": rejected,
             "candidates": picked, "n_rows": n_rows, "existing": msa.get("ref_rows", {}).get("probe", {}), "method": method,
             "primer3": p3_info}
 
