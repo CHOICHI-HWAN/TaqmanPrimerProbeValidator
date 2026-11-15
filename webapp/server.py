@@ -359,7 +359,7 @@ def run_report_job(job_id, base_url):
             JOBS[job_id]["log_path"] = str(log_path)
 
 
-_PD_SEQ_RE = re.compile(r"^[ACGTRYSWKMBDHVN]{10,60}$")
+_PD_SEQ_RE = re.compile(r"^[ACGTRYSWKMBDHVNI]{10,60}$")
 _PD_ID_RE = re.compile(r"^[A-Za-z0-9_\-]+$")
 
 
@@ -1748,14 +1748,16 @@ def load_pipelines():
     if reg is None:
         return []
     try:
-        items = json.loads(reg.read_text(encoding="utf-8")).get("pipelines", [])
+        reg_data = json.loads(reg.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return []
+    items, entry_port = reg_data.get("pipelines", []), reg_data.get("entry_port", 8760)
     try:
         here = str(ROOT.relative_to(reg.parent.parent)).replace("\\\\", "/")
     except ValueError:
         here = f"{ROOT.parent.name}/{ROOT.name}"
-    return [{"id": p["id"], "name": p.get("short") or p["name"], "port": p["port"], "current": p.get("path") == here} for p in items]
+    return [{"id": p["id"], "name": p.get("short") or p["name"], "port": p["port"], "current": p.get("path") == here,
+             "entry_port": entry_port} for p in items]
 
 
 def _venn_saved_path():
@@ -3984,7 +3986,7 @@ class Handler(BaseHTTPRequestHandler):
         if not _PD_ID_RE.fullmatch(set_id) or not (ROOT / "input_primers" / f"{set_id}.tsv").exists():
             return self._send_json({"error": "세트를 찾을 수 없습니다."}, 404)
         if not _PD_SEQ_RE.match(seq):
-            return self._send_json({"error": "Probe 서열은 10-60nt의 IUPAC 문자(ACGTRYSWKMBDHVN)여야 합니다."}, 400)
+            return self._send_json({"error": "Probe 서열은 10-60nt의 IUPAC 문자(ACGTRYSWKMBDHVN, inosine I)여야 합니다."}, 400)
         job_id = uuid.uuid4().hex[:12]
         with JOBS_LOCK:
             JOBS[job_id] = {"status": "running", "kind": "probe_validate", "label": f"{set_id} 설계 Probe 검증 ({seq})",

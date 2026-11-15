@@ -5,6 +5,11 @@ All notable changes to this project are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-11-15
+
+### Added
+- `scripts/rank_top3.py`: ranks the top-3 sets per segment (coverage, then probe Tm). A set can rank only if its amplicon on the reference is <= 200 bp, its probe Tm is above both primers (MGB probes +10 C, rough) and it passes the hard design rule of `scripts/oligo_rules.py` (probe 5' end is not G with a FAM-like reporter). Other design rules (G>C in the probe, 4-base runs, GC clamp, F/R Tm difference, GC range, IUPAC codes near the primer 3' end, oligo multiplicity) and an amplicon-over-limit note are written as warnings into the remark of tool-made sets; a user's own sets keep their sequences, names and remarks.
+
 ## [0.1.4] - 2026-11-13
 
 ### Added
