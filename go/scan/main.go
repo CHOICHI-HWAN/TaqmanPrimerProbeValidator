@@ -22,11 +22,11 @@ import (
 
 var iupac = map[byte]string{
 	'A': "A", 'C': "C", 'G': "G", 'T': "T", 'R': "AG", 'Y': "CT", 'S': "GC", 'W': "AT", 'K': "GT", 'M': "AC",
-	'B': "CGT", 'D': "AGT", 'H': "ACT", 'V': "ACG", 'N': "ACGT",
+	'B': "CGT", 'D': "AGT", 'H': "ACT", 'V': "ACG", 'N': "ACGT", 'I': "ACGT",
 }
 
 var complement = map[byte]byte{
-	'A': 'T', 'T': 'A', 'C': 'G', 'G': 'C', 'N': 'N', 'R': 'Y', 'Y': 'R', 'S': 'S', 'W': 'W', 'K': 'M', 'M': 'K',
+	'A': 'T', 'T': 'A', 'C': 'G', 'G': 'C', 'N': 'N', 'I': 'I', 'R': 'Y', 'Y': 'R', 'S': 'S', 'W': 'W', 'K': 'M', 'M': 'K',
 	'D': 'H', 'H': 'D', 'B': 'V', 'V': 'B',
 }
 

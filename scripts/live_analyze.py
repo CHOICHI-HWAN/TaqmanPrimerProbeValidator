@@ -27,7 +27,7 @@ from run_dimer_hairpin import (  # noqa: E402
     summarize_dimers, summarize_hairpins, DG_FLAG_THRESHOLD,
 )
 
-VALID_SEQ_RE = re.compile(r"^[ACGTRYSWKMBDHVN]+$", re.IGNORECASE)
+VALID_SEQ_RE = re.compile(r"^[ACGTRYSWKMBDHVNI]+$", re.IGNORECASE)
 GENE_TABLE_CACHE = {}
 # See build_alignment_table.py's identical constant/comment: mfeprimer's probe `search` can
 # fail to find a genuinely low-mismatch site (seed-finding miss, not a real absence) -- this
@@ -35,6 +35,13 @@ GENE_TABLE_CACHE = {}
 # as coincidental rather than real.
 PROBE_FALLBACK_MAX_MISMATCH = 8
 
+
+
+def _dg(s):
+    try:
+        return float(s)
+    except (TypeError, ValueError):
+        return 0.0
 
 def _probe_hit_with_fallback(p_hit, p_seq, amp_seq, amp_start, genome_seq=None, amp_end=None):
     """The probe hit for one genome, the same way the Snakemake pipeline decides it: mfeprimer's best hit (only usable when
@@ -56,7 +63,7 @@ def validate_oligo(seq: str, label: str):
     if not seq:
         raise ValueError(f"{label} sequence is empty")
     if not VALID_SEQ_RE.match(seq):
-        raise ValueError(f"{label} sequence contains characters other than IUPAC nucleotide codes (ACGTRYSWKMBDHVN): {seq}")
+        raise ValueError(f"{label} sequence contains characters other than IUPAC nucleotide codes (ACGTRYSWKMBDHVN) or inosine (I): {seq}")
     if len(seq) < 10 or len(seq) > 60:
         raise ValueError(f"{label} sequence length looks unusual ({len(seq)}bp) -- expected roughly 15-40bp")
     return seq
@@ -105,7 +112,7 @@ def probe_search_best(mfeprimer_bin, db_fasta, probe_id, probe_seq, out_txt, mis
             cols = line.rstrip("\n").split("\t")
             chrom, start, end, mm = cols[0], cols[1], cols[2], int(cols[6])
             dg, tm = cols[7], cols[8]
-            if chrom not in best or mm < best[chrom]["mismatch"]:
+            if chrom not in best or (mm, _dg(dg)) < (best[chrom]["mismatch"], _dg(best[chrom]["dg"])):
                 best[chrom] = {"mismatch": mm, "start": start, "end": end, "tm": tm, "dg": dg}
     return best
 
