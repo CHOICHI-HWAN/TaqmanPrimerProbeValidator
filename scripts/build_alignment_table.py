@@ -29,6 +29,13 @@ PROBE_FALLBACK_MAX_MISMATCH = 8
 PROBE_WIDE_MISMATCH = 8
 
 
+
+def _dg(s):
+    try:
+        return float(s)
+    except (TypeError, ValueError):
+        return 0.0
+
 def probe_wide_search(mfeprimer_bin, db_fasta, probe_id, probe_seq, out_txt):
     probe_fa = out_txt.with_suffix(".fa")
     write_oligo_fasta(probe_fa, [(probe_id, probe_seq)])
@@ -54,7 +61,8 @@ def probe_wide_search(mfeprimer_bin, db_fasta, probe_id, probe_seq, out_txt):
             # already numerically correct since a half-open end equals the 1-based
             # inclusive end).
             start = str(int(start) + 1)
-            if chrom not in best or mismatch < best[chrom]["mismatch"]:
+            # equal mismatch: keep the lowest dG, so the choice never depends on the engine's row order
+            if chrom not in best or (mismatch, _dg(dg)) < (best[chrom]["mismatch"], _dg(best[chrom]["dg"])):
                 best[chrom] = {"mismatch": mismatch, "start": start, "end": end, "tm": tm, "dg": dg}
     return best
 

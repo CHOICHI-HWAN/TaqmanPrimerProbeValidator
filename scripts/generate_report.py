@@ -243,12 +243,12 @@ def render_lineage_table(lineage_rows):
 IUPAC_RC = {
     "A": "T", "C": "G", "G": "C", "T": "A",
     "R": "Y", "Y": "R", "S": "S", "W": "W", "K": "M", "M": "K",
-    "B": "V", "V": "B", "D": "H", "H": "D", "N": "N",
+    "B": "V", "V": "B", "D": "H", "H": "D", "N": "N", "I": "I",
 }
 IUPAC_SET = {
     "A": "A", "C": "C", "G": "G", "T": "T",
     "R": "AG", "Y": "CT", "S": "GC", "W": "AT", "K": "GT", "M": "AC",
-    "B": "CGT", "D": "AGT", "H": "ACT", "V": "ACG", "N": "ACGT",
+    "B": "CGT", "D": "AGT", "H": "ACT", "V": "ACG", "N": "ACGT", "I": "ACGT",
 }
 
 

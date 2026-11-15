@@ -124,6 +124,71 @@ def probe_variants(al, lo, hi, mm, tp_n, orig):
     top = sorted(pool.values(), key=lambda x: (-x["cnt"], x["amb"]))[:60]
     return top if not orig or any(not x["changed"] for x in top) else top + [pool[(orig["s"], orig["e"], orig["seq"])]]
 
+CLASS_ORDER = ("P", "F", "R", "FR", "FP", "RP", "FRP")
+
+
+def _chichipes_optimize(a, tp_n, d):
+    """The search through `chichipes design shift` (every shift / length / IUPAC level of F, R and the probe) -> True when
+    OPTIMIZE_<seg>.tsv was written; False when chichipes is not configured or fails (then the Python search runs)."""
+    import os
+    import subprocess
+    import tempfile
+    from mfe_common import _configured_mfeprimer
+    exe = _configured_mfeprimer(ROOT) or os.environ.get("MFEPRIMER_BIN", "")
+    aln = d / "aligned.fa"
+    if not exe or not Path(exe).is_file() or not aln.exists():
+        return False
+    manifest = list(csv.DictReader((ROOT / "config" / "primers.tsv").open(encoding="utf-8"), delimiter="\t"))
+    sets = [r for r in manifest if r["segment"].lower() == a.segment.lower() and r["source"] != "AUTO-DESIGN"]
+    G = sum(1 for ln in aln.open(encoding="utf-8") if ln.startswith(">"))
+    by_id = {r["primer_id"]: r for r in sets}
+    try:
+        with tempfile.TemporaryDirectory(prefix="chichipes_shift_") as tmp:
+            seeds, res = Path(tmp) / "sets.tsv", Path(tmp) / "shift.tsv"
+            with open(seeds, "w", encoding="utf-8") as fh:
+                fh.write("name\tF\tR\tP\n")
+                for r in sets:
+                    fh.write(f"{r['primer_id']}\t{r['forward_primer']}\t{r['reverse_primer']}\t{r['probe']}\n")
+            cmd = [exe, "design", "shift", "-a", str(aln), "--sets", str(seeds), "-o", str(res), "--shift", str(a.shift),
+                   "--ambig", str(a.max_amb), "--mm", str(a.mm), "--tp", str(tp_n), "--amp", f"1,{a.amp_max}", "--dtm", repr(float(a.dtm)),
+                   "--qc=false"]
+            print(f"{a.segment}: {G} genomes, {len(sets)} user sets, mm {a.mm} (chichipes design shift)", flush=True)
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=24 * 3600)
+            if r.returncode:
+                raise RuntimeError(r.stderr.strip()[-300:] or f"rc={r.returncode}")
+            rows = list(csv.DictReader(res.open(encoding="utf-8"), delimiter="\t"))
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+        print(f"[warn] chichipes design shift failed ({exc}) -- using the Python search", file=sys.stderr)
+        return False
+    for ln in r.stderr.splitlines():
+        if "not located" in ln or "cannot" in ln:
+            print("  " + ln, flush=True)
+    out = []
+    for sid in by_id:
+        mine = [x for x in rows if x["name"] == sid]
+        start = next((x for x in mine if x["change"] == "-"), None)
+        if start is None:
+            continue
+        base = int(start["coverage"])
+        s = by_id[sid]
+        print(f"  {sid} {s['primer_name']} [{s['source'][:14]}]: now {base}/{G} = {100 * base / G:.1f}%", flush=True)
+        best = {x["change"]: x for x in mine if x["change"] != "-"}
+        for cls in CLASS_ORDER:
+            x = best.get(cls)
+            if x is None or int(x["coverage"]) <= base:
+                continue
+            cnt = int(x["coverage"])
+            print(f"      change {cls:3s}: {cnt}/{G} = {100 * cnt / G:.1f}%  (+{cnt - base})", flush=True)
+            out.append({"set_id": sid, "name": s["primer_name"], "change": cls, "now_pct": round(100 * base / G, 2), "new_pct": round(100 * cnt / G, 2),
+                        "F": x["F"], "P": x["P"], "R": x["R"], "F_tm": round(tm_of(x["F"]), 1), "P_tm": round(tm_of(x["P"]), 1),
+                        "R_tm": round(tm_of(x["R"]), 1), "amplicon": int(x["amplicon"])})
+    with open(d / f"OPTIMIZE_{a.segment}.tsv", "w", newline="", encoding="utf-8") as fh:
+        w = csv.DictWriter(fh, fieldnames=["set_id", "name", "change", "now_pct", "new_pct", "F", "P", "R", "F_tm", "P_tm", "R_tm", "amplicon"], delimiter="\t", lineterminator="\n")
+        w.writeheader()
+        w.writerows(out)
+    print(f"{len(out)} improvements -> {d / ('OPTIMIZE_' + a.segment + '.tsv')}")
+    return True
+
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -136,6 +201,8 @@ def main():
     a = ap.parse_args()
     tp_n = cfg_int("three_prime_consecutive_match", 2)
     d = ROOT / "output" / "design_sweep" / a.segment
+    if _chichipes_optimize(a, tp_n, d):
+        return
     ids, rows = rc.read_aligned(d / "aligned.fa")
     al = rc.Aligned(ids, rows)
     manifest = list(csv.DictReader((ROOT / "config" / "primers.tsv").open(encoding="utf-8"), delimiter="\t"))
