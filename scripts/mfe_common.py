@@ -377,7 +377,7 @@ def validate_primer_manifest_rows(rows, segments=("S", "L")):
     errors = []
     seen_names = {}
     seen_ids = {}
-    valid_bases = set("ACGTUWSMKRYBDHVN")
+    valid_bases = set("ACGTUWSMKRYBDHVNI")
     for i, r in enumerate(rows):
         name = (r.get("primer_name") or "").strip()
         f_seq = (r.get("forward_primer") or "").strip()
@@ -460,13 +460,14 @@ IUPAC = {
     "A": "A", "C": "C", "G": "G", "T": "T",
     "R": "AG", "Y": "CT", "S": "GC", "W": "AT", "K": "GT", "M": "AC",
     "B": "CGT", "D": "AGT", "H": "ACT", "V": "ACG", "N": "ACGT",
+    "I": "ACGT",   # deoxyinosine: one base that pairs with every base (not expanded; chichipes scores it)
 }
 
 
 _COMPLEMENT = {
     "A": "T", "T": "A", "C": "G", "G": "C", "N": "N",
     "R": "Y", "Y": "R", "S": "S", "W": "W", "K": "M", "M": "K",
-    "D": "H", "H": "D", "B": "V", "V": "B",
+    "D": "H", "H": "D", "B": "V", "V": "B", "I": "I",
 }
 
 
@@ -628,6 +629,27 @@ def _go_scan_bin(pipeline_root=None):
             return str(exe)
     return str(exe) if exe.exists() else None
 
+_CHICHIPES_SCAN = {}
+
+
+def _chichipes_scan_cmd(pipeline_root=None):
+    """[chichipes, "scan"] when the configured engine (config mfeprimer_bin, else $MFEPRIMER_BIN) is a chichipes with the
+    scan command (v0.7.0+, the Rust port of go/scan: same request, same answer); else None. Checked once per process."""
+    root = str(Path(pipeline_root or _ROOT))
+    if root not in _CHICHIPES_SCAN:
+        cmd = None
+        exe = _configured_mfeprimer(Path(root)) or os.environ.get("MFEPRIMER_BIN", "")
+        if exe and Path(exe).is_file():
+            try:
+                r = subprocess.run([exe, "scan"], input='{"mode":"sites","oligo":"A","max_mm":0,"genomes":[]}',
+                                   capture_output=True, text=True, timeout=15)
+                if r.returncode == 0 and r.stdout.startswith('{"results":'):
+                    cmd = [exe, "scan"]
+            except (OSError, subprocess.SubprocessError):
+                pass
+        _CHICHIPES_SCAN[root] = cmd
+    return _CHICHIPES_SCAN[root]
+
 
 def clear_site_cache():
     _SITE_CACHE.clear()
@@ -643,19 +665,29 @@ def prefetch_sites(oligos, genome_seqs, pipeline_root=None) -> bool:
     genomes = list(dict.fromkeys(g.upper() for g in genome_seqs if g))
     if not uniq_oligos or not genomes:
         return False
+    engines = []
+    cc = _chichipes_scan_cmd(pipeline_root)
+    if cc:
+        engines.append(("chichipes scan", cc))
     exe = _go_scan_bin(pipeline_root)
-    if not exe:
-        print("[warn] scan_engine=go but go/scan is not built and Go is not installed -- using the Python scan", file=sys.stderr)
+    if exe:
+        engines.append(("go/scan", [exe]))
+    if not engines:
+        print("[warn] scan_engine=go but neither chichipes scan nor go/scan is available -- using the Python scan", file=sys.stderr)
         return False
-    req = {"mode": "multi", "oligos": [{"seq": o, "max_mm": mm} for o, mm in uniq_oligos],
-           "genomes": [{"id": str(i), "seq": g} for i, g in enumerate(genomes)]}
-    try:
-        r = subprocess.run([exe], input=_json.dumps(req), capture_output=True, text=True, timeout=3600)
-        if r.returncode:
-            raise RuntimeError(r.stderr.strip() or f"rc={r.returncode}")
-        results = _json.loads(r.stdout)["results"]
-    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError, KeyError) as exc:
-        print(f"[warn] go/scan failed ({exc}) -- using the Python scan", file=sys.stderr)
+    req = _json.dumps({"mode": "multi", "oligos": [{"seq": o, "max_mm": mm} for o, mm in uniq_oligos],
+                       "genomes": [{"id": str(i), "seq": g} for i, g in enumerate(genomes)]})
+    results = None
+    for name, cmd in engines:
+        try:
+            r = subprocess.run(cmd, input=req, capture_output=True, text=True, timeout=3600)
+            if r.returncode:
+                raise RuntimeError(r.stderr.strip() or f"rc={r.returncode}")
+            results = _json.loads(r.stdout)["results"]
+            break
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError, KeyError) as exc:
+            print(f"[warn] {name} failed ({exc}) -- trying the next scan engine", file=sys.stderr)
+    if results is None:
         return False
     for gi, res in enumerate(results):
         for k, (o, mm) in enumerate(uniq_oligos):
@@ -771,6 +803,13 @@ def probe_inside_amplicon(row: dict) -> bool:
     return a <= min(ps, pe) and max(ps, pe) <= b
 
 
+def _num(s, default=0.0):
+    try:
+        return float(s)
+    except (TypeError, ValueError):
+        return default
+
+
 def parse_spec_best(spec_path: Path, f_id: str, f_seq: str, r_id: str, r_seq: str, three_prime_n: int = 0,
                     genome_seqs: dict = None):
     """chrom -> {f_mismatch, r_mismatch, f_3p_ok, r_3p_ok, amp_start, amp_end, f_tm, f_dg,
@@ -849,11 +888,14 @@ def parse_spec_best(spec_path: Path, f_id: str, f_seq: str, r_id: str, r_seq: st
             f_mm, r_mm = mismatches["F"], mismatches["R"]
             total = f_mm + r_mm
             prev = best.get(chrom)
-            if prev is None or total < prev["total"]:
+            # Equal mismatch totals happen when several degenerate variants bind the same site; keep the strongest binder
+            # (lowest F+R dG) so the reported Tm/dG never depends on the order the engine happens to list rows in.
+            dg_sum = _num(thermo["F"]["dg"]) + _num(thermo["R"]["dg"])
+            if prev is None or total < prev["total"] or (total == prev["total"] and dg_sum < prev["dg_sum"]):
                 best[chrom] = {"f_mismatch": f_mm, "r_mismatch": r_mm, "total": total,
                                 "f_3p_ok": terminal_ok["F"], "r_3p_ok": terminal_ok["R"],
                                 "amp_start": amp_start, "amp_end": amp_end,
                                 "f_tm": thermo["F"]["tm"], "f_dg": thermo["F"]["dg"],
                                 "r_tm": thermo["R"]["tm"], "r_dg": thermo["R"]["dg"],
-                                "f_pos": positions["F"], "r_pos": positions["R"]}
+                                "f_pos": positions["F"], "r_pos": positions["R"], "dg_sum": dg_sum}
     return best
