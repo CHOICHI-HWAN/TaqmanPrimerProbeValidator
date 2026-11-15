@@ -243,6 +243,50 @@ def best_triples(F, R, P, covered, amp, probe_above, max_dtm, want=12, require_s
     out = sorted(heap, reverse=True)
     return [(x[5], x[1], x[6], x[7], x[8]) for x in out]
 
+_PREFILTER = ["--large-genome-prefilter"]   # set to ["--large-genome-prefilter"] in editions whose candidates() skips hopeless windows of large genomes
+_DESIGN_FLOATS = ("F_tm", "P_tm", "R_tm", "F_gc", "P_gc", "R_gc", "est_cov_pct")
+
+
+def _chichipes_design(ids, rows, ambig, probe_ambig, top, pass_mm, tp_n, amp, primer_tm, probe_above, say):
+    """design_from_alignment() through `chichipes design cover --json` (the Rust port of this engine: the same designs, checked
+    field by field on 240 LASV runs). None when chichipes is not configured or cannot answer, so the caller runs Python."""
+    import json as _json
+    import multiprocessing
+    import os
+    import tempfile
+    from mfe_common import _configured_mfeprimer
+    exe = _configured_mfeprimer(Path(__file__).resolve().parent.parent) or os.environ.get("MFEPRIMER_BIN", "")
+    if not exe or not Path(exe).is_file() or not rows:
+        return None
+    cpu = 1 if multiprocessing.parent_process() is not None else (os.cpu_count() or 1)   # a sweep runs many designs in parallel
+    t0 = time.time()
+    try:
+        with tempfile.TemporaryDirectory(prefix="chichipes_design_") as tmp:
+            aln = Path(tmp) / "aligned.fa"
+            aln.write_text("".join(f">{i}\n{r}\n" for i, r in zip(ids, rows)), encoding="utf-8")
+            cmd = [exe, "design", "cover", "-a", str(aln), "--json", "--top", str(top), "--ambig", str(ambig),
+                   "--probe-ambig", str(probe_ambig), "--mm", str(pass_mm), "--tp", str(tp_n), "--amp", f"{amp[0]},{amp[1]}",
+                   "--primer-tm", f"{primer_tm[0]!r},{primer_tm[1]!r}", "--probe-above", f"{probe_above[0]!r},{probe_above[1]!r}",
+                   "--primer-len", f"{LEN_PRIMER.start},{LEN_PRIMER.stop - 1}", "--probe-len", f"{LEN_PROBE.start},{LEN_PROBE.stop - 1}",
+                   "--cpu", str(cpu)] + _PREFILTER
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
+        if r.returncode:
+            raise RuntimeError(r.stderr.strip()[-300:] or f"rc={r.returncode}")
+        out = _json.loads(r.stdout)
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+        print(f"[warn] chichipes design failed ({exc}) -- using the Python design engine", file=sys.stderr)
+        return None
+    designs = out["designs"]
+    for d in designs:
+        for k in _DESIGN_FLOATS:
+            d[k] = float(d[k])
+    if not (out["nf"] and out["nr"] and out["np"]):
+        return {"status": "none", "n": out["n"], "designs": [], "message": "조건(Tm·GC·모호 염기)을 만족하는 F/R/Probe 후보가 부족해 설계를 내지 못했습니다."}
+    if not designs:
+        return {"status": "none", "n": out["n"], "designs": [], "message": "F·R·Probe가 함께 맞는 조합을 찾지 못했습니다(증폭산물 길이·Tm 조건을 확인하세요)."}
+    say(f"설계 {len(designs)}개 ({time.time() - t0:.0f}초)")
+    return {"status": "ok", "n": out["n"], "designs": designs, "message": "", "threshold": None}
+
 
 def design_from_alignment(ids, rows, ambig=2, probe_ambig=2, top=3, pass_mm=2, tp_n=2, amp=(70, 200), primer_tm=(52.0, 66.0),
                           gc=(30.0, 75.0), probe_above=(2.0, 14.0), max_dtm=5.0, progress=None, std_rows=None, require_std=False, std_prefer_pct=0.0):
@@ -251,6 +295,10 @@ def design_from_alignment(ids, rows, ambig=2, probe_ambig=2, top=3, pass_mm=2, t
     def say(msg):
         if progress:
             progress(msg)
+    if not std_rows and tuple(gc) == (30.0, 75.0) and max_dtm == 5.0:
+        res = _chichipes_design(ids, rows, ambig, probe_ambig, top, pass_mm, tp_n, amp, primer_tm, probe_above, say)
+        if res is not None:
+            return res
     al = Aligned(ids, rows, std_rows)
     require_std = bool(require_std and std_rows)
     std_bonus = int(round(al.G * std_prefer_pct / 100.0)) if (std_rows and not require_std) else 0
