@@ -101,15 +101,6 @@
       "short": "RVFV"
     },
     {
-      "id": "flua",
-      "name": "FLUA",
-      "sci": "Alphainfluenzavirus influenzae (Influenza A virus)",
-      "path": "FLUA/pipeline_flua",
-      "port": 8777,
-      "desc": "8분절 유전체(HA·NA는 아형별). NCBI 공개 데이터, 아형(H1N1·H3N2·H5N1)별 커버리지.",
-      "short": "FLUA"
-    },
-    {
       "id": "gtov",
       "name": "GTOV",
       "sci": "Mammarenavirus guanaritoense (Guanarito virus)",
