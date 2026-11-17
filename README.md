@@ -1,7 +1,7 @@
 # Pipeline list page (branch `entry`)
 
 A small stand-alone front door for the per-pathogen primer/probe validation pipelines of this repository
-(one branch per pathogen: `main` = LASV, `nipah`, `ebov`, `sudv`, `bdbv`, `restv`, `tafv`, `marv`, `cchfv`, `mpxv`, `rvfv`, `flua`).
+(one branch per pathogen: `main` = LASV, `nipah`, `ebov`, `sudv`, `bdbv`, `restv`, `tafv`, `marv`, `cchfv`, `mpxv`, `rvfv`, `gtov`, `chpv`, `junv`, `sabv`, `machv`, `varv`).
 
 It shows every pipeline as a card with live status, a few numbers read from the project's own result files, and can start / stop a
 pipeline's web app. Pure Python standard library.
