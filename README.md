@@ -157,13 +157,21 @@ curl -L -o webapp/static/vendor/peartree.bundle.min.js \
 
 ## Windows and macOS
 
-The tool was developed and tested on **Linux (Ubuntu 24.04)**. The Docker setup below was tested on Linux only; it has **not** been run on real Windows or macOS machines yet — please report problems.
+The tool was developed and tested on **Linux (Ubuntu 24.04)**. The Docker setup below was tested on Linux only. A trial run on **Windows 11 with WSL2** (Ubuntu) completed the analyses of nearly every edition; Docker Desktop on Windows and any run on macOS are still untested — please report problems.
 
 | system | how |
 |---|---|
 | **Windows** (10/11) | **Docker Desktop** (recommended, below) or **WSL2** (then follow the Linux steps inside Ubuntu). Native Windows is not supported: mafft, htslib and pixy have no Windows builds. |
 | **macOS** (Intel / Apple silicon) | **Docker Desktop** (below), or natively with Miniforge: `./setup.sh` and mfeprimer’s macOS binary from <https://www.mfeprimer.com/> (untested; if the environment step fails, use Docker). |
 | **Linux** | the Installation steps above, or Docker. |
+
+**WSL2 on Windows 11** (PowerShell as administrator, then inside Ubuntu follow the Linux steps above):
+
+1. `wsl --install -d Ubuntu`, then restart the PC. (A named release such as `Ubuntu-24.04` fails with "invalid distribution name" on older Windows 11 builds such as 21H2.)
+2. `wsl --update`.
+3. Open the Ubuntu window once and create your user name and password; until then the `wsl` command looks stuck.
+4. Large genomes (MPXV, VARV) need several GB per job and WSL gets only half of the PC's memory by default. If a job is killed for lack of memory, run it with fewer parallel jobs (`snakemake --cores 2`, or `--cores 1`), or raise the limit: write `[wsl2]` and `memory=20GB` into `%UserProfile%\.wslconfig`, then `wsl --shutdown` and start Ubuntu again.
+5. The PDF report button needs Chrome, which WSL does not have by default.
 
 **With Docker** (the container is Linux, so download the **linux-amd64** mfeprimer — step 3 above — even on Windows/macOS; Apple-silicon Macs run it through emulation, which is slower):
 

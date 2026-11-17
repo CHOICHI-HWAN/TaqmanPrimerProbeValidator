@@ -5,6 +5,7 @@
 # contains no sequences, is tracked.
 config/*
 !config/config.yaml
+!config/refgenome_genes.tsv
 data/
 input_primers/
 output/

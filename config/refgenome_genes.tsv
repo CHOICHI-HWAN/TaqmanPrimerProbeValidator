@@ -1,0 +1,5 @@
+segment	accession	genome_len	gene	start	end	strand
+s	AY628203	3402	N	101	1810	+
+s	AY628203	3402	GPC	1872	3347	-
+l	AY628202	7285	Z	66	365	+
+l	AY628202	7285	L	466	7128	-

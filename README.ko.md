@@ -158,13 +158,21 @@ curl -L -o webapp/static/vendor/peartree.bundle.min.js \
 
 ## Windows와 macOS
 
-이 도구는 **Linux(Ubuntu 24.04)** 에서 만들고 테스트했습니다. 아래 Docker 방식도 Linux에서만 확인했고, 실제 Windows·macOS 컴퓨터에서는 **아직 실행해 보지 못했습니다.** 문제가 있으면 알려 주세요.
+이 도구는 **Linux(Ubuntu 24.04)** 에서 만들고 테스트했습니다. 아래 Docker 방식도 Linux에서만 확인했습니다. **Windows 11 + WSL2**(Ubuntu)에서는 시험 실행으로 거의 모든 에디션의 분석이 끝까지 돌았고, Windows의 Docker Desktop과 macOS는 **아직 실행해 보지 못했습니다.** 문제가 있으면 알려 주세요.
 
 | 시스템 | 방법 |
 |---|---|
 | **Windows** (10/11) | **Docker Desktop**(권장, 아래) 또는 **WSL2**(Ubuntu 안에서 위의 Linux 설치 단계를 그대로). 순수 Windows는 지원하지 않습니다: mafft, htslib, pixy의 Windows 빌드가 없습니다. |
 | **macOS** (Intel / Apple silicon) | **Docker Desktop**(아래), 또는 Miniforge로 직접 설치: `./setup.sh` + <https://www.mfeprimer.com/> 의 macOS용 mfeprimer (테스트 못 함, 환경 단계가 실패하면 Docker 사용). |
 | **Linux** | 위의 설치 단계 또는 Docker. |
+
+**Windows 11의 WSL2** (관리자 PowerShell에서 설치한 뒤, Ubuntu 안에서 위의 Linux 설치 단계를 그대로):
+
+1. `wsl --install -d Ubuntu` 실행 후 PC를 재부팅합니다. (`Ubuntu-24.04`처럼 버전을 적으면 Windows 11 21H2 등 오래된 빌드에서 "잘못된 배포 이름" 오류가 납니다.)
+2. `wsl --update`를 실행합니다.
+3. Ubuntu 창을 한 번 열어 사용자 이름과 비밀번호를 만듭니다. 그 전에는 `wsl` 명령이 멈춘 것처럼 보입니다.
+4. 큰 게놈(MPXV, VARV)은 작업 하나가 수 GB를 쓰는데, WSL은 기본으로 PC 메모리의 절반만 씁니다. 메모리 부족으로 작업이 죽으면 동시에 도는 작업을 줄이거나(`snakemake --cores 2`, 안 되면 `--cores 1`), 한도를 올리세요: `%UserProfile%\.wslconfig`에 `[wsl2]`와 `memory=20GB`를 적고 `wsl --shutdown` 후 Ubuntu를 다시 시작합니다.
+5. PDF 리포트 버튼은 Chrome이 필요한데 WSL에는 기본으로 없습니다.
 
 **Docker로 실행**(컨테이너가 Linux이므로 Windows·macOS에서도 mfeprimer는 위 3단계의 **linux-amd64** 파일을 받으세요. Apple silicon Mac은 에뮬레이션으로 돌아가 더 느립니다):
 
