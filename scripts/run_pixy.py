@@ -55,6 +55,11 @@ def run_pixy_pi(pixy_cmd_base, vcf_path, pops_path, window_size, out_dir, prefix
     result = subprocess.run(pixy_cmd, capture_output=True, text=True)
     print(result.stdout, file=sys.stderr)
     print(result.stderr, file=sys.stderr)
+    try:   # keep pixy's own messages in the rule's log file (the script directive leaves it empty otherwise)
+        with open(snakemake.log[0], "a", encoding="utf-8") as lf:
+            lf.write(f"$ {' '.join(pixy_cmd)}\n{result.stdout}\n{result.stderr}\n")
+    except (AttributeError, IndexError, OSError):
+        pass
     if result.returncode != 0:
         sys.exit(f"[error] pixy failed (returncode={result.returncode})")
     return out_dir / f"{prefix}_pi.txt"
@@ -131,8 +136,12 @@ def main():
 
     per_lineage_pops = out_dir / f"populations_lineage_{seg}.txt"
     kept, hidden, n_total = split_populations(pops_path, min_n, per_lineage_pops)
-    lineage_pi_path = run_pixy_pi(pixy_cmd_base, vcf_path, per_lineage_pops, window_size, out_dir, f"pixy_{seg}")
-    by_lineage, summary = parse_pi_txt(lineage_pi_path)
+    if kept:
+        lineage_pi_path = run_pixy_pi(pixy_cmd_base, vcf_path, per_lineage_pops, window_size, out_dir, f"pixy_{seg}")
+        by_lineage, summary = parse_pi_txt(lineage_pi_path)
+    else:   # no lineage reaches min_lineage_n (few genomes): pixy fails on 0 populations, so only the pooled curve is written
+        print(f"[pixy] no lineage has >= {min_n} genomes -- per-lineage curves skipped, pooled curve only", file=sys.stderr)
+        by_lineage, summary = {}, {}
     per_lineage_pops.unlink(missing_ok=True)
 
     all_pops_path = out_dir / f"populations_all_{seg}.txt"
