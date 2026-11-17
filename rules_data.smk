@@ -56,7 +56,13 @@ if SPLIT_SEGS:
 
 # Clade/lineage from a locally built Auspice JSON (profile lineage.mode = "auspice_clades"): one
 # accession -> clade table per segment, merged into the curated metadata by rename_headers.
-LINEAGE_FROM_AUSPICE = PROFILE["lineage"]["mode"] == "auspice_clades"
+# Clades come from the locally built Auspice JSON (scripts/run_nextstrain_nipah.sh) when it exists. That step is OPTIONAL: without the
+# file the analysis still runs and takes the lineage from the metadata column (or "NA"), so only the clade-level views are empty.
+LINEAGE_FROM_AUSPICE = (PROFILE["lineage"]["mode"] == "auspice_clades"
+                        and all(Path(PROFILE["lineage"]["auspice"].format(seg=s)).exists() for s in PROFILE["segments"]))
+if PROFILE["lineage"]["mode"] == "auspice_clades" and not LINEAGE_FROM_AUSPICE:
+    print("[info] no Auspice JSON (%s) -- running without clades; to get them: ./setup.sh --nextstrain, then scripts/run_nextstrain_nipah.sh"
+          % PROFILE["lineage"]["auspice"], file=sys.stderr)
 
 if LINEAGE_FROM_AUSPICE:
     rule lineage_table:
