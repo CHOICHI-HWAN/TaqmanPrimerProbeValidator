@@ -1,0 +1,5 @@
+primer_id	primer_name	segment	forward_primer	reverse_primer	probe	fluorophore	source	remark	proceed	add_date
+P001	NiV Sendow 2013 (N, Indonesia)	GENOME	TCAGCAGGAAGGCAAGAGAGTAA	CCCCTTCATCGATATCTTGATCA	CCTCCAATGAGCACACCTCCTGCAG	FAM	LITERATURE	Published example set: Sendow I, Ratnawati A, Taylor T, et al (doi:10.1371/journal.pone.0069544; CC BY)	True	2026-11-18
+P002	NiV-M Jensen 2018 (F-G intergenic)	GENOME	CCGTGAATATGTAATTGATAATTTCCC	GCTTAGAAAGATACAGTTAAGTATCCAATGA	CTTAGGACCCAGGTCCATAA	FAM / MGB	LITERATURE	Published example set: Jensen KS, Adams R, Bennett RS, et al (doi:10.1371/journal.pone.0199534; CC0 1.0)	True	2026-11-18
+P003	NiV-B Jensen 2018 (F-G intergenic)	GENOME	GTACTCAACCATGAATGAACAGTTG	CTTTAAAGGACACAGTTTAATATCCAATG	CTTAGGACCCAGGTCCATAA	FAM / MGB	LITERATURE	Published example set: Jensen KS, Adams R, Bennett RS, et al (doi:10.1371/journal.pone.0199534; CC0 1.0)	True	2026-11-18
+P004	NiV Ranadheera 2018 (L)	GENOME	CAAAACAGAGATGCGAGCAG	ATGCATGAATCTGAACGGAA	GATCAAGAATTCRCAAAAGCCGAAA	FAM / BHQ1	LITERATURE	Published example set: Ranadheera C, Proulx R, Chaiyakul M, et al (doi:10.1038/s41598-018-34484-7; CC BY 4.0)	True	2026-11-18

@@ -172,6 +172,8 @@ Your `config/`, `data/` and `output/` stay in the project folder (it is mounted 
 ./start.sh            # http://localhost:8767   (127.0.0.1 only — there is no login)
 ```
 
+**Try it first with published example sets** (four openly licensed Nipah sets from the papers credited in [examples/literature/SOURCES.md](examples/literature/SOURCES.md)): `cp examples/literature/primers.example.tsv config/primers.tsv`, then run the pipeline. Replace it with your own sets afterwards.
+
 **Enter your primer/probe sets** on the dashboard page **📝 Primer input / manage** (Excel download/upload supported), or edit `config/primers.tsv` (tab-separated):
 
 | column | meaning |

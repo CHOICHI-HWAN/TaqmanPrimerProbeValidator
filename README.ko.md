@@ -173,6 +173,8 @@ docker compose up --build                                          # 대시보�
 ./start.sh            # http://localhost:8767   (127.0.0.1에서만 열림 — 로그인이 없습니다)
 ```
 
+**먼저 공개 논문의 예시 세트로 확인해 보세요**(출처는 [examples/literature/SOURCES.md](examples/literature/SOURCES.md)에 적힌 이용 허락 논문 4편의 니파 세트): `cp examples/literature/primers.example.tsv config/primers.tsv` 후 파이프라인을 실행하세요. 확인이 끝나면 직접 만든 세트로 바꾸세요.
+
 **프라이머/프로브 세트 입력**: 대시보드 **"📝 프라이머 입력 / 관리"** 페이지(엑셀 다운로드·업로드 가능) 또는 `config/primers.tsv`(탭 구분):
 
 | 열 | 의미 |

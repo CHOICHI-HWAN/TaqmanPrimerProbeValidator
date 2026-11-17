@@ -11,6 +11,8 @@ dashboard.
 | Jensen KS, Adams R, Bennett RS, et al. Development of a novel real-time polymerase chain reaction assay for the quantitative detection of Nipah virus replicative viral RNA. PLoS ONE 2018;13(6):e0199534 | CC0 1.0 (public domain dedication) | <https://doi.org/10.1371/journal.pone.0199534> |
 | Ranadheera C, Proulx R, Chaiyakul M, et al. The interaction between the Nipah virus nucleocapsid protein and phosphoprotein regulates virus replication. Sci Rep 2018;8:15994 | CC BY 4.0 | <https://doi.org/10.1038/s41598-018-34484-7> |
 
+`primers.example.tsv` is the same four sets in the format of `config/primers.tsv` (copy it to `config/primers.tsv` to try the pipeline).
+
 **Changes made:** the oligonucleotide sequences were copied from the text of each paper into a tab-separated table, without altering them;
 the columns for the target, the verification note and the remark were added by this project. Nothing else of the papers is reproduced.
 
