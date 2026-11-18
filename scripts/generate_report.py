@@ -67,9 +67,9 @@ def scope_note(row):
 def mask_seq(seq):
     """Hide the literal primer/probe sequence in the report (this PDF tends to travel
     further/more loosely than the live dashboard, which stays behind localhost) -- shown as
-    one bullet per base so the reader can still see its length, never the actual bases."""
+    one solid black block per base so the reader can still see its length, never the actual bases."""
     seq = seq or ""
-    return "&bull;" * len(seq) if seq else "&mdash;"
+    return "&#9608;" * len(seq) if seq else "&mdash;"      # solid black blocks, one per base
 
 
 def render_citation(citation):
@@ -1150,7 +1150,7 @@ body { font-family: -apple-system, "Noto Sans KR", "Malgun Gothic", sans-serif; 
 .wf-desc { font-size: 10.5px; color: #556; line-height: 1.5; }
 .wf-arrow { text-align: center; color: #aab; font-size: 13px; margin: 2px 0; }
 .mini-table-note { font-size: 10px; color: #889; margin-top: 10px; }
-.seq-redacted { color: #aab; letter-spacing: 1px; }
+.seq-redacted { color: #000; letter-spacing: 0; }
 .citation-box { margin-top: 8px; padding: 6px 9px; border: 1px dashed #dde3ea; border-radius: 6px; font-size: 9px; color: #778; }
 .citation-box b { color: #445; }
 .citation-box a { color: #2f5fa8; word-break: break-all; }

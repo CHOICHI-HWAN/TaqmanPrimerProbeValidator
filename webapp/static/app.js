@@ -1789,7 +1789,7 @@ function msaRenderCanvas(msaCard, setData) {
     const y = PAD + ri * LH;
     if (r.kind !== "ruler") for (const [w, color] of wins) {
       if (!w) continue;
-      const a = Math.max(w[0], lo), b = Math.min(w[1], hi);
+      const a = Math.max(w[0], lo), b = Math.min(w[1] - 1, hi);   // f/p/r_col are [start, end): the end column is not part of the oligo
       if (b >= a) { ctx.fillStyle = color; ctx.fillRect(x0 + (a - lo) * cw, y, (b - a + 1) * cw, LH); }
     }
     ctx.fillStyle = r.kind === "genome" ? fg : muted;
