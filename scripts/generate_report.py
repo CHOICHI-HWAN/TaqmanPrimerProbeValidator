@@ -64,11 +64,20 @@ def scope_note(row):
     return f" · 숙주 기준: {label.get(sc, sc)}" if sc else ""
 
 
+UNMASK = False        # --unmasked writes the real primer/probe sequences
+
+
+def seq_note():
+    return "" if UNMASK else '<div class="note" style="margin-top:4px;font-size:9.5px;color:#889;">서열은 리포트에서 가렸습니다 — 대시보드에서 확인하세요.</div>'
+
+
 def mask_seq(seq):
     """Hide the literal primer/probe sequence in the report (this PDF tends to travel
     further/more loosely than the live dashboard, which stays behind localhost) -- shown as
     one solid black block per base so the reader can still see its length, never the actual bases."""
     seq = seq or ""
+    if UNMASK:                                           # second copy of the report (--unmasked): the real sequence
+        return esc(seq) if seq else "&mdash;"
     return "&#9608;" * len(seq) if seq else "&mdash;"      # solid black blocks, one per base
 
 
@@ -355,6 +364,9 @@ def _render_amp_align(role, dir_chars, primer_chars, colon_chars, seq_chars):
     role, dir_chars, primer_chars, colon_chars, seq_chars = _compact_amp_gaps(
         role, dir_chars, primer_chars, colon_chars, seq_chars)
     n = len(role)
+    if not UNMASK:   # masked report: the primer/probe bases and the genome bases under them (they spell the oligo) become black blocks
+        primer_chars = ["\u2588" if role[i] and c != "-" else c for i, c in enumerate(primer_chars)]
+        seq_chars = ["\u2588" if role[i] and c != "-" else c for i, c in enumerate(seq_chars)]
     groups = []
     for start in range(0, n, AMP_ALIGN_CHUNK_WIDTH):
         end = min(n, start + AMP_ALIGN_CHUNK_WIDTH)
@@ -719,6 +731,40 @@ def render_binding(binding, segment=None, diversity_data=None):
     return f"<table class='mini-table'><tbody>{''.join(rows)}</tbody></table>{note}"
 
 
+_CURVES = {}
+
+
+def render_curve(base_url, set_data):
+    """A small ROC-style curve: share of genomes that pass (y) as the tolerated primer mismatches k grow (x), this set only."""
+    seg = str(set_data.get("segment") or "").lower()
+    try:
+        if seg not in _CURVES:
+            _CURVES[seg] = fetch_json(base_url, f"/api/mismatch-curve/{seg}")
+        c = _CURVES[seg]
+    except Exception:  # noqa: BLE001 -- older server / no curve data: the page just has no curve
+        return ""
+    s = next((x for x in c.get("series") or [] if x.get("set_id") == set_data.get("set_id")), None)
+    ks, vals, total = c.get("x") or [], (s or {}).get("fixed") or [], c.get("total") or 0
+    if not s or not ks or not total or not vals:
+        return ""
+    W, H, L, R, T, B = 300, 112, 30, 10, 8, 24
+    kmax = ks[-1] or 1
+    X = lambda k: L + k / kmax * (W - L - R)
+    Y = lambda p: T + (1 - p / 100) * (H - T - B)
+    grid = "".join(f'<line x1="{L}" x2="{W - R}" y1="{Y(p):.1f}" y2="{Y(p):.1f}" stroke="#ccd" stroke-width="0.6"/>'
+                   f'<text x="{L - 4}" y="{Y(p) + 3:.1f}" text-anchor="end" font-size="8" fill="#667">{p}%</text>' for p in (0, 50, 100))
+    xt = "".join(f'<text x="{X(k):.1f}" y="{H - B + 11}" text-anchor="middle" font-size="8" fill="#667">{k}</text>' for k in ks)
+    pts = [(X(k), Y(100.0 * (vals[i] if i < len(vals) else 0) / total)) for i, k in enumerate(ks)]
+    line = " ".join(f"{x:.1f},{y:.1f}" for x, y in pts)
+    dots = "".join(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="2.2" fill="#2f5fa8"/>' for x, y in pts)
+    pp = c.get("primer_pass")
+    rule = (f'<line x1="{X(pp):.1f}" x2="{X(pp):.1f}" y1="{T}" y2="{H - B}" stroke="#e5484d" stroke-dasharray="3 2" stroke-width="0.8"/>'
+            if isinstance(pp, (int, float)) and pp <= kmax else "")
+    return (f'<div class="curve-wrap"><div class="curve-title">커버리지 곡선 (허용 mismatch k → 통과 유전체 %, 점선 = 현재 기준)</div>'
+            f'<svg viewBox="0 0 {W} {H}" width="{W}" height="{H}">{grid}{rule}<polyline points="{line}" fill="none" stroke="#2f5fa8" stroke-width="1.6"/>{dots}{xt}'
+            f'<text x="{(L + W - R) / 2:.0f}" y="{H - 2}" text-anchor="middle" font-size="8" fill="#667">허용 mismatch 수 k</text></svg></div>')
+
+
 def render_set_section(base_url, set_data, index, total, diversity_data=None):
     sid = set_data["set_id"]
     display_name = set_data.get("display_name") or sid
@@ -760,10 +806,10 @@ def render_set_section(base_url, set_data, index, total, diversity_data=None):
       <div class="grid2">
         <div class="box">
           <h3>프라이머 / 프로브 서열</h3>
-          <div class="seq-row"><span class="tag">Forward</span><span class="mono seq-redacted">{mask_seq(set_data.get('F_seq'))} <span class="muted">({len(set_data.get('F_seq') or '')}nt)</span></span></div>
-          <div class="seq-row"><span class="tag">Probe</span><span class="mono seq-redacted">{mask_seq(set_data.get('P_seq'))} <span class="muted">({len(set_data.get('P_seq') or '')}nt)</span></span></div>
-          <div class="seq-row"><span class="tag">Reverse</span><span class="mono seq-redacted">{mask_seq(set_data.get('R_seq'))} <span class="muted">({len(set_data.get('R_seq') or '')}nt)</span></span></div>
-          <div class="note" style="margin-top:4px;font-size:9.5px;color:#889;">서열은 리포트에서 가렸습니다 — 대시보드에서 확인하세요.</div>
+          <div class="seq-row"><span class="tag">Forward</span><span class="mono {'seq-open' if UNMASK else 'seq-redacted'}">{mask_seq(set_data.get('F_seq'))} <span class="muted">({len(set_data.get('F_seq') or '')}nt)</span></span></div>
+          <div class="seq-row"><span class="tag">Probe</span><span class="mono {'seq-open' if UNMASK else 'seq-redacted'}">{mask_seq(set_data.get('P_seq'))} <span class="muted">({len(set_data.get('P_seq') or '')}nt)</span></span></div>
+          <div class="seq-row"><span class="tag">Reverse</span><span class="mono {'seq-open' if UNMASK else 'seq-redacted'}">{mask_seq(set_data.get('R_seq'))} <span class="muted">({len(set_data.get('R_seq') or '')}nt)</span></span></div>
+          {seq_note()}
           {render_citation(set_data.get('citation'))}
         </div>
         <div class="box">
@@ -776,6 +822,7 @@ def render_set_section(base_url, set_data, index, total, diversity_data=None):
             <tr><td>Probe dropout</td><td>{esc(s.get('probe_dropout'))}</td></tr>
             <tr class="highlight"><td><b>최종 Validated</b></td><td><b>{esc(s.get('validated'))} / {esc(s.get('total_genomes'))} ({fmt_pct(s.get('validated_pct'))})</b>{esc(scope_note(s))}</td></tr>
           </table>
+          {render_curve(base_url, set_data)}
         </div>
         <div class="box">
           <h3>표준물질(KDCA) 매치</h3>
@@ -1151,6 +1198,9 @@ body { font-family: -apple-system, "Noto Sans KR", "Malgun Gothic", sans-serif; 
 .wf-arrow { text-align: center; color: #aab; font-size: 13px; margin: 2px 0; }
 .mini-table-note { font-size: 10px; color: #889; margin-top: 10px; }
 .seq-redacted { color: #000; letter-spacing: 0; }
+.seq-open { color: #111; letter-spacing: .5px; word-break: break-all; }
+.curve-wrap { margin-top: 6px; }
+.curve-title { font-size: 9px; color: #667; margin-bottom: 1px; }
 .citation-box { margin-top: 8px; padding: 6px 9px; border: 1px dashed #dde3ea; border-radius: 6px; font-size: 9px; color: #778; }
 .citation-box b { color: #445; }
 .citation-box a { color: #2f5fa8; word-break: break-all; }
@@ -1312,8 +1362,10 @@ def main():
     ap.add_argument("--base-url", default="http://localhost:8765")
     ap.add_argument("--out", default=str(ROOT / "output" / "report" / "report.pdf"))
     ap.add_argument("--chrome", default="google-chrome")
+    ap.add_argument("--unmasked", action="store_true", help="write the real primer/probe sequences (default: black bars)")
     args = ap.parse_args()
-    global VIRUS_SHORT
+    global VIRUS_SHORT, UNMASK
+    UNMASK = args.unmasked
     try:
         VIRUS_SHORT = fetch_json(args.base_url, "/api/profile")["short_name"]
     except Exception:  # noqa: BLE001 -- an older server without /api/profile: keep the default
