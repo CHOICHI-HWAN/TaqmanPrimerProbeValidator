@@ -6252,7 +6252,7 @@ function renderGuidePage() {
        "형광물질(채널) 기록과 출처(citation, 예: 공개 논문 기반 프라이머의 MLA 인용) 표기를 세트별로 저장.",
        "실험(wet-lab) 검증 기록: 실제 RT-PCR 결과(검출 여부, Ct, 형광물질, 이미지)를 인실리코 예측과 비교.",
        "\"🗺 메타데이터 / 지도\" 페이지: 분석 대상 데이터의 수집/필터링 통계와, 국가별 보고 유전체 수를 지도로(국가에 마우스를 올리면 연도별 추이 그래프 표시).",
-       "\"📄 종합 리포트 PDF 생성\": 위 내용을 워크플로 설명 + 전체 요약 + 세트당 1페이지로 정리한 PDF로 내보내기(서열은 자동으로 가려서 출력).",
+       "\"📄 종합 리포트 PDF 생성\": 위 내용을 워크플로 설명 + 전체 요약 + 세트당 1페이지(커버리지 곡선 포함)로 정리한 PDF로 내보내기. 서열을 가린 것과 서열이 보이는 것, 두 파일이 만들어집니다(python-hwpx가 설치돼 있으면 한글 HWPX 파일도 함께).",
        "점검: <code>./test.sh</code>(핵심 기능을 정답을 아는 합성 게놈으로 검증)와 <code>./test.sh --full</code>(실제 결과 감사: 프라이머 mismatch 재계산, 쌍 누락, 가닥 방향)."]),
   ];
   const flowHtml = flow.map((stage, i) => stage + (i < flow.length - 1 ? '<div class="guide-arrow">↓</div>' : "")).join("");
@@ -9592,10 +9592,26 @@ async function pollReportJob(jobId) {
         sub.appendChild(document.createTextNode(" "));
         const link = document.createElement("a");
         link.href = "/api/report/download";
-        link.textContent = "📄 PDF 다운로드";
+        link.textContent = "📄 PDF 다운로드 (서열 가림)";
         link.className = "btn btn-primary";
         link.style.marginLeft = "8px";
         sub.appendChild(link);
+        const full = document.createElement("a");
+        full.href = "/api/report/download?variant=full";
+        full.textContent = "📄 PDF 다운로드 (서열 포함)";
+        full.className = "btn btn-secondary";
+        full.style.marginLeft = "8px";
+        sub.appendChild(full);
+        if (job.hwpx) {                                  // the editable Hancom copies exist only when python-hwpx is installed
+          for (const [variant, label] of [["", "HWPX (서열 가림)"], ["&variant=full", "HWPX (서열 포함)"]]) {
+            const h = document.createElement("a");
+            h.href = `/api/report/download?format=hwpx${variant}`;
+            h.textContent = `📝 ${label}`;
+            h.className = "btn btn-secondary";
+            h.style.marginLeft = "8px";
+            sub.appendChild(h);
+          }
+        }
       }
     }
     break;

@@ -52,6 +52,7 @@ curl -L -o webapp/static/vendor/peartree.bundle.min.js \
 | zstd | 1.5.7 | BSD-3-Clause (GPL-2 이중) | `.zst` 해제 |
 | PyYAML | 6.0.3 | MIT | |
 | pytest | 9.1.1 | MIT | 테스트용 |
+| python-hwpx / lxml | 6.12.0 / 6.1.3 | Apache-2.0 / BSD-3-Clause | 선택 사항: 요약 리포트의 한글(HWPX) 사본 (`scripts/report_hwpx.py`), 없으면 HWPX만 건너뜀 |
 | Python | 3.12 | PSF-2.0 | 우리 코드는 표준 라이브러리만 import |
 | Chrome / Chromium | 사용자 설치 | 브라우저별 약관 | PDF 리포트용, 포함하지 않음 |
 
