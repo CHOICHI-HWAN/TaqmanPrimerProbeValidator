@@ -337,14 +337,32 @@ def run_report_job(job_id, base_url):
         cmd = [sys.executable, str(script), "--base-url", base_url, "--out", str(out_pdf)]
         with JOBS_LOCK:
             JOBS[job_id]["cmd"] = " ".join(cmd)
+        out_full = out_pdf.with_name("report_with_sequences.pdf")      # second copy: real primer/probe sequences
+        cmd_full = [sys.executable, str(script), "--base-url", base_url, "--out", str(out_full), "--unmasked"]
         with open(log_path, "w", encoding="utf-8") as logf:
             proc = subprocess.Popen(cmd, cwd=str(ROOT), stdout=logf, stderr=subprocess.STDOUT, text=True)
             with JOBS_LOCK:
                 JOBS[job_id]["pid"] = proc.pid
                 JOBS[job_id]["log_path"] = str(log_path)
             proc.wait()
+            if proc.returncode == 0:
+                proc = subprocess.Popen(cmd_full, cwd=str(ROOT), stdout=logf, stderr=subprocess.STDOUT, text=True)
+                with JOBS_LOCK:
+                    JOBS[job_id]["pid"] = proc.pid
+                proc.wait()
+        hwpx_ok = False
+        if proc.returncode == 0:                                         # optional HWPX copies (need python-hwpx); a failure here never fails the job
+            import importlib.util  # noqa: PLC0415
+            if importlib.util.find_spec("hwpx"):
+                hw = str(ROOT / "scripts" / "report_hwpx.py")
+                with open(log_path, "a", encoding="utf-8") as logf:
+                    rc = [subprocess.run([sys.executable, hw, "--base-url", base_url, "--out", str(o)] + extra,
+                                         cwd=str(ROOT), stdout=logf, stderr=subprocess.STDOUT, text=True).returncode
+                          for o, extra in ((out_pdf.with_suffix(".hwpx"), []), (out_full.with_suffix(".hwpx"), ["--unmasked"]))]
+                hwpx_ok = rc == [0, 0]
         with JOBS_LOCK:
-            JOBS[job_id]["status"] = "done" if proc.returncode == 0 and out_pdf.exists() else "error"
+            JOBS[job_id]["hwpx"] = hwpx_ok
+            JOBS[job_id]["status"] = "done" if proc.returncode == 0 and out_pdf.exists() and out_full.exists() else "error"
             JOBS[job_id]["returncode"] = proc.returncode
             JOBS[job_id]["progress"] = tail_progress(log_path)
             if JOBS[job_id]["status"] == "done":
@@ -2870,8 +2888,12 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/backup/download":
             return self._send_backup_file((qs.get("file") or [""])[0])
         if path == "/api/report/download":
-            return self._send_file(ROOT / "output" / "report" / "report.pdf", "application/pdf",
-                                    download_name=f"{get_profile()['short_name']}_primer_validation_report.pdf")
+            full = (qs.get("variant") or [""])[0] == "full"          # ?variant=full: the copy with the real sequences
+            hw = (qs.get("format") or [""])[0] == "hwpx"             # ?format=hwpx: the editable Hancom copy
+            ext = "hwpx" if hw else "pdf"
+            return self._send_file(ROOT / "output" / "report" / f"{'report_with_sequences' if full else 'report'}.{ext}",
+                                    "application/hwp+zip" if hw else "application/pdf",
+                                    download_name=f"{get_profile()['short_name']}_primer_validation_report{'_with_sequences' if full else '_masked'}.{ext}")
 
         m = re.match(r"^/vendor/([A-Za-z0-9_.-]+)$", path)
         if m:
